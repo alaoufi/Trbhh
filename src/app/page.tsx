@@ -18,6 +18,7 @@ import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
 import { mergeHomeAds, selectedHomeCategory, splitHomeFeed } from '@/lib/home-feed';
 import { HomeCompactStrip } from '@/components/home-compact-strip';
+import feedStyles from '@/components/home-dense-feed.module.css';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -104,6 +105,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const design = (await cookies()).get('design')?.value;
   const compactStripOn = !selectedCategory && !['shop','list'].includes(design || '') && await getSettingBool('home_compact_strip_on',true).catch(()=>false);
   const compactFeed = splitHomeFeed(feedAds);
+  const [denseFeed,stripMotion]=await Promise.all([getSettingBool('home_dense_feed_on',true),getSettingBool('home_strip_motion_on',true)]);
   const [compactStripTitle,compactStripHint] = compactStripOn ? await Promise.all([
     getSetting('home_compact_strip_title','لمحة من السوق'),
     getSetting('home_compact_strip_hint','تصفّح المزيد بالسحب أو التمرير'),
@@ -204,12 +206,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       <section aria-label={selectedCategory?.name || 'السوق'} className="space-y-4">
         {feedAds.length > 0 && <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-xl font-extrabold text-[#16294a]"><span className="h-6 w-1.5 rounded-full bg-[#ff6a1a]" />{selectedCategory?.name || 'اكتشف السوق'}</h2><Link href={feedSearchHref} className="py-2 text-sm font-bold text-[#16294a]">عرض الكل ←</Link></div>}
-        <div className="space-y-4">
+        <div className={`space-y-3 ${denseFeed?feedStyles.dense:''}`}>
           {selectedCategory && !feedAds.length
             ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
             : compactStripOn && compactFeed.strip.length ? <>
               <AdGrid ads={compactFeed.before} appearance="marketplace" />
-              <HomeCompactStrip ads={compactFeed.strip} title={compactStripTitle} hint={compactStripHint}/>
+              <HomeCompactStrip ads={compactFeed.strip} title={compactStripTitle} hint={compactStripHint} autoPlay={stripMotion}/>
               {compactFeed.after.length>0&&<AdGrid ads={compactFeed.after} appearance="marketplace" />}
             </> : <AdGrid ads={feedAds} appearance="marketplace" />}
           <PromoSlot placement="feed" />

@@ -1,6 +1,8 @@
 /** Admin-editable controls for the approved site audit. */
 export const AUDIT_UX_FLAGS = [
   ['home_compact_strip_on', 'تنويع الرئيسية بشريط إعلانات صغيرة بين البطاقات'],
+  ['home_strip_motion_on', 'الحركة البطيئة لشريط إعلانات الرئيسية (مع زر إيقاف للزائر)'],
+  ['home_dense_feed_on', 'بطاقات رئيسية أصغر مع تناوب بطاقات عريضة على الكمبيوتر'],
   ['guide_book_enabled', 'عرض أدلة الاستخدام ككتاب تفاعلي بالفهرس والبحث'],
   ['home_discovery_on', 'إظهار البحث والإضافة في مقدمة الرئيسية'],
   ['personalized_discovery_on', 'إظهار التوصيات المخصصة «يهمّك الآن»'],

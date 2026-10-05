@@ -46,6 +46,10 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
         await staff.p.locator('#report-reply').fill(`استفسار الإدارة ${type} ${i}`);
         await staff.p.getByRole('button', { name: 'إرسال الرد', exact: true }).click();
         await staff.p.locator('ol').getByText(`استفسار الإدارة ${type} ${i}`, { exact: true }).waitFor();
+        await staff.p.goto(origin+'/admin/reports?tab=followup');
+        assert.equal(await staff.p.locator(`a[href="${adminPath}"]`).count(),0,'handled report leaves active list');
+        await staff.p.goto(origin+'/admin/reports?tab=followup&state=handled');
+        assert.equal(await staff.p.locator(`a[href="${adminPath}"]`).count(),1,'handled conversation remains accessible');
         if(type==='ad') {
           await staff.p.goto(origin+'/admin/archive?tab=reports');
           await staff.p.getByText('تم الرد — بانتظار متابعة المبلّغ',{exact:false}).first().waitFor();
@@ -55,6 +59,8 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
         await page.locator('#report-reply').fill(`متابعة العضو ${type} ${i}`);
         await page.getByRole('button', { name: 'إرسال الرد', exact: true }).click();
         await page.locator('ol').getByText(`متابعة العضو ${type} ${i}`, { exact: true }).waitFor();
+        await staff.p.goto(origin+'/admin/reports?tab=followup');
+        assert.equal(await staff.p.locator(`a[href="${adminPath}"]`).count(),1,'member followup re-enters active list');
       }
       assert.equal(await page.locator('ol[aria-label="ردود البلاغ"] > li').count(), 5);
       assert.equal(await page.getByRole('link', { name: 'مراسلة المُبلّغ عنه', exact: true }).count(), 0);

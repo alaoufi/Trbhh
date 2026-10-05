@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { cached } from '@/lib/redis';
+import {getReportQueue} from '@/lib/report-queue';
 
 type Item = { n: number; label: string; href: string; oldest: Date | null };
 
@@ -13,6 +14,7 @@ type Item = { n: number; label: string; href: string; oldest: Date | null };
  */
 export async function AdminAlertsBanner() {
   const notArchived = { OR: [{ data_archive: null }, { data_archive: '' }] };
+  const pendingReports=(await getReportQueue()).filter(r=>r.pending);
 
   // عدّاد + أقدم طلب لكل بند (لحساب وقت التأخير)
   const [
@@ -40,8 +42,8 @@ export async function AdminAlertsBanner() {
     prisma.name_requests.count({ where: { status: 0, kind: 'store' } }).catch(() => 0),
     prisma.name_requests.findFirst({ where: { status: 0, kind: 'store' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
     // البلاغات بانتظار إجراء (لم تُغلق بعد بحظر/حذف/تجاهل) — تُعالَج من صفحة البلاغات
-    prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0),
-    prisma.repord_ads.findFirst({ where: { status: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    pendingReports.length,
+    pendingReports.at(-1)?.created_at??null,
     prisma.stores.count({ where: { status: 0 } }).catch(() => 0),
     prisma.stores.findFirst({ where: { status: 0 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
     prisma.store_transfers.count({ where: { status: 1 } }).catch(() => 0),
@@ -75,7 +77,7 @@ export async function AdminAlertsBanner() {
     { n: pendingTopups, label: 'تأكيد شحن رصيد', href: '/admin/topups', oldest: oldestTopup },
     { n: pendingAds, label: 'إعلان بانتظار الموافقة', href: '/admin/ads?view=pending', oldest: oldestAd },
     { n: adminUnread, label: 'مراسلة للإدارة تحتاج إجراء', href: '/admin/messages?tab=open', oldest: oldestAdminMsg },
-    { n: reports, label: 'بلاغ/شكوى جديدة', href: '/admin/reports', oldest: oldestReport },
+    { n: reports, label: 'بلاغ/شكوى جديدة', href: '/admin/reports?tab=followup', oldest: oldestReport },
     { n: userNameReqs, label: 'طلب تغيير اسم عضو', href: '/admin/name-requests', oldest: oldestUserName },
     { n: storeNameReqs, label: 'طلب اسم متجر', href: '/admin/name-requests', oldest: oldestStoreName },
     { n: pendingVerify, label: 'طلب توثيق', href: '/admin/verifications', oldest: null },

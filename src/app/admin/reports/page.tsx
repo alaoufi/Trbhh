@@ -13,6 +13,7 @@ import { hasAction } from '@/lib/roles';
 import { REPORT_FOLLOWUP_ENABLED } from '@/lib/report-followup';
 import { toggleReportFollowup, saveReportReasons } from './followup-actions';
 import { REPORT_COMMON_REASONS, DEFAULT_REPORT_REASONS } from '@/lib/report-reasons';
+import {getReportQueue} from '@/lib/report-queue';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'البلاغات' };
@@ -34,14 +35,14 @@ const TABS = [
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string; reasonsError?: string }> }) {
+export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string; reasonsError?: string; state?:string }> }) {
   const session = await requirePerm('reports');
-  const { tab, reasonsError } = await searchParams;
+  const { tab, reasonsError, state } = await searchParams;
   const active: TabKey = tab === 'auto' ? 'auto' : tab === 'followup' ? 'followup' : 'members';
   const enabled = await getSettingBool(REPORT_FOLLOWUP_ENABLED, true);
   const canToggle = await hasAction(session.uid, 'reports', 'edit');
   const commonReasons = await getSetting(REPORT_COMMON_REASONS, DEFAULT_REPORT_REASONS);
-  const pendingCount = await prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0);
+  const pendingCount = (await getReportQueue()).filter(r=>r.kind==='ad'&&r.pending).length;
 
   return (
     <div className="space-y-4">
@@ -67,7 +68,7 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
           <label><input type="checkbox" name="enabled" value="1" defaultChecked={enabled} /> السماح بالردود المتعددة على البلاغات</label>
           <button className="rounded-lg bg-primary px-3 py-1 text-white">حفظ</button>
         </form>}
-        <SubmittedReportList admin />
+        <SubmittedReportList admin handled={state==='handled'} />
         {canToggle && <form action={saveReportReasons} className="space-y-2 rounded-xl border p-3">
           <label htmlFor="common-report-reasons" className="block font-bold">أسباب البلاغات الشائعة</label>
           <p className="text-sm text-muted-foreground">سبب في كل سطر؛ حتى 40 سببًا و80 حرفًا لكل سبب. تُضاف إلى الأسباب الموجودة، ويظل «سبب آخر» متاحًا مع توضيح إلزامي.</p>
@@ -82,7 +83,8 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
 
 /** بلاغات الأعضاء: بلاغ يرفعه عضو على إعلان مخالف — يُغلق دائماً بإجراء (حظر/حذف/تجاهل). */
 async function MemberReportsTab() {
-  const reports = await prisma.repord_ads.findMany({ orderBy: { id: 'desc' }, take: 100 });
+  const pendingIds=(await getReportQueue()).filter(r=>r.kind==='ad'&&r.pending).slice(0,100).map(r=>r.id);
+  const reports = await prisma.repord_ads.findMany({ where:{id:{in:pendingIds}},orderBy: { id: 'desc' }, take: 100 });
   const reasonIds = [...new Set(reports.map((r) => r.reason_id))].map((n) => BigInt(n));
   const adIds = [...new Set(reports.map((r) => BigInt(r.ads_id)))];
   const [reasons, ads] = await Promise.all([
@@ -103,7 +105,7 @@ async function MemberReportsTab() {
     `SELECT id, response FROM repord_ads ORDER BY id DESC LIMIT 100`,
   ).catch(() => []);
   const respById = new Map(respRows.map((r) => [toInt(r.id), r.response]));
-  const pending = reports.filter((r) => r.status === 0);
+  const pending = reports;
   const resolvedCount = await prisma.repord_ads.count({ where: { status: { not: 0 } } }).catch(() => 0);
   return (
     <div className="space-y-4">

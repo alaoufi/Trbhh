@@ -3,7 +3,8 @@ import type { CategoryFormConfig,CategoryGroupOption } from './ad-categories/con
 /** Change presentation only; preserve ranking, identities and the original input. */
 export function splitHomeFeed<T>(ads: readonly T[]): {before:T[];strip:T[];after:T[]} {
   if(ads.length<12)return {before:[...ads],strip:[],after:[]};
-  return {before:ads.slice(0,8),strip:ads.slice(8,14),after:ads.slice(14)};
+  const end=6+Math.min(12,ads.length-10);
+  return {before:ads.slice(0,6),strip:ads.slice(6,end),after:ads.slice(end)};
 }
 
 export type SelectedHomeCategory=CategoryGroupOption&{id?:number};

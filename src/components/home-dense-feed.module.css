@@ -1,0 +1,11 @@
+.dense [data-home-feed-grid] {grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:8px;align-items:stretch;}
+.dense :global(.marketplace-card) {border-radius:12px;}
+.dense :global(.marketplace-card)>div:first-child {aspect-ratio:16/10;}
+.dense :global(.marketplace-card)>div:nth-child(2) {padding:8px;gap:5px;}
+.dense :global(.marketplace-card) h3 {font-size:12px;line-height:18px;min-height:36px;}
+.dense :global(.marketplace-card) strong {font-size:14px;}
+.dense :global(.marketplace-card) dl {font-size:10px;}
+.dense :global(.marketplace-card) dl>div:nth-child(n+3) {display:none;}
+ .dense [data-mosaic="true"]>:nth-child(9n+3){grid-column:span 2;flex-direction:row;}
+ .dense [data-mosaic="true"]>:nth-child(9n+3)>div:first-child{width:45%;flex-shrink:0;aspect-ratio:auto;}
+ .dense [data-mosaic="true"]>:nth-child(9n+3)>div:nth-child(2){min-width:0;}

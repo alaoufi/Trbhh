@@ -46,6 +46,10 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
         await staff.p.locator('#report-reply').fill(`استفسار الإدارة ${type} ${i}`);
         await staff.p.getByRole('button', { name: 'إرسال الرد', exact: true }).click();
         await staff.p.locator('ol').getByText(`استفسار الإدارة ${type} ${i}`, { exact: true }).waitFor();
+        if(type==='ad') {
+          await staff.p.goto(origin+'/admin/archive?tab=reports');
+          await staff.p.getByText('تم الرد — بانتظار متابعة المبلّغ',{exact:false}).first().waitFor();
+        }
         await page.reload();
         await page.locator('ol').getByText(`استفسار الإدارة ${type} ${i}`, { exact: true }).waitFor();
         await page.locator('#report-reply').fill(`متابعة العضو ${type} ${i}`);

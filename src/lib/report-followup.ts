@@ -75,6 +75,18 @@ export async function replyToReport(kind: string, id: string, body: string, nonc
         report_kind: context.ref.kind, report_id: context.ref.id, author_id: BigInt(context.uid),
         is_staff: admin, body: text, nonce,
       } });
+      // A staff reply handles the alert, not the conversation. A later member
+      // follow-up reopens only this reply state, never a final moderation decision.
+      if (context.ref.kind === 'ad') {
+        if (admin) await tx.repord_ads.updateMany({
+          where: { id: context.ref.id, status: 0 },
+          data: { status: 1, action: 'reply', handled_at: new Date(), handled_by: BigInt(context.uid) },
+        });
+        else await tx.repord_ads.updateMany({
+          where: { id: context.ref.id, status: 1, action: 'reply' },
+          data: { status: 0, action: null, handled_at: null, handled_by: null },
+        });
+      }
       if (recipient && recipient !== context.uid) await tx.notfications.create({ data: {
         user_id: String(recipient), type: 'other', title: admin ? 'رد جديد من الإدارة على بلاغك' : 'متابعة جديدة من صاحب بلاغ',
         route: `${admin ? '/account/submitted-reports' : '/admin/reports'}/${context.ref.kind}/${id}`, model_id: 0,

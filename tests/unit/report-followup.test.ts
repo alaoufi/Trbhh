@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
-  user: vi.fn(), permission: vi.fn(), enabled: vi.fn(), readonly: vi.fn(),
+  user: vi.fn(), permission: vi.fn(), enabled: vi.fn(), readonly: vi.fn(), update: vi.fn(),
   ad: vi.fn(), general: vi.fn(), list: vi.fn(), create: vi.fn(), notify: vi.fn(), admin: vi.fn(), targetAd: vi.fn(), targetUser: vi.fn(),
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: m.user }));
@@ -11,12 +11,21 @@ vi.mock('@/lib/read-only-preview', () => ({ isReadOnlyPreview: m.readonly }));
 vi.mock('@/data/schema-sync', () => ({ ensureSchema: vi.fn() }));
 vi.mock('@/lib/admin-inbox', () => ({ getPrimaryAdminId: m.admin }));
 vi.mock('@/lib/prisma', () => {
-  const db = { ads: { findUnique: m.targetAd }, users: { findUnique: m.targetUser }, repord_ads: { findUnique: m.ad }, reports: { findUnique: m.general },
+  const db = { ads: { findUnique: m.targetAd }, users: { findUnique: m.targetUser }, repord_ads: { findUnique: m.ad, updateMany:m.update }, reports: { findUnique: m.general },
     report_replies: { findMany: m.list, create: m.create }, notfications: { create: m.notify } };
   return { prisma: { ...db, $transaction: (fn: (tx: typeof db) => unknown) => fn(db) } };
 });
 
 describe('private report follow-up', () => {
+  it('handles the pending ad alert transactionally when staff replies',async()=>{
+    m.user.mockResolvedValue({uid:1});m.permission.mockResolvedValue(true);
+    await (await api()).replyToReport('ad','3','رد الإدارة','12345678-1234-4234-8234-123456789012',true);
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({where:{id:3n,status:0},data:expect.objectContaining({status:1,action:'reply',handled_by:1n})}));
+  });
+  it('reopens only reply-handled reports when a member follows up, never final decisions',async()=>{
+    await (await api()).replyToReport('ad','3','متابعة','12345678-1234-4234-8234-123456789012');
+    expect(m.update).toHaveBeenCalledWith(expect.objectContaining({where:{id:3n,status:1,action:'reply'},data:expect.objectContaining({status:0})}));
+  });
   beforeEach(() => {
     vi.resetAllMocks();
     m.user.mockResolvedValue({ uid: 7 }); m.permission.mockResolvedValue(false);

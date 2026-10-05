@@ -11,7 +11,7 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الأرشيف' };
 
-const ACTION_LABEL: Record<string, string> = { ban: 'حُظر صاحب الإعلان', delete: 'حُذف الإعلان', dismiss: 'تم التجاهل (لا مخالفة)' };
+const ACTION_LABEL: Record<string, string> = { ban: 'حُظر صاحب الإعلان', delete: 'حُذف الإعلان', dismiss: 'تم التجاهل (لا مخالفة)', reply: 'تم الرد — بانتظار متابعة المبلّغ' };
 const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   content: { label: 'محتوى ممنوع', icon: ShieldAlert },
   duplicate: { label: 'إعلان مكرر', icon: Copy },

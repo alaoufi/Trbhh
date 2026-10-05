@@ -9,6 +9,7 @@ export async function reportReplyAction(admin: boolean, kind: string, id: string
     revalidatePath(`/account/submitted-reports/${kind}/${id}`);
     revalidatePath(`/admin/reports/${kind}/${id}`);
     revalidatePath('/admin/reports');
+    revalidatePath('/', 'layout');
     return { saved: true };
   } catch (error) {
     unstable_rethrow(error);

@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import {InterfaceTextsProvider} from '@/components/interface-texts';
+import {getInterfaceTexts} from '@/lib/interface-texts-server';
 import Script from 'next/script';
 import { Cairo } from 'next/font/google';
 import { cookies } from 'next/headers';
@@ -73,6 +75,7 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const interfaceTexts=await getInterfaceTexts();
   const session = await getSession();
   // اقرأ الكوكيز مرة واحدة، وشغّل الاستعلامات المستقلّة بالتوازي بدل التسلسل
   // (كانت ~٦ جولات متتابعة تُضاف لكل صفحة في الموقع لأنه التخطيط الجذري).
@@ -142,6 +145,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
+        <InterfaceTextsProvider texts={interfaceTexts}>
         <NavigationProgress />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
@@ -176,6 +180,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
         <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
         <SealReposition />
+        </InterfaceTextsProvider>
       </body>
     </html>
   );

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import {INTERFACE_TEXTS,INTERFACE_TEXT_GROUPS,type InterfaceTextKey} from '@/lib/interface-texts';
+import {getInterfaceTexts} from '@/lib/interface-texts-server';
 import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck, HandCoins, Smile } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
@@ -30,6 +32,7 @@ const box = 'w-full rounded-lg border border-primary/30 bg-white p-2 text-sm out
 const field = 'h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 
 const SECTIONS = [
+  { key: 'interface', label: 'التسعير ونموذج الإعلان والتفاصيل', icon: Sparkles },
   { key: 'vars', label: 'المتغيّرات', icon: Braces },
   { key: 'general', label: 'عام', icon: Megaphone },
   { key: 'welcome', label: 'رسائل الترحيب', icon: Smile },
@@ -54,9 +57,10 @@ const VARIABLES = [
   { token: '{amount}', meaning: 'مبلغ طلب شحن الرصيد بالريال', where: 'رسالتا تأكيد ورفض شحن الرصيد (تبويب «المحفظة»).' },
 ];
 
-export default async function AdminTexts({ searchParams }: { searchParams: Promise<{ saved?: string; sec?: string }> }) {
+export default async function AdminTexts({ searchParams }: { searchParams: Promise<{ saved?: string; sec?: string; textError?:string }> }) {
   await requireAction('users', 'edit');
-  const { saved, sec: secRaw } = await searchParams;
+  const interfaceTexts=await getInterfaceTexts();
+  const { saved, sec: secRaw, textError } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
   const [tplAd, tplAdmin, tplSupport, adNotice, subMsg, showMsg, adshowMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupNameNote, topupCancel] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
@@ -135,6 +139,13 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
       {sec !== 'vars' && (
       <form action={saveTextsAction} className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
         <input type="hidden" name="sec" value={sec} />
+        {sec==='interface'&&<>
+          {textError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{textError==='readonly'?'هذه المعاينة للقراءة فقط؛ لم تُحفظ تغييرات.':'لم تُحفظ النصوص: الحد الأقصى لكل نص 500 حرف. أعد المحاولة.'}</p>}
+          <p className="text-sm">هذه نصوص العرض فقط؛ تعديل «على السوم» لا يغيّر طريقة التسعير. «بيانات العرض» هو عنوان مجموعة بيانات الإعلان الحالية. اترك النص فارغًا لاستعادة الافتراضي.</p>
+          {Object.entries(INTERFACE_TEXT_GROUPS).map(([group,title])=><fieldset key={group} className="space-y-3 rounded-xl border p-3"><legend className="px-2 font-bold">{title}</legend>
+            {(Object.keys(INTERFACE_TEXTS) as InterfaceTextKey[]).filter(key=>INTERFACE_TEXTS[key][0]===group).map(key=><label key={key} className="block space-y-1"><span className="text-sm font-medium">{INTERFACE_TEXTS[key][1]}{key==='adData'?' — بيانات الإعلان':''}</span><input name={`ui_${key}`} maxLength={500} defaultValue={interfaceTexts[key]} className={field}/></label>)}
+          </fieldset>)}
+        </>}
 
         {sec === 'general' && (
           <>

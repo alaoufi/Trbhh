@@ -15,6 +15,7 @@ import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { adPriceLabel } from '@/lib/ad-presentation';
+import {ConfiguredPriceLabel,InterfaceText} from '@/components/interface-texts';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { getSettingBool, getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
@@ -590,7 +591,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>
         )}
         {ad.priceEnabled && <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <span className="text-2xl font-bold text-primary">{adPriceLabel(ad)}</span>
+          <span className="text-2xl font-bold text-primary"><ConfiguredPriceLabel label={adPriceLabel(ad)}/></span>
           {/* نوع السعر: تأجير بمدته أو بيع */}
           {ad.price > 0 && ad.priceType === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {ad.rentPeriod || ''}</span>}
           {ad.price > 0 && ad.priceType === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
@@ -741,7 +742,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       {/* Comments */}
       {ad.commentAllow && (
         <div className="card-3d rounded-2xl p-4">
-          <h2 className="mb-3 font-bold text-primary">التعليقات ({comments.length})</h2>
+          <h2 className="mb-3 font-bold text-primary"><InterfaceText name="comments"/> ({comments.length})</h2>
           {spx.cblocked === '1' && <div className="mb-3 rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">تعليقك يحتوي محتوى ممنوعاً ولم يُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
           {spx.cdup === '1' && <div className="mb-3 rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⚠️ سبق أن نشرت تعليقاً مطابقاً — تكرار المحاولة يعرّض حسابك للحظر.</div>}
           {spx.cbanned === '1' && <div className="mb-3 rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">🚫 تم حظر حسابك بعد تكرار نشر نفس التعليق.</div>}
@@ -980,13 +981,13 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       {/* ذات صلة (لنفس المعلن) + المشابهة — تُخفى لإعلان المتجر (استقلال تام) */}
       {!inStore && sellerAds.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات ذات صلة — لنفس المعلن</h2>
+          <h2 className="mb-3 text-lg font-bold text-primary"><InterfaceText name="related"/></h2>
           <AdGrid ads={sellerAds} />
         </section>
       )}
       {!inStore && similar.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات مشابهة</h2>
+          <h2 className="mb-3 text-lg font-bold text-primary"><InterfaceText name="similar"/></h2>
           <AdGrid ads={similar} />
         </section>
       )}

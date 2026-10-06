@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {ConfiguredPriceLabel} from './interface-texts';
 import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide-react';
@@ -143,7 +144,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
 
 function CardPrice({ ad }: { ad: AdCardType }) {
   return <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
-    <span className={cn('text-sm font-extrabold', ad.price > 0 ? 'text-primary' : 'text-muted-foreground')}>{adPriceLabel(ad)}</span>
+    <span className={cn('text-sm font-extrabold', ad.price > 0 ? 'text-primary' : 'text-muted-foreground')}><ConfiguredPriceLabel label={adPriceLabel(ad)}/></span>
     <OldPrice ad={ad} /><DiscountChip ad={ad} />
   </div>;
 }
@@ -269,7 +270,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
       </div>
     </div>
     <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-      <div className="flex flex-wrap items-baseline gap-1.5"><strong className="text-base font-extrabold text-[#16294a] sm:text-xl">{adPriceLabel(ad)}</strong><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
+      <div className="flex flex-wrap items-baseline gap-1.5"><strong className="text-base font-extrabold text-[#16294a] sm:text-xl"><ConfiguredPriceLabel label={adPriceLabel(ad)}/></strong><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
       <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(ad.title)}</h3>
       <CategoryCardFacts ad={ad} />
       {ad.storeName && <StoreTag name={ad.storeName} />}

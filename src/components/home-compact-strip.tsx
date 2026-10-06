@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {ConfiguredPriceLabel} from './interface-texts';
 import Image from 'next/image';
 import type {AdCard} from '@/lib/data';
 import {adPriceLabel,compactAdTitle} from '@/lib/ad-presentation';
@@ -20,7 +21,7 @@ export function HomeCompactStrip({ads,title,hint,autoPlay=true}:{ads:AdCard[];ti
         </div>
         <div className="flex flex-1 flex-col gap-1 p-1.5">
           <h4 className="line-clamp-2 break-words text-xs font-bold leading-4 text-primary">{compactAdTitle(ad.title)}</h4>
-          {ad.priceEnabled!==false&&<p className="break-words text-xs font-extrabold text-primary">{adPriceLabel(ad)}</p>}
+          {ad.priceEnabled!==false&&<p className="break-words text-xs font-extrabold text-primary"><ConfiguredPriceLabel label={adPriceLabel(ad)}/></p>}
           <div className="mt-auto min-w-0 border-t border-primary/10 pt-1.5 [&_span]:line-clamp-2 [&_span]:text-xs [&_span]:leading-4"><AdAdvertiserName name={ad.sellerName} storeName={ad.storeName}/></div>
           {ad.cityName&&<p className="truncate text-xs text-muted-foreground">{ad.cityName}</p>}
         </div>

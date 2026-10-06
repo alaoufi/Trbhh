@@ -1,3 +1,4 @@
+import {defaultInterfaceTexts,type InterfaceTexts} from './interface-texts';
 type PriceData = { price: number; adsType?: string; priceType?: string | null; rentPeriod?: string | null; priceEnabled?:boolean };
 
 /** Presentation only: callers must pass the schema's public projection. */
@@ -13,12 +14,12 @@ export function formatAdSpecification(value: unknown): string {
   return '';
 }
 
-export function adPriceLabel(ad: PriceData): string {
+export function adPriceLabel(ad: PriceData, texts:InterfaceTexts=defaultInterfaceTexts): string {
   if(ad.priceEnabled === false) return '';
   if (!Number.isFinite(ad.price) || ad.price <= 0) {
-    if (ad.priceType === 'som') return 'على السوم';
-    if (ad.priceType === 'negotiable') return 'السعر قابل للتفاوض';
-    return ad.adsType === 'request' ? 'الميزانية غير محددة' : 'السعر غير محدد';
+    if (ad.priceType === 'som') return texts.bidding;
+    if (ad.priceType === 'negotiable') return texts.negotiable;
+    return ad.adsType === 'request' ? texts.noBudget : texts.noPrice;
   }
   const amount = `${new Intl.NumberFormat('en-US').format(ad.price)} ر.س`;
   const period: Record<string, string> = { 'بالساعة': 'ساعة', 'يومي': 'يوم', 'أسبوعي': 'أسبوع', 'شهري': 'شهر', 'سنوي': 'سنة' };

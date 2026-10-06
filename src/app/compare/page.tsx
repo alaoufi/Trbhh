@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {InterfaceText} from '@/components/interface-texts';
 import Image from 'next/image';
 import { Scale } from 'lucide-react';
 import { readCompareIds, clearCompareAction, toggleCompareAction } from './actions';
@@ -64,7 +65,7 @@ export default async function ComparePage() {
             </thead>
             <tbody>
               <Row label="النوع" values={ads.map((a) => a.adsType === 'request' ? 'طلب' : 'عرض')} />
-              <Row label="السعر" values={ads.map((a) => <span key={a.id} className="text-primary">{a.price > 0 ? formatPrice(a.price) : (a.adsType === 'request' ? 'مطلوب' : 'على السوم')}</span>)} />
+              <Row label="السعر" values={ads.map((a) => <span key={a.id} className="text-primary">{a.price > 0 ? formatPrice(a.price) : (a.adsType === 'request' ? 'مطلوب' : <InterfaceText name="bidding"/>)}</span>)} />
               <Row label="المدينة" values={ads.map((a) => a.cityName || '—')} />
               <Row label="المعلن" values={ads.map((a) => a.sellerName || '—')} />
               <Row label="التقييم" values={ads.map((a) => (a.ratingCount ?? 0) > 0 ? `⭐ ${a.ratingAvg} (${a.ratingCount})` : '—')} />

@@ -38,6 +38,7 @@ import { PlatformRatingWidget } from '@/components/platform-rating-widget';
 import { getPlatformRating, getMyPlatformReview } from '@/lib/platform-rating';
 import { CommerceHero } from '@/components/commerce/commerce-hero';
 import { publicHomeHero } from '@/lib/public-home';
+import {getInterfaceTexts} from '@/lib/interface-texts-server';
 import { HOME_HERO_AD_IDS, parseHomeHeroIds } from '@/lib/home-hero-selection';
 import { isNationalDayCampaignActive, NATIONAL_DAY_HERO_INTERVAL_MS, nationalDayHeroSlides } from '@/lib/national-day';
 import { NationalDayBanner, NationalDayEntry, NationalDayHeroFrame } from '@/components/national-day-banner';
@@ -159,6 +160,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     discoveryTitle === 'تربح — إعلانات ومتاجر قريبة منك' ? 'بيع. اشترِ. وتربح.' : discoveryTitle,
     discoverySubtitle === 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.' ? 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.' : discoverySubtitle,
     feedSearchHref,
+    await getInterfaceTexts(),
   );
   const heroSlides = nationalDayActive ? nationalDayHeroSlides() : marketplaceHeroSlides;
 

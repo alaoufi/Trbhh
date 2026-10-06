@@ -687,7 +687,16 @@ export async function saveTextsAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
   const sec = String(formData.get('sec') || 'general');
   const put = async (key: string, name: string) => setSetting(key, String(formData.get(name) ?? '').trim());
-  if (sec === 'general') {
+  if (sec === 'interface') {
+    const {isReadOnlyPreview}=await import('@/lib/read-only-preview');
+    if(isReadOnlyPreview())redirect('/admin/texts?sec=interface&textError=readonly');
+    const {interfaceTextChanges,INTERFACE_TEXT_SETTING}=await import('@/lib/interface-texts');
+    const {getInterfaceTexts}=await import('@/lib/interface-texts-server');
+    const current=await getInterfaceTexts();
+    let texts;
+    try {texts=interfaceTextChanges(formData,current);} catch {redirect('/admin/texts?sec=interface&textError=invalid');}
+    await setSetting(INTERFACE_TEXT_SETTING,JSON.stringify(texts));
+  } else if (sec === 'general') {
     await put(SETTING_TICKER, 'ticker');
     await put(SETTING_SITE_SHARE_TITLE, 'shareTitle');
     await put(SETTING_SITE_SHARE_DESC, 'shareDesc');

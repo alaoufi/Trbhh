@@ -1,4 +1,5 @@
 'use client';
+import {useInterfaceTexts} from './interface-texts';
 import { useMemo, useState, useRef, useActionState, useEffect, startTransition } from 'react';
 import type {AdSubmissionState} from '@/lib/ad-submission-result';
 import Link from 'next/link';
@@ -94,6 +95,7 @@ export function AdForm({
   identity?: { name: string; isStore: boolean };
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
+  const texts=useInterfaceTexts();
   const rejection = error ? adPublishRejection(error as AdPublishRejectionCode) : null;
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const [listingType,setListingType]=useState<ListingTypeKey>(inferLegacyListingType({listingType:initial?.listingType,adsType:initial?.adsType,priceType:initial?.priceType}));
@@ -128,7 +130,7 @@ export function AdForm({
       : initial?.priceType === 'sale' || (initial?.price ?? 0) > 0 ? 'sale'
       : initial?.id ? 'som' : 'sale',
   );
-  const previewPricingLabel=categoryListingActive?PRICING_LABELS[effectivePricingMode]:priceMode==='rent'?'تأجير':priceMode==='sale'?'بيع':'على السوم';
+  const previewPricingLabel=categoryListingActive?(effectivePricingMode==='bidding'?texts.bidding:PRICING_LABELS[effectivePricingMode]):priceMode==='rent'?'تأجير':priceMode==='sale'?'بيع':texts.bidding;
   // الموقع موجّه للسعودية فقط
   const saudiId = useMemo(() => countries.find((c) => /سعود/.test(c.name))?.id ?? countries[0]?.id ?? 1, [countries]);
   const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
@@ -372,7 +374,7 @@ export function AdForm({
         {isReq ? 'إعلان طلب: تصف ما تبحث عنه، والصور والسعر اختيارية.' : 'إعلان عرض: تعرض منتجك أو خدمتك للبيع/الإيجار.'}
       </div></>}
 
-      <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
+      <Section icon={Tag} title={isReq ? texts.requestData : texts.adData}>
         {categoryOn && <fieldset className="space-y-2 rounded-xl border border-primary/20 p-3">
           <legend className="px-2 text-sm font-bold">{categoryConfig.labels.section}</legend>
           {canPreserveCategory && <label className={lbl}>{initialCategoryIsAlias?'التصنيف الحالي مرتبط بالتصنيف الموحد. يمكنك الإبقاء عليه دون تغيير، أو نقله صراحةً إلى التصنيف الموحد مع الاحتفاظ بالقيم السابقة.':categoryConfig.labels.preserveHint}<select name="category_mode" className={field} value={categoryMode} onChange={e=>{const mode=e.target.value;setCategoryMode(mode);if(mode==='select'&&initialCategoryOption){setCategoryGroup(initialCategoryOption.groupKey||String(initialCategoryOption.categoryId));setSubcategoryId(String(initialCategoryOption.id));}else if(mode==='select'){setCategoryGroup('');setSubcategoryId('');}}}>
@@ -393,7 +395,7 @@ export function AdForm({
           </>}
         </fieldset>}
         <div>
-          <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
+          <label className={lbl}>{isReq ? texts.requestTitle : texts.title}</label>
           <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب سيارة للشراء' : 'مثال: سيارة للبيع'} />
         </div>
         {!categoryListingActive&&priceEnabled && (isReq ? (
@@ -407,7 +409,7 @@ export function AdForm({
             <input type="hidden" name="priceType" value={priceMode} />
             {/* اختيار نوع السعر — والحقول تظهر حسب الاختيار */}
             <div className="grid grid-cols-3 gap-2">
-              {([['rent', '🔑 سعر تأجير'], ['sale', '💰 سعر بيع'], ['som', '🤝 على السوم']] as const).map(([k, l]) => (
+              {([['rent', '🔑 سعر تأجير'], ['sale', '💰 سعر بيع'], ['som', `🤝 ${texts.bidding}`]] as const).map(([k, l]) => (
                 <button key={k} type="button" onClick={() => setPriceMode(k)}
                   className={`rounded-lg border-2 px-2 py-2.5 text-sm font-bold transition ${priceMode === k ? 'border-primary bg-primary text-white shadow' : 'border-primary/25 bg-white text-foreground/80 hover:border-primary/50'}`}>
                   {l}
@@ -420,7 +422,7 @@ export function AdForm({
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س) — اختياري" />
-                    <span className="block text-[11px] text-muted-foreground">اختياري — اتركه فارغاً لو تفضّل «على السوم»</span>
+                    <span className="block text-[11px] text-muted-foreground">اختياري — اتركه فارغاً لو تفضّل «{texts.bidding}»</span>
                   </div>
                   <div className="space-y-1">
                     <select name="rentPeriod" defaultValue={initial?.rentPeriod || ''} className={field}>
@@ -439,7 +441,7 @@ export function AdForm({
               </div>
             )}
             {priceMode === 'som' && (
-              <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">🤝 على السوم: لا يظهر سعر على إعلانك — يتفاوض معك المهتمّون مباشرة.</p>
+              <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">🤝 {texts.bidding}: {texts.biddingHint}</p>
             )}
           </div>
         ))}
@@ -465,7 +467,7 @@ export function AdForm({
         </div>
       </Section>
 
-      {!categoryOn && <Section icon={Tag} title="تفاصيل إضافية">
+      {!categoryOn && <Section icon={Tag} title={texts.extras}>
         <AdExtraFields
           hideNegotiable={categoryListingActive?effectivePricingMode==='bidding':priceMode === 'som'}
           initial={{
@@ -478,7 +480,7 @@ export function AdForm({
         />
       </Section>}
 
-      <Section icon={MapPin} title="الموقع" hint="المنطقة والمدينة والموقع الدقيق بيانات اختيارية، ويمكنك نشر الإعلان بدونها.">
+      <Section icon={MapPin} title={texts.location} hint="المنطقة والمدينة والموقع الدقيق بيانات اختيارية، ويمكنك نشر الإعلان بدونها.">
         <p className="text-xs font-bold text-foreground">المنطقة والمدينة <span className="font-normal text-muted-foreground">(اختياري)</span></p>
         <div className="flex gap-2">
           <button type="button" onClick={() => setWantLocation(false)} className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-bold ${!wantLocation ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
@@ -529,7 +531,7 @@ export function AdForm({
         </div>
       </Section>
 
-      <Section icon={ImageIcon} title="الصور" hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>
+      <Section icon={ImageIcon} title={texts.images} hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>
         <ImageUploader
           name="images"
           maxImages={10}
@@ -540,17 +542,17 @@ export function AdForm({
         {!imgBusy && imgReady > 0 && <p className="text-xs font-bold text-green-600">✓ {imgReady} صورة جاهزة</p>}
       </Section>
 
-      <Section icon={Video} title="فيديو" hint="مقطع قصير للإعلان (اختياري، الحد 25 ميجابايت).">
+      <Section icon={Video} title={texts.video} hint="مقطع قصير للإعلان (اختياري، الحد 25 ميجابايت).">
         <input name="video" type="file" accept="video/*" onChange={onVideo} className="w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-primary file:px-3 file:py-1 file:font-bold file:text-white" />
         {vidName && <p className="text-xs font-bold text-green-600">✓ {vidName}</p>}
         {vidErr && <p className="text-xs font-bold text-red-600">{vidErr}</p>}
       </Section>
 
-      <Section icon={Mic} title="تسجيل صوتي" hint="سجّل رسالة صوتية تعرّف بإعلانك (اختياري، حتى دقيقتين).">
+      <Section icon={Mic} title={texts.audio} hint="سجّل رسالة صوتية تعرّف بإعلانك (اختياري، حتى دقيقتين).">
         <AudioRecorder name="audio" />
       </Section>
 
-      <Section icon={Phone} title="وسيلة التواصل">
+      <Section icon={Phone} title={texts.contact}>
         <p className="text-xs text-muted-foreground">يجب إدخال رقم الجوال أو الواتساب على الأقل. <span className="font-bold text-red-600">*</span></p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -568,7 +570,7 @@ export function AdForm({
         </div>
       </Section>
 
-      <Section icon={ShieldCheck} title="التعهّد">
+      <Section icon={ShieldCheck} title={texts.pledge}>
         <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-900">
           <input type="checkbox" name="pledge" required className="mt-0.5 h-4 w-4 accent-primary" />
           <span>أتعهّد بأن جميع بيانات هذا الإعلان صحيحة، وأتحمّل كامل المسؤولية عنه. وأقرّ أن التعامل والدفع يتمّان خارج المنصة، وأن المنصة وسيلة عرض وربط فقط.</span>

@@ -57,16 +57,16 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
   });
   it('shows missing Arabic clearly while retaining original text only in labeled source details',async()=>{
     const html=await browse({detail:'PID-1'}),visible=withoutSourceDetails(html);
-    expect(visible).toContain('الترجمة العربية غير متاحة');expect(visible).toContain('اكتب اسم المنتج بالعربية أو الإنجليزية');
+    expect(visible).toContain('بانتظار الترجمة');expect(visible).toContain('اكتب اسم المنتج بالعربية أو الإنجليزية');
     for(const source of ['Cotton Summer Shirt','Summer Clothing','Blue Large']){expect(html).toContain(source);expect(visible).not.toContain(source);}
     expect(html).toContain('النص الأصلي من المصدر');expect(visible).toContain('PID-1');expect(visible).toContain('SKU-1');
-    const options=html.match(/<option\b[^>]*>[\s\S]*?<\/option>/g)??[];expect(options.join('')).toContain('value="CAT-1"');expect(options.join('')).not.toContain('Summer Clothing');expect(options.join('')).not.toContain('>الترجمة العربية غير متاحة · CAT-1');
+    const options=html.match(/<option\b[^>]*>[\s\S]*?<\/option>/g)??[];expect(options.join('')).toContain('value="CAT-1"');expect(options.join('')).not.toContain('Summer Clothing');expect(options.join('')).not.toContain('>بانتظار الترجمة · CAT-1');
   });
   it('uses cached Arabic in titles, category filters and detail variants without English fallback',async()=>{
     state.cache=new Map([['Cotton Summer Shirt','قميص صيفي قطني'],['Summer Clothing','ملابس صيفية'],['Blue Large','أزرق كبير']]);
     const visible=withoutSourceDetails(await browse({detail:'PID-1',cat:'CAT-1'}));
     for(const label of state.cache.values())expect(visible).toContain(label);
-    expect(visible).not.toContain('الترجمة العربية غير متاحة');expect(state.translate).not.toHaveBeenCalled();
+    expect(visible).not.toContain('بانتظار الترجمة');expect(state.translate).not.toHaveBeenCalled();
   });
   it('renders saved padded titles, category paths and variants through the real cache contract without changing source text',async()=>{
     state.sourceName=' Cotton Summer Shirt ';state.category=' Summer Clothing ';state.categoryPath=' Clothing > Summer Clothing ';state.variantName=' Blue Large ';
@@ -75,19 +75,19 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     expect(state.savedRows.size).toBe(4);state.write.mockClear();
     const html=await browse({detail:'PID-1',cat:'CAT-1'}),visible=withoutSourceDetails(html);
     for(const label of translations.values())expect(visible).toContain(label);
-    expect(visible).not.toContain('الترجمة العربية غير متاحة');expect(visible).not.toContain('تصنيف بانتظار الترجمة');
+    expect(visible).not.toContain('بانتظار الترجمة');expect(visible).not.toContain('تصنيف بانتظار الترجمة');
     expect(html).toContain(state.sourceName);expect(html).toContain(state.categoryPath.replace('>','&gt;'));expect(html).toContain(state.variantName);
     const showcase=renderToStaticMarkup(await Showcase({searchParams:Promise.resolve({})}));
-    expect(withoutSourceDetails(showcase)).toContain('قميص صيفي قطني');expect(withoutSourceDetails(showcase)).not.toContain('الترجمة العربية غير متاحة');expect(showcase).toContain(state.sourceName);
+    expect(withoutSourceDetails(showcase)).toContain('قميص صيفي قطني');expect(withoutSourceDetails(showcase)).not.toContain('بانتظار الترجمة');expect(showcase).toContain(state.sourceName);
     expect(state.translate).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
   });
   it('does not call a mixed Arabic-English imported title fully translated',async()=>{
     state.nameAr='قميص Cotton Summer Shirt';const visible=withoutSourceDetails(await browse());
-    expect(visible).toContain('الترجمة العربية غير متاحة');expect(visible).not.toContain(state.nameAr);
+    expect(visible).toContain('بانتظار الترجمة');expect(visible).not.toContain(state.nameAr);
   });
   it('keeps already Arabic source names and categories without inventing a missing translation',async()=>{
     state.sourceName='قميص قطني';state.category='ملابس صيفية';const visible=withoutSourceDetails(await browse());
-    expect(visible).toContain('قميص قطني');expect(visible).toContain('ملابس صيفية');expect(visible).not.toContain('الترجمة العربية غير متاحة');
+    expect(visible).toContain('قميص قطني');expect(visible).toContain('ملابس صيفية');expect(visible).not.toContain('بانتظار الترجمة');
   });
   it('rejects a non-viewer before reading translation cache',async()=>{
     state.allowed=false;await expect(browse()).rejects.toThrow('denied');expect(state.read).not.toHaveBeenCalled();expect(state.translate).not.toHaveBeenCalled();
@@ -105,7 +105,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
   });
   it('showcase never labels raw English as the Arabic product title',async()=>{
     const html=renderToStaticMarkup(await Showcase({searchParams:Promise.resolve({})}));
-    expect(withoutSourceDetails(html)).toContain('الترجمة العربية غير متاحة');expect(withoutSourceDetails(html)).not.toContain('Cotton Summer Shirt');
+    expect(withoutSourceDetails(html)).toContain('بانتظار الترجمة');expect(withoutSourceDetails(html)).not.toContain('Cotton Summer Shirt');
     expect(html).toContain('النص الأصلي من المصدر');expect(html).toContain('Cotton Summer Shirt');expect(state.translate).not.toHaveBeenCalled();
     expect(html).toContain('src="https://example.test/saved-gallery.jpg"');
     expect(html).toContain('التعميم غير مفعّل');expect(html).not.toContain('تفعيل الإعلان للعامة');

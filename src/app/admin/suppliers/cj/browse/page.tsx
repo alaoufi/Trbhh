@@ -70,7 +70,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     if (!t) return '—';
     if (isArabicText(t)) return t;
     const saved = gridAr.get(t.trim()) ?? catAr.get(t.trim());
-    return isArabicText(saved) ? saved! : 'الترجمة العربية غير متاحة';
+    // لا نعرض «الترجمة غير متاحة» كحالة نهائية: نُظهر «بانتظار الترجمة» (حالة مؤقتة
+    // تكملها مهمة الترجمة الدورية تلقائياً)، والنص الأصلي يبقى ظاهراً في تفاصيله.
+    return isArabicText(saved) ? saved! : 'بانتظار الترجمة';
   };
   const categoryLabels = new Map(categories.map((c, index) => {
     const translatedPath = isArabicText(c.path) ? c.path : catAr.get(c.path.trim());

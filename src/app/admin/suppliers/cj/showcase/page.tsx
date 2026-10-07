@@ -53,7 +53,9 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
             {items.map((r) => {
               const priceMinor = r.sale_price_override_minor ?? r.sale_price_minor;
               const saved = isArabicText(r.name_ar) ? r.name_ar : translations.get(r.name.trim());
-              const title = isArabicText(saved) ? saved! : 'الترجمة العربية غير متاحة';
+              // لا نعرض «الترجمة غير متاحة» كحالة نهائية: نُظهر «بانتظار الترجمة» (حالة
+              // مؤقتة تكملها مهمة الترجمة الدورية تلقائياً)، والنص الأصلي يبقى ظاهراً أدناه.
+              const title = isArabicText(saved) ? saved! : 'بانتظار الترجمة';
               return (
                 <div key={r.id} className="card-3d flex flex-col overflow-hidden rounded-xl">
                   <CjProductImage src={cjImg(cjProductImages(r)[0])} alt={title} className="aspect-square w-full object-cover" />

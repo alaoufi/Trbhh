@@ -8,6 +8,7 @@ import { timeAgo, cn } from '@/lib/utils';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
 import { PriceText } from '@/components/price-text';
 import { SafeRender } from '@/components/safe-render';
+import { AdAdvertiserName } from './ad-advertiser-name';
 
 /** بديل آمن عند تعذّر تصيير بطاقة إعلان بعينها — يبقي الصفحة سليمة والإعلان قابلاً للفتح. */
 function FallbackAdCard({ id }: { id: number | string }) {
@@ -289,7 +290,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
         <span>{timeShort(ad.createdAt)}</span>
       </div>
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
-        <span className="inline-flex min-w-0 items-center gap-1">{ad.sellerTrusted && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />}<span className="truncate">{ad.sellerName || 'المعلن'}</span></span>
+        <span className="inline-flex min-w-0 items-center gap-1">{ad.sellerTrusted && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />}<AdAdvertiserName name={ad.sellerName} storeName={ad.storeName} /></span>
         {(ad.ratingCount ?? 0) > 0 && <span className="inline-flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-500" />{ad.ratingAvg} ({ad.ratingCount})</span>}
         <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" />{ad.views}</span>
       </div>
@@ -321,7 +322,7 @@ export async function AdGrid({ ads, className, appearance }: { ads: AdCardType[]
     );
   }
   if (appearance === 'marketplace') {
-    return <div className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <SafeRender key={ad.id} label="marketplace" fallback={<FallbackAdCard id={ad.id} />}><AdCardMarketplace ad={ad} /></SafeRender>)}</div>;
+    return <div data-home-feed-grid data-mosaic={ads.length >= 6} className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <SafeRender key={ad.id} label="marketplace" fallback={<FallbackAdCard id={ad.id} />}><AdCardMarketplace ad={ad} /></SafeRender>)}</div>;
   }
   return (
     <div className={cn('grid gap-3 lg:grid-cols-2', className)}>

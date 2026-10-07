@@ -15,7 +15,9 @@ import {
 import { PublicSearchForm } from '@/components/public-search-form';
 import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
-import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
+import { HomeCompactStrip } from '@/components/home-compact-strip';
+import feedStyles from '@/components/home-dense-feed.module.css';
+import { mergeHomeAds, selectedHomeCategory, splitHomeFeed } from '@/lib/home-feed';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -88,6 +90,19 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
   const feedAds = selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated);
   const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
+  // تنويع الرئيسية: تغذية مضغوطة أكثف + شريط إعلانات صغيرة بين البطاقات — كلها قابلة
+  // للتحكم والتراجع من الإعدادات (الافتراضي مفعّل)، ولا تؤثر على تكامل CJ/التجارة.
+  const design = (await cookies()).get('design')?.value || '';
+  const compactStripOn = !selectedCategory && !['shop', 'list'].includes(design) && await getSettingBool('home_compact_strip_on', true).catch(() => false);
+  const [denseFeed, stripMotion] = await Promise.all([
+    getSettingBool('home_dense_feed_on', true).catch(() => true),
+    getSettingBool('home_strip_motion_on', true).catch(() => true),
+  ]);
+  const compactFeed = splitHomeFeed(feedAds);
+  const [compactStripTitle, compactStripHint] = await Promise.all([
+    getSetting('home_compact_strip_title', 'لمحة من السوق'),
+    getSetting('home_compact_strip_hint', 'تصفّح المزيد بالسحب أو التمرير'),
+  ]);
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
   const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
@@ -164,10 +179,16 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       <section aria-label={selectedCategory?.name || 'السوق'} className="space-y-4">
         {feedAds.length > 0 && <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-xl font-extrabold text-[#16294a]"><span className="h-6 w-1.5 rounded-full bg-[#ff6a1a]" />{selectedCategory?.name || 'اكتشف السوق'}</h2><Link href={feedSearchHref} className="py-2 text-sm font-bold text-[#16294a]">عرض الكل ←</Link></div>}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${denseFeed ? feedStyles.dense : ''}`}>
           {selectedCategory && !feedAds.length
             ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
-            : <AdGrid ads={feedAds} appearance="marketplace" />}
+            : compactStripOn && compactFeed.strip.length ? (
+              <>
+                <AdGrid ads={compactFeed.before} appearance="marketplace" />
+                <HomeCompactStrip ads={compactFeed.strip} title={compactStripTitle} hint={compactStripHint} autoPlay={stripMotion} />
+                {compactFeed.after.length > 0 && <AdGrid ads={compactFeed.after} appearance="marketplace" />}
+              </>
+            ) : <AdGrid ads={feedAds} appearance="marketplace" />}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}

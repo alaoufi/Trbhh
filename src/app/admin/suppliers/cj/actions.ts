@@ -7,6 +7,7 @@ import { cjSyncSettings, saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync
 import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount, setCjProductAvailability, setCjProductGallery, setCjProductDetails, buildCjDetails } from '@/lib/cj/mapping';
 import { translateToArabicCached, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
+import { upsertGlossaryTerm, deleteGlossaryTerm } from '@/lib/cj/glossary';
 import { readCjAvailability } from '@/lib/cj/availability';
 import { collectCjProductImages } from '@/lib/cj/media';
 import { getSession } from '@/lib/auth';
@@ -185,6 +186,27 @@ export async function saveCjArabic(form: FormData) {
   await auditProduct(s.uid, before);
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** «تعليم» المُسرد: إضافة/تعديل مصطلح (إنجليزي → عربي) يُطبَّق محلياً على كل ترجمات CJ.
+ *  wholeText=1 يعني مطابقة تامّة للحقل فقط (لا استبدال داخل النص). للمشرف فقط. */
+export async function addCjGlossaryTerm(form: FormData) {
+  await requireCjAccess('products', 'edit');
+  const source = String(form.get('source') || '').trim();
+  const targetAr = String(form.get('targetAr') || '').trim();
+  const wholeText = String(form.get('wholeText') || '') === '1';
+  const ok = await upsertGlossaryTerm(source, targetAr, { wholeText });
+  revalidatePath('/admin/suppliers/cj/glossary');
+  redirect(`/admin/suppliers/cj/glossary?${ok ? 'saved=1' : 'error=term'}`);
+}
+
+/** حذف مصطلح من المُسرد. للمشرف فقط. */
+export async function removeCjGlossaryTerm(form: FormData) {
+  await requireCjAccess('products', 'edit');
+  const id = String(form.get('id') || '').trim();
+  if (id) await deleteGlossaryTerm(id);
+  revalidatePath('/admin/suppliers/cj/glossary');
+  redirect('/admin/suppliers/cj/glossary?deleted=1');
 }
 
 /** تعديل سعر البيع النهائي بالريال (أو تركه فارغاً للعودة للسعر المحسوب). */

@@ -9,10 +9,11 @@ const TABS: { key: string; href: string; label: string }[] = [
   { key: 'showcase', href: '/admin/suppliers/cj/showcase', label: 'السلع المعروضة' },
   { key: 'orders', href: '/admin/suppliers/cj/orders', label: 'الطلبات' },
   { key: 'agents', href: '/admin/suppliers/cj/agents', label: 'الوكلاء' },
+  { key: 'glossary', href: '/admin/suppliers/cj/glossary', label: 'مُسرد الترجمة' },
   { key: 'settings', href: '/admin/suppliers/cj', label: 'الإعدادات والاختبار' },
 ];
 
-export function CjAdminNav({ current }: { current: 'browse' | 'showcase' | 'orders' | 'agents' | 'settings' }) {
+export function CjAdminNav({ current }: { current: 'browse' | 'showcase' | 'orders' | 'agents' | 'glossary' | 'settings' }) {
   return (
     <nav aria-label="إدارة CJ" className="-mx-1 flex flex-wrap gap-1.5 border-b border-primary/15 pb-2">
       {TABS.map(tab => {

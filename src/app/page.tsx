@@ -154,7 +154,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {nationalDayActive && <NationalDayBanner />}
 
       {discoveryOn && (
-        <section className="space-y-4" aria-label="اكتشف سوق تربح">
+        <section className="space-y-3" aria-label="اكتشف سوق تربح">
           <NationalDayHeroFrame active={nationalDayActive}>
             <CommerceHero
               compact
@@ -164,16 +164,22 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               slides={heroSlides}
             />
           </NationalDayHeroFrame>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2>
-              <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
-            </div>
-            <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
-          </div>
         </section>
       )}
-      <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
+      {/* أدوات البحث والأقسام مطويّة افتراضياً وتُفتح بالضغط على «وش تبحث عنه اليوم؟» */}
+      <div data-home-search-shell className="relative">
+        <details data-home-search className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm sm:px-4">
+          <summary className="cursor-pointer list-none py-3 text-lg font-extrabold text-[#16294a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary lg:min-h-16 lg:pl-44 lg:py-4 [&::-webkit-details-marker]:hidden">وش تبحث عنه اليوم؟</summary>
+          <div className="space-y-3 pb-3">
+            {discoveryOn && <>
+              <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
+              <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
+            </>}
+            <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
+          </div>
+        </details>
+        {discoveryOn && <Link data-home-search-add href="/ads/new" className="absolute left-4 top-2.5 hidden lg:inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>}
+      </div>
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 

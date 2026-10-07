@@ -23,6 +23,14 @@ test('runtime allows only a disabled issuance credential addition and preserves 
     assert.notEqual(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:''}),0);
     assert.equal(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:'existing'}),0);
     assert.notEqual(run(base,{...base,FINANCE_ISSUANCE_SECRET:'',AUTH_SECRET:'changed'}),0);
+    // Retired, inert preview flags ('0') baked into the old image may disappear
+    // from the new image; a real value being dropped, a value change, or a
+    // reappearance must still fail.
+    assert.equal(run({...base,TRBHH_PREVIEW_MODE:'0',TRBHH_READ_ONLY_PREVIEW:'0'},base),0);
+    assert.notEqual(run({...base,TRBHH_PREVIEW_MODE:'1'},base),0);
+    assert.notEqual(run({...base,TRBHH_READ_ONLY_PREVIEW:'1'},base),0);
+    assert.notEqual(run({...base,TRBHH_PREVIEW_MODE:'0'},{...base,TRBHH_PREVIEW_MODE:'1'}),0);
+    assert.notEqual(run(base,{...base,TRBHH_PREVIEW_MODE:'0'}),0);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 test('orchestrator parses as Bash and rejects bad mode, run or revision before external work',()=>{

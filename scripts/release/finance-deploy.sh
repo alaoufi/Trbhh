@@ -258,6 +258,12 @@ const fs=require('node:fs'),env=file=>Object.fromEntries(JSON.parse(fs.readFileS
 const before=env(process.argv[2]),after=env(process.argv[3]);
 for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
   if(key==='FINANCE_ISSUANCE_SECRET'&&before[key]===undefined&&after[key]==='')continue;
+  // Legacy inert preview flags were baked into an older production image and
+  // later removed from the codebase; the app never reads them. Tolerate ONLY
+  // their disappearance in the new image, and ONLY when the retired value was
+  // the disabled '0' — a real value (e.g. an enabled read-only mode) being
+  // dropped, or either flag reappearing, still fails the proof.
+  if((key==='TRBHH_PREVIEW_MODE'||key==='TRBHH_READ_ONLY_PREVIEW')&&after[key]===undefined&&before[key]==='0')continue;
   if(!['FINANCE_CAPTURE_SECRET','NODE_VERSION','YARN_VERSION'].includes(key)&&before[key]!==after[key])throw Error('runtime_changed');
 }
 if((after.FINANCE_CAPTURE_SECRET||'').length<32||(before.FINANCE_CAPTURE_SECRET&&before.FINANCE_CAPTURE_SECRET!==after.FINANCE_CAPTURE_SECRET))throw Error('capture_secret_changed');

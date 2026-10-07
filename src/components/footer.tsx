@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { Phone } from 'lucide-react';
 import { SITE } from '@/lib/constants';
+import { releaseVersion } from '@/lib/release-version';
 
-export function Footer() {
+export async function Footer() {
+  const version = await releaseVersion();
   return (
     <footer className="mt-6 border-t border-black/20 bg-[#16294a] text-white md:mt-12">
       <div className="container pt-7 pb-24 md:py-10 md:pb-10">
@@ -36,6 +38,7 @@ export function Footer() {
         </div>
         <div className="mt-6 border-t border-white/15 pt-5 text-center text-xs text-white/60 md:mt-8 md:pt-6">
           جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
+          {version && <span className="ms-2 text-white/40" dir="ltr" title="رقم النسخة المنشورة">· v{version}</span>}
         </div>
       </div>
     </footer>

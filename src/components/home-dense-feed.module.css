@@ -1,4 +1,6 @@
-.dense [data-home-feed-grid] {grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr));gap:8px;align-items:start;}
+/* auto-fill (not auto-fit): empty trailing tracks are KEPT so a short last row's
+   cards stay small instead of stretching into big "old-style" cards. */
+.dense [data-home-feed-grid] {grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr));gap:8px;align-items:start;}
 .dense :global(.marketplace-card) {border-radius:12px;}
 .dense :global(.marketplace-card)>div:first-child {aspect-ratio:16/10;}
 .dense :global(.marketplace-card)>div:nth-child(2) {padding:8px;gap:5px;flex:0 0 auto;}

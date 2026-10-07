@@ -1,10 +1,18 @@
 import type { CategoryFormConfig } from './ad-categories/contracts';
 
-/** يقسّم تغذية الرئيسية إلى: قبل الشريط، شريط إعلانات صغيرة، بعده (تنويع بصري قابل للتحكم). */
+/**
+ * يقسّم تغذية الرئيسية إلى: صفّ تشويقي صغير، ثم شريط «لمحة من السوق» الأفقي
+ * الذي يضمّ **البقية** (قابل للسحب — يعرض أكبر عدد من الإعلانات)، ثم شبكة ختامية
+ * اختيارية للفائض الكبير. الهدف: الشريط هو القسم الأغنى لا المجوّع.
+ *   • أقل من ٨ إعلانات: شبكة واحدة بلا شريط (لا معنى لشريط شبه فارغ).
+ *   • ٨ فأكثر: ٤ قبل الشريط، حتى ٢٠ داخل الشريط، والباقي شبكة بعده.
+ */
+const STRIP_LEAD = 4;
+const STRIP_MAX = 20;
 export function splitHomeFeed<T>(ads: readonly T[]): { before: T[]; strip: T[]; after: T[] } {
-  if (ads.length < 12) return { before: [...ads], strip: [], after: [] };
-  const end = 6 + Math.min(12, ads.length - 10);
-  return { before: ads.slice(0, 6), strip: ads.slice(6, end), after: ads.slice(end) };
+  if (ads.length < 8) return { before: [...ads], strip: [], after: [] };
+  const stripEnd = STRIP_LEAD + STRIP_MAX;
+  return { before: ads.slice(0, STRIP_LEAD), strip: ads.slice(STRIP_LEAD, stripEnd), after: ads.slice(stripEnd) };
 }
 
 /** Browsing includes legacy active categories without configured form fields. */

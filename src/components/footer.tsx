@@ -36,9 +36,19 @@ export async function Footer() {
             </a>
           </div>
         </div>
-        <div className="mt-6 border-t border-white/15 pt-5 text-center text-xs text-white/60 md:mt-8 md:pt-6">
-          جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
-          {version && <span className="ms-2 text-white/40" dir="ltr" title="رقم النسخة المنشورة">· v{version}</span>}
+        <div className="mt-6 border-t border-white/15 pt-5 text-center md:mt-8 md:pt-6">
+          <p className="text-xs text-white/60">جميع الحقوق محفوظة لمنصة {SITE.name} © 2015</p>
+          {version && (
+            <p className="mt-2.5">
+              <span
+                className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-bold tracking-wider text-white/80"
+                dir="ltr"
+                title="رقم النسخة المنشورة على الخادم"
+              >
+                v{version}
+              </span>
+            </p>
+          )}
         </div>
       </div>
     </footer>

@@ -8,6 +8,7 @@ import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
 import { ChromeGate } from '@/components/chrome-gate';
 import { PwaRegister } from '@/components/pwa-register';
+import { releaseVersion } from '@/lib/release-version';
 import { GeoPrompt } from '@/components/geo-prompt';
 import { ForceUpdateGate } from '@/components/force-update-gate';
 import { InstallPrompt } from '@/components/install-prompt';
@@ -74,10 +75,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const ck = await cookies();
   const theme = ck.get('theme')?.value || '';
   const design = ck.get('design')?.value || '';
-  const [unread, isAdminUser, splashSeconds] = await Promise.all([
+  const [unread, isAdminUser, splashSeconds, release] = await Promise.all([
     session ? getMyStats(session.uid).then((s) => s.unread).catch(() => 0) : Promise.resolve(0),
     session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
     getClassifiedSplashSeconds().catch(() => 5),
+    releaseVersion().catch(() => ''),
   ]);
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
@@ -154,7 +156,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <GeoPrompt />
         <ForceUpdateGate />
         <InstallPrompt />
-        <PwaRegister />
+        <PwaRegister version={release} />
         {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — شارة عائمة تُثبَّت أسفل يسار
             الصفحة. نسخة واحدة على مستوى الموقع، والسكربت الرسمي يُحمَّل async بعد رسم الصفحة
             ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}

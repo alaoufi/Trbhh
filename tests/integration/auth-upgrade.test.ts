@@ -39,7 +39,7 @@ const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   cj_products: ["id","cj_product_id","cj_variant_id","cj_sku","name","name_ar","source_description","display_description_ar","trbhh_category","status","images","details_json","agent_user_id","agent_claimed_at","hidden","sale_price_override_minor","image","supplier_cost_minor","shipping_cost_minor","other_costs_minor","profit_minor","sale_price_minor","margin_bps","currency","commerce_product_id","trbhh_variant_id","last_sync_at","created_at","updated_at"],
   cj_agents: ["user_id","phone","whatsapp","weekly_quota","active","notes","created_at","updated_at"],
   cj_translations: ["source_key","target_ar","created_at"],
-  cj_orders: ["id","internal_ref","user_id","cj_product_id","product_name","cj_order_id","status","status_reason","items_total_minor","shipping_total_minor","tax_total_minor","grand_total_minor","currency","carrier","tracking_number","tracking_url","tracking_status","ship_name","ship_phone","ship_country","ship_region","ship_city","ship_address1","ship_address2","ship_zip","placed_at","delivered_at","created_at","updated_at"],
+  cj_orders: ["id","internal_ref","user_id","cj_product_id","product_name","cj_order_id","cj_lines_json","status","status_reason","items_total_minor","shipping_total_minor","tax_total_minor","grand_total_minor","currency","carrier","tracking_number","tracking_url","tracking_status","ship_name","ship_phone","ship_country","ship_region","ship_city","ship_address1","ship_address2","ship_zip","placed_at","delivered_at","created_at","updated_at"],
   cj_order_events: ["id","order_id","event_key","type","source","from_status","to_status","note","actor_id","created_at"],
   cj_webhook_events: ["id","event_key","type","received_at"],
 
@@ -59,8 +59,10 @@ const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   ad_category_definitions: ['subcategory_id', 'version', 'kind', 'price_enabled', 'goods_enabled', 'fields_json'],
   ad_category_values: ['ad_id', 'subcategory_id', 'definition_version', 'values_json'],
   ad_category_audit: ['id', 'actor_id', 'action', 'payload', 'created_at'],
-  commerce_products: ['id', 'ad_id', 'title', 'price_minor', 'currency', 'stock_available', 'stock_reserved', 'approved', 'visible', 'enabled', 'created_at', 'updated_at'],
-  commerce_orders: ['id', 'member_id', 'request_key', 'request_fingerprint', 'status', 'currency', 'subtotal_minor', 'shipping_fee_minor', 'total_minor', 'shipping', 'fulfillment_status', 'created_at', 'paid_at'],
+  commerce_products: ['id', 'ad_id', 'title', 'price_minor', 'currency', 'stock_available', 'stock_reserved', 'approved', 'visible', 'enabled', 'seller_type', 'seller_member_id', 'shipping_minor', 'item_price_minor', 'site_commission_minor', 'member_commission_minor', 'sale_listed', 'created_at', 'updated_at'],
+  commerce_orders: ['id', 'member_id', 'request_key', 'request_fingerprint', 'status', 'currency', 'subtotal_minor', 'shipping_fee_minor', 'total_minor', 'shipping', 'fulfillment_status', 'carrier', 'tracking_number', 'shipped_at', 'created_at', 'paid_at'],
+  commerce_member_payouts: ['id', 'member_id', 'amount_minor', 'note', 'admin_id', 'created_at'],
+  commerce_stock_reminders: ['id', 'product_id', 'member_id', 'notified', 'created_at'],
   commerce_order_items: ['id', 'order_id', 'product_id', 'title', 'quantity', 'unit_price_minor', 'total_minor', 'variant_key', 'variant_snapshot', 'list_unit_price_minor', 'discount_minor'],
   commerce_payment_attempts: ['id', 'order_id', 'provider', 'provider_ref', 'redirect_url', 'merchant_order_id', 'claim_token', 'amount_minor', 'currency', 'status', 'created_at', 'paid_at'],
   commerce_notifications: ['id', 'order_id', 'event', 'channel', 'recipient', 'payload', 'status', 'claim_token', 'last_error', 'created_at', 'claimed_at', 'sent_at'],
@@ -121,7 +123,11 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     for (const old of baselineColumns) {
       expect(now.find((c) => c.table_name === old.table_name && c.column_name === old.column_name), `old column ${old.table_name}.${old.column_name}`).toEqual(old);
     }
-    expect(await snapshot(baselineColumns)).toEqual(before);
+    const candidate = await snapshot(baselineColumns);
+    // schema-sync يسجّل علامة داخلية notif_readat_backfilled في site_settings (مرّة واحدة)،
+    // وهي بيانات تشغيلية للتطبيق لا بيانات مستخدم؛ نستثنيها من مقارنة حفظ البيانات القديمة.
+    if (candidate.site_settings) candidate.site_settings = candidate.site_settings.filter((r) => !r.includes('notif_readat_backfilled'));
+    expect(candidate).toEqual(before);
   }
   async function assertLegacyAuthentication() {
     const { verifyPassword, getSession } = await import('@/lib/auth');
@@ -226,7 +232,7 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     const candidateColumns = await columns();
     const added = candidateColumns.filter((c) => !baselineColumns.some((old) => old.table_name === c.table_name && old.column_name === c.column_name));
     expect(added.map((c) => `${c.table_name}.${c.column_name}`).sort()).toEqual([
-      'users.auth_session_version', 'auth_mfa.user_id', 'auth_mfa.secret', 'auth_mfa.recovery_hashes', 'auth_mfa.last_step', 'auth_mfa.version', 'auth_mfa.created_at', 'auth_security_limits.k', 'auth_security_limits.hits', 'auth_security_limits.expires_at',
+      'users.auth_session_version', 'users.direct_sale_approved', 'users.sale_deposit_minor', 'auth_mfa.user_id', 'auth_mfa.secret', 'auth_mfa.recovery_hashes', 'auth_mfa.last_step', 'auth_mfa.version', 'auth_mfa.created_at', 'auth_security_limits.k', 'auth_security_limits.hits', 'auth_security_limits.expires_at',
       ...Object.entries(ADDITIVE_TABLE_COLUMNS).flatMap(([table, names]) =>
         table==='finance_change_requests'?[]:table==='finance_tax_policies'?['finance_tax_policies.calculation_policy']:names.map((name) => `${table}.${name}`)),
       'commerce_customer_addresses.id','commerce_customer_addresses.member_id','commerce_customer_addresses.label','commerce_customer_addresses.snapshot','commerce_customer_addresses.is_default','commerce_customer_addresses.created_at','commerce_customer_addresses.updated_at',

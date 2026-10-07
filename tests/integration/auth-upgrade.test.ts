@@ -39,6 +39,7 @@ const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   cj_products: ["id","cj_product_id","cj_variant_id","cj_sku","name","name_ar","source_description","display_description_ar","trbhh_category","status","images","details_json","agent_user_id","agent_claimed_at","hidden","sale_price_override_minor","image","supplier_cost_minor","shipping_cost_minor","other_costs_minor","profit_minor","sale_price_minor","margin_bps","currency","commerce_product_id","trbhh_variant_id","last_sync_at","created_at","updated_at"],
   cj_agents: ["user_id","phone","whatsapp","weekly_quota","active","notes","created_at","updated_at"],
   cj_translations: ["source_key","target_ar","created_at"],
+  cj_glossary: ["id","src_norm","source","target_ar","enabled","whole_text","created_at","updated_at"],
   cj_orders: ["id","internal_ref","user_id","cj_product_id","product_name","cj_order_id","cj_lines_json","status","status_reason","items_total_minor","shipping_total_minor","tax_total_minor","grand_total_minor","currency","carrier","tracking_number","tracking_url","tracking_status","ship_name","ship_phone","ship_country","ship_region","ship_city","ship_address1","ship_address2","ship_zip","placed_at","delivered_at","created_at","updated_at"],
   cj_order_events: ["id","order_id","event_key","type","source","from_status","to_status","note","actor_id","created_at"],
   cj_webhook_events: ["id","event_key","type","received_at"],

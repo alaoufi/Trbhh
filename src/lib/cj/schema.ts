@@ -73,6 +73,22 @@ export const CJ_DDL: string[] = [
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  // مُسرد مصطلحات التجارة/المنتجات (إنجليزي → عربي ثابت) يُطبَّق محلياً قبل الترجمة
+  // الآلية: مطابقة تامّة للحقول القصيرة (ألوان/مقاسات/خيارات) واستبدال المصطلحات
+  // كلمةً كلمةً في النص الطويل. src_norm = المصدر بعد التحويل لحروف صغيرة وتوحيد
+  // المسافات (مفتاح التفرّد). محرَّر بالكامل من لوحة الإدارة («تعليم» المصطلحات).
+  `CREATE TABLE IF NOT EXISTS cj_glossary (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    src_norm VARCHAR(191) NOT NULL,
+    source VARCHAR(400) NOT NULL DEFAULT '',
+    target_ar VARCHAR(400) NOT NULL DEFAULT '',
+    enabled TINYINT NOT NULL DEFAULT 1,
+    whole_text TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY cj_glossary_src (src_norm)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   // طلبات CJ داخل تربح (بنية دورة الطلب — لا شراء حقيقي حتى التفعيل اليدوي).
   // internal_ref مفتاح تفرّد داخلي يمنع تكرار الطلب (idempotency).
   `CREATE TABLE IF NOT EXISTS cj_orders (

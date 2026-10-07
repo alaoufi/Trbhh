@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { getSetting } from '@/lib/settings';
+import { glossaryExact, glossarySubstitute } from './glossary';
 
 /**
  * إعدادات مزوّدي الترجمة من لوحة التحكم (جدول settings — لا أسرار في الكود ولا .env):
@@ -175,7 +176,11 @@ async function viaGoogle(text: string, deadline: number): Promise<string | null>
 /** Full-source translation is all-or-nothing; a failed chunk cannot become a cached description. */
 async function translateRaw(text: string): Promise<string | null> {
   const deadline = Date.now() + TRANSLATION_BUDGET_MS;
-  const chunks = sourceChunks(text);
+  // يطبّق المسرد (استبدال المصطلحات المعروفة بالعربية) قبل الترجمة الآلية؛ إن أصبح
+  // النص كله عربياً بفضل المسرد فلا حاجة لنداء المترجم.
+  const prepared = await glossarySubstitute(text);
+  if (isArabicText(prepared)) return prepared;
+  const chunks = sourceChunks(prepared);
   if (!chunks?.length) return null;
   const translated: string[] = [];
   for (const chunk of chunks) {
@@ -194,6 +199,9 @@ export async function translateToArabic(text: string | null | undefined): Promis
   const src = (text ?? '').trim();
   if (!src) return null;
   if (isArabicText(src)) return src;
+  // مطابقة تامّة في المسرد للحقول القصيرة (ألوان/مقاسات/خيارات) قبل نداء المترجم.
+  const exact = await glossaryExact(src);
+  if (exact) return exact;
   return translateRaw(src);
 }
 
@@ -259,10 +267,18 @@ export async function learnTranslation(source: string | null | undefined, arabic
  *  ينفّذ المفقود على دفعات متوازية محدودة لتقليل زمن الانتظار. */
 export async function translateManyCached(texts: (string | null | undefined)[], max = 30): Promise<Map<string, string>> {
   const map = await getCachedArabic(texts);
-  const missing = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !isArabicText(t) && !map.has(t)))].slice(0, Math.max(0, Math.floor(max)));
+  const candidates = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !isArabicText(t) && !map.has(t)))];
+  // مطابقة تامّة في المسرد أولاً (محلية، بلا مترجم) لكل الحقول القصيرة.
+  const missing: string[] = [];
+  for (const src of candidates) {
+    const exact = await glossaryExact(src);
+    if (exact) { const saved = await saveAutomaticTranslation(src, exact); if (saved) { map.set(src, saved); continue; } }
+    missing.push(src);
+  }
+  const limited = missing.slice(0, Math.max(0, Math.floor(max)));
   const CONCURRENCY = 5;
-  for (let i = 0; i < missing.length; i += CONCURRENCY) {
-    const batch = missing.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < limited.length; i += CONCURRENCY) {
+    const batch = limited.slice(i, i + CONCURRENCY);
     const results = await Promise.all(batch.map(async (src) => [src, await translateRaw(src)] as const));
     let batchWins = 0;
     for (const [src, ar] of results) {

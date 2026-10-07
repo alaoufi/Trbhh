@@ -42,6 +42,13 @@ describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
     expect((await getPublicCategories([ad.id])).get(Number(ad.id))?.categoryFields[0].value).toBe('مستعمل');
     expect((await client.ads.findUnique({where:{id:ad.id}}))?.title).toBe('Fixture ad');
   });
+  it('a corrupt category definition degrades to defaults instead of crashing public rendering (P0 home)',async()=>{
+    const ad=await create();
+    // fields_json تالف (كائن بدل مصفوفة) — كان يرمي «تعريف الحقول غير صالح» ويُسقط الرئيسية كلها
+    await client.$executeRaw`UPDATE ad_category_definitions SET fields_json=${JSON.stringify({broken:true})} WHERE subcategory_id=34`;
+    const map=await getPublicCategories([ad.id]);
+    expect(map.get(Number(ad.id))).toMatchObject({categoryFields:[],priceEnabled:true,goodsEnabled:false});
+  });
   it('operator activation twice preserves real old ads, definitions, values and protected settings',async()=>{
     const payload=activation.buildPayload();
     await create();

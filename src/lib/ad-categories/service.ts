@@ -10,6 +10,13 @@ const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
 function definition(r:DefinitionRow) {
   return {version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(json(r.fields_json))};
 }
+/** تعريف متسامح للعرض العام: صفٌّ واحد بتعريف حقول تالف (fields_json غير صالح أو JSON
+ *  معطوب) لا يجوز أن يُسقط الصفحة كلها — يتدهور لتعريف افتراضي بلا حقول، ويبقى الباقي يعمل.
+ *  التحقق الصارم يبقى في مسارات الكتابة/الإدارة (definition) حيث يجب رفض التالف. */
+function safeDefinition(r:DefinitionRow):ReturnType<typeof definition> {
+  try { return definition(r); }
+  catch { return {version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[] as ReturnType<typeof validateDefinition>}; }
+}
 export async function getCategoryFormConfig(admin=false):Promise<CategoryFormConfig> {
   const enabled=categoryEnabled(await getSetting('categories_v2_enabled','0'));
   const labels={...CATEGORY_LABELS};
@@ -17,7 +24,7 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   if(!enabled&&!admin) return {enabled,labels,categories:[],subcategories:[]};
   const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:{ordered:'asc'}}),prisma.sub_categories.findMany({orderBy:{order:'asc'}}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
-  return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered})),subcategories:subs.filter(s=>admin||(s.active===1&&dm.has(Number(s.id))&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?definition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}))};
+  return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered})),subcategories:subs.filter(s=>admin||(s.active===1&&dm.has(Number(s.id))&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?safeDefinition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}))};
 }
 export type CategorySelection={category_id:bigint;subcategory_id:number;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean};
 export type CategoryEditContext={adId:bigint;memberId:bigint};
@@ -69,6 +76,6 @@ export async function getPublicCategories(ids:bigint[]):Promise<Map<number,Publi
   const out=new Map<number,PublicCategory>();
   if(!ids.length||!categoryEnabled(await getSetting('categories_v2_enabled','0'))) return out;
   const rows=await prisma.$queryRaw<(DefinitionRow&{ad_id:bigint;values_json:unknown;name:string;active:number;is_active:string})[]>(Prisma.sql`SELECT a.id AS ad_id,d.*,v.values_json,s.name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`);
-  for(const r of rows){const d=definition(r);out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,subcategoryName:r.active===1&&r.is_active==='yes'?r.name:undefined,categoryFields:r.active===1&&r.is_active==='yes'?visibleCategoryValues(d.fields,(json(r.values_json)||{}) as CategoryValues):[]});}
+  for(const r of rows){const d=safeDefinition(r);let vals:CategoryValues={};try{vals=(json(r.values_json)||{}) as CategoryValues;}catch{vals={};}out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,subcategoryName:r.active===1&&r.is_active==='yes'?r.name:undefined,categoryFields:r.active===1&&r.is_active==='yes'?visibleCategoryValues(d.fields,vals):[]});}
   return out;
 }

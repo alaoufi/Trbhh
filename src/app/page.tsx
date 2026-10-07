@@ -17,7 +17,7 @@ import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
 import { HomeCompactStrip } from '@/components/home-compact-strip';
 import feedStyles from '@/components/home-dense-feed.module.css';
-import { mergeHomeAds, selectedHomeCategory, splitHomeFeed } from '@/lib/home-feed';
+import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -67,7 +67,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     selectedCategory ? Promise.resolve([]) : getFeaturedAds(8),
-    selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(16),
+    selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(20),
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
     selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),
@@ -98,7 +98,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     getSettingBool('home_dense_feed_on', true).catch(() => true),
     getSettingBool('home_strip_motion_on', true).catch(() => true),
   ]);
-  const compactFeed = splitHomeFeed(feedAds);
+  // الشريط «لمحة من السوق» يُغذّى من مجموعة مستقلة (الأكثر مشاهدة/تقييماً/مميّزة)
+  // كي يبقى ممتلئاً دائماً دون أن يستهلك تغذية الشبكات. التخطيط المطلوب:
+  //   صفّ «اكتشف السوق» فوق الشريط  →  شريط «لمحة من السوق»  →  عدّة صفوف تحته.
+  const stripAds = selectedCategory ? [] : mergeHomeAds(mostViewed, topRated, featured, latest).slice(0, 16);
+  const feedBefore = selectedCategory ? feedAds : feedAds.slice(0, 4);
+  const feedAfter = selectedCategory ? [] : feedAds.slice(4);
   const [compactStripTitle, compactStripHint] = await Promise.all([
     getSetting('home_compact_strip_title', 'لمحة من السوق'),
     getSetting('home_compact_strip_hint', 'تصفّح المزيد بالسحب أو التمرير'),
@@ -188,11 +193,11 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         <div className={`space-y-4 ${denseFeed ? feedStyles.dense : ''}`}>
           {selectedCategory && !feedAds.length
             ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
-            : compactStripOn && compactFeed.strip.length ? (
+            : compactStripOn && stripAds.length >= 4 ? (
               <>
-                <AdGrid ads={compactFeed.before} appearance="marketplace" />
-                <HomeCompactStrip ads={compactFeed.strip} title={compactStripTitle} hint={compactStripHint} autoPlay={stripMotion} />
-                {compactFeed.after.length > 0 && <AdGrid ads={compactFeed.after} appearance="marketplace" />}
+                <AdGrid ads={feedBefore} appearance="marketplace" />
+                <HomeCompactStrip ads={stripAds} title={compactStripTitle} hint={compactStripHint} autoPlay={stripMotion} />
+                {feedAfter.length > 0 && <AdGrid ads={feedAfter} appearance="marketplace" />}
               </>
             ) : <AdGrid ads={feedAds} appearance="marketplace" />}
           <PromoSlot placement="feed" />

@@ -1,16 +1,17 @@
 import type { CategoryFormConfig } from './ad-categories/contracts';
 
 /**
- * يقسّم تغذية الرئيسية إلى: صفّ تشويقي صغير، ثم شريط «لمحة من السوق» الأفقي
- * الذي يضمّ **البقية** (قابل للسحب — يعرض أكبر عدد من الإعلانات)، ثم شبكة ختامية
- * اختيارية للفائض الكبير. الهدف: الشريط هو القسم الأغنى لا المجوّع.
- *   • أقل من ٨ إعلانات: شبكة واحدة بلا شريط (لا معنى لشريط شبه فارغ).
- *   • ٨ فأكثر: ٤ قبل الشريط، حتى ٢٠ داخل الشريط، والباقي شبكة بعده.
+ * يقسّم تغذية الرئيسية إلى: شبكة «اكتشف السوق» ممتلئة (صفوف كاملة)، ثم شريط
+ * «لمحة من السوق» الأفقي الذي يضمّ دفعة إعلانات غنية، ثم شبكة ختامية للفائض.
+ *   • أقل من ١٦ إعلاناً: شبكة واحدة ممتلئة بلا شريط (كي لا تظهر صفوف ناقصة
+ *     أو شريط شبه فارغ).
+ *   • ١٦ فأكثر: ١٢ في الشبكة الأولى (تملأ صفوفاً كاملة)، حتى ١٦ في الشريط،
+ *     والباقي شبكة ختامية.
  */
-const STRIP_LEAD = 4;
-const STRIP_MAX = 20;
+const STRIP_LEAD = 12;
+const STRIP_MAX = 16;
 export function splitHomeFeed<T>(ads: readonly T[]): { before: T[]; strip: T[]; after: T[] } {
-  if (ads.length < 8) return { before: [...ads], strip: [], after: [] };
+  if (ads.length < 16) return { before: [...ads], strip: [], after: [] };
   const stripEnd = STRIP_LEAD + STRIP_MAX;
   return { before: ads.slice(0, STRIP_LEAD), strip: ads.slice(STRIP_LEAD, stripEnd), after: ads.slice(stripEnd) };
 }

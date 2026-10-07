@@ -7,6 +7,16 @@ import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
 import { PriceText } from '@/components/price-text';
+import { SafeRender } from '@/components/safe-render';
+
+/** بديل آمن عند تعذّر تصيير بطاقة إعلان بعينها — يبقي الصفحة سليمة والإعلان قابلاً للفتح. */
+function FallbackAdCard({ id }: { id: number | string }) {
+  return (
+    <Link href={`/ads/${id}`} className="card-3d flex min-h-[180px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 text-center text-xs text-muted-foreground">
+      تعذّر عرض هذا الإعلان — افتحه لعرض التفاصيل
+    </Link>
+  );
+}
 
 function timeShort(iso: string | null) {
   const s = timeAgo(iso); // e.g. "قبل 3 يوم"
@@ -294,27 +304,29 @@ export async function AdGrid({ ads, className, appearance }: { ads: AdCardType[]
     return <p className="py-12 text-center text-muted-foreground">{msg}</p>;
   }
   const design = (await cookies()).get('design')?.value || '';
+  // كل بطاقة داخل حدّ خطأ دقيق: فشل تصيير إعلان واحد (بيانات ناقصة/تالفة) يعرض بديلاً
+  // بدل إسقاط الصفحة كلها لشاشة «حدث خطأ غير متوقع».
   if (design === 'shop') {
     return (
       <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4', className)}>
-        {ads.map((ad) => <AdCardShop key={ad.id} ad={ad} />)}
+        {ads.map((ad) => <SafeRender key={ad.id} label="shop" fallback={<FallbackAdCard id={ad.id} />}><AdCardShop ad={ad} /></SafeRender>)}
       </div>
     );
   }
   if (design === 'list') {
     return (
       <div className={cn('grid gap-3 lg:grid-cols-2', className)}>
-        {ads.map((ad) => <AdCardList key={ad.id} ad={ad} />)}
+        {ads.map((ad) => <SafeRender key={ad.id} label="list" fallback={<FallbackAdCard id={ad.id} />}><AdCardList ad={ad} /></SafeRender>)}
       </div>
     );
   }
   if (appearance === 'marketplace') {
-    return <div className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <AdCardMarketplace key={ad.id} ad={ad} />)}</div>;
+    return <div className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <SafeRender key={ad.id} label="marketplace" fallback={<FallbackAdCard id={ad.id} />}><AdCardMarketplace ad={ad} /></SafeRender>)}</div>;
   }
   return (
     <div className={cn('grid gap-3 lg:grid-cols-2', className)}>
       {ads.map((ad, i) => (
-        <AdCard key={ad.id} ad={ad} variant={i % 2 === 0 ? 'raised' : 'inset'} />
+        <SafeRender key={ad.id} label="grid" fallback={<FallbackAdCard id={ad.id} />}><AdCard ad={ad} variant={i % 2 === 0 ? 'raised' : 'inset'} /></SafeRender>
       ))}
     </div>
   );

@@ -124,9 +124,18 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
       expect(now.find((c) => c.table_name === old.table_name && c.column_name === old.column_name), `old column ${old.table_name}.${old.column_name}`).toEqual(old);
     }
     const candidate = await snapshot(baselineColumns);
-    // schema-sync يسجّل علامة داخلية notif_readat_backfilled في site_settings (مرّة واحدة)،
-    // وهي بيانات تشغيلية للتطبيق لا بيانات مستخدم؛ نستثنيها من مقارنة حفظ البيانات القديمة.
-    if (candidate.site_settings) candidate.site_settings = candidate.site_settings.filter((r) => !r.includes('notif_readat_backfilled'));
+    // schema-sync يُجري ترقيعاً واحداً محروساً (backfillLegacyNotificationReadAt) يضيف علامة
+    // نظامية واحدة معروفة إلى site_settings. نقبل هذه العلامة بعينها فقط — أي تغيير آخر في
+    // site_settings (إضافة/تعديل/حذف صف غيرها) يجب أن يُفشِل الاختبار، فلا نُضعِف حارس الحفظ.
+    const KNOWN_MARKER = stable({ k: 'notif_readat_backfilled', v: '1' });
+    if (candidate.site_settings && before.site_settings) {
+      const beforeRows = before.site_settings;
+      const addedRows = candidate.site_settings.filter((r) => !beforeRows.includes(r));
+      const removedRows = beforeRows.filter((r) => !candidate.site_settings.includes(r));
+      expect(removedRows, 'no site_settings row may be changed or removed by upgrade').toEqual([]);
+      expect(addedRows, 'only the known notif_readat_backfilled marker may be added').toEqual([KNOWN_MARKER]);
+      candidate.site_settings = beforeRows; // تُطابِق تماماً عدا العلامة المعروفة، فنسوّيها لفحص التطابق الكامل أدناه
+    }
     expect(candidate).toEqual(before);
   }
   async function assertLegacyAuthentication() {

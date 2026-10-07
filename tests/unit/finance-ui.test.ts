@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FinanceData, FinanceInvoice, FinanceSection } from '@/lib/finance/types';
 
 vi.mock('@/app/admin/finance/actions', () => ({
@@ -32,6 +32,11 @@ function renderSection(section: FinanceSection, source = data(), flags = { canEd
   const report = buildFinanceReport(source, { month: '2026-09', section, mode: 'accountant' }, new Date('2026-09-22T10:00:00Z'));
   return renderToStaticMarkup(createElement(FinanceWorkspace, { report, ...flags, actionKey: 'd0fb8672-aa6b-41ee-8383-2526b28f6c80' }));
 }
+// هذه الاختبارات تستخدم بيانات شهر 2026-09، وبعض ضوابط الواجهة (تحرير الشهر الجاري فقط)
+// تقرأ الساعة الحقيقية new Date(). نثبّت الساعة على نفس شهر البيانات حتى تبقى الاختبارات
+// حتمية في أي تاريخ تشغيل — دون تغيير سلوك المكوّن (قصر التحرير على الشهر الجاري سلوك صحيح).
+beforeAll(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-22T10:00:00Z')); });
+afterAll(() => { vi.useRealTimers(); });
 
 describe('finance invoice disclosure', () => {
   it('never renders internal supplier identity, cost, references or controls in the customer copy', () => {

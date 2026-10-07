@@ -322,7 +322,7 @@ export async function AdGrid({ ads, className, appearance }: { ads: AdCardType[]
     );
   }
   if (appearance === 'marketplace') {
-    return <div data-home-feed-grid data-mosaic={ads.length >= 6} className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <SafeRender key={ad.id} label="marketplace" fallback={<FallbackAdCard id={ad.id} />}><AdCardMarketplace ad={ad} /></SafeRender>)}</div>;
+    return <div data-home-feed-grid className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <SafeRender key={ad.id} label="marketplace" fallback={<FallbackAdCard id={ad.id} />}><AdCardMarketplace ad={ad} /></SafeRender>)}</div>;
   }
   return (
     <div className={cn('grid gap-3 lg:grid-cols-2', className)}>

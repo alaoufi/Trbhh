@@ -102,8 +102,8 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   // كي يبقى ممتلئاً دائماً دون أن يستهلك تغذية الشبكات. التخطيط المطلوب:
   //   صفّ «اكتشف السوق» فوق الشريط  →  شريط «لمحة من السوق»  →  عدّة صفوف تحته.
   const stripAds = selectedCategory ? [] : mergeHomeAds(mostViewed, topRated, featured, latest).slice(0, 16);
-  const feedBefore = selectedCategory ? feedAds : feedAds.slice(0, 4);
-  const feedAfter = selectedCategory ? [] : feedAds.slice(4);
+  const feedBefore = selectedCategory ? feedAds : feedAds.slice(0, 8);
+  const feedAfter = selectedCategory ? [] : feedAds.slice(8);
   const [compactStripTitle, compactStripHint] = await Promise.all([
     getSetting('home_compact_strip_title', 'لمحة من السوق'),
     getSetting('home_compact_strip_hint', 'تصفّح المزيد بالسحب أو التمرير'),

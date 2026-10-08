@@ -321,10 +321,10 @@ export function AdForm({
             <option value="preserve">{categoryConfig.labels.preserve}</option><option value="select">{categoryConfig.labels.reclassify}</option>
           </select></label>}
           {!preservingCategory && <><div className="grid gap-2 sm:grid-cols-2">
-            <label className={lbl}>{categoryConfig.labels.category}<select className={field} name="category_id" required value={categoryId} onChange={e=>{setCategoryId(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
+            <label className={lbl}>{categoryConfig.labels.category} <span className="text-xs font-normal text-muted-foreground">(اختياري)</span><select className={field} name="category_id" value={categoryId} onChange={e=>{setCategoryId(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
               <option value="">{categoryConfig.labels.choose}</option>{eligibleCategories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select></label>
-            <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{setSubcategoryId(e.target.value);setCategoryValues({});}}>
+            <label className={lbl}>{categoryConfig.labels.subcategory} <span className="text-xs font-normal text-muted-foreground">(اختياري)</span><select className={field} name="subcategory_id" value={subcategoryId} onChange={e=>{setSubcategoryId(e.target.value);setCategoryValues({});}}>
               <option value="">{categoryConfig.labels.choose}</option>{eligibleSubs.filter(s=>String(s.categoryId)===categoryId).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select></label>
           </div>

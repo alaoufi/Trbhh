@@ -127,6 +127,12 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
               <button className={`${button} bg-primary text-white`}>إضافة قسم مخفي</button>
             </form>
           </AccessBoundary>
+          {(() => {
+            const empty = cfg.subcategories.filter((s) => s.version < 1 || s.fields.length === 0).length;
+            return empty > 0
+              ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">أقسام فرعية بلا حقول بعد: <b>{empty}</b> — تُعبّأ تلقائياً من القوالب المطابقة عند أول إقلاع بعد النشر. إن بقيت بعد النشر فأسماؤها لا تطابق أي قالب؛ أخبرني لأضيف المطابقة.</p>
+              : <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">كل الأقسام الفرعية لها حقول ✓</p>;
+          })()}
           {cfg.categories.map((c) => (
             <details key={c.id} open={filter.category === c.id} className="space-y-3 rounded-xl border p-3">
               <summary className="flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 font-bold hover:bg-secondary"><span>{c.name} — {c.active ? 'ظاهر' : 'مخفي'} (#{c.id})</span><span className="text-xs font-normal text-muted-foreground">اضغط ▾</span></summary>

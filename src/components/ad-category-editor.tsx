@@ -46,6 +46,7 @@ export function AdCategoryEditor({initial,categoryId,action}:{initial?:Subcatego
         <button type="button" className="ms-auto rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50" onClick={()=>setFields(fields.filter((_,n)=>n!==i))}>إزالة الحقل</button>
       </div>
     </fieldset>)}
+    {fields.length===0&&<p className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 text-center text-sm">لا توجد حقول في هذا القسم الفرعي بعد. اضغط <b>«إضافة حقل»</b> لإضافة أول حقل — عندها يظهر لكل حقل مفتاح <b>الظهور</b> (مخفي/ظاهر) ومفتاح <b>الإلزام</b> (اختياري/إجباري). أو اختر قالباً جاهزاً أعلاه.</p>}
     <div className="flex gap-3"><button type="button" className="rounded border px-3 py-2" onClick={()=>setFields(current=>[...current,{key:nextCategoryFieldKey(current),label:'',type:'text',group:'',required:false,visible:true,order:current.length,options:[]}])}>إضافة حقل</button><button className="rounded bg-primary px-4 py-2 text-white">حفظ القسم الفرعي</button></div>
   </form>;
 }

@@ -54,11 +54,7 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
       if(fd.has('category_version')) throw new CategoryValidationError('','تم إيقاف الأقسام؛ أعد تحميل الصفحة');
       return write(tx,null);
     }
-    // التصنيف اختياري: إن لم يختر العضو قسماً وقسماً فرعياً، يُكتب الإعلان بلا تصنيف
-    // صريح (يبقى الإسناد الآلي الاحتياطي) بدل رفض الإضافة وكأن الحقل إجباري.
-    const catRaw=String(fd.get('category_id')??'').trim(),subRaw=String(fd.get('subcategory_id')??'').trim();
-    if(!catRaw||!subRaw) return write(tx,null);
-    const cid=categoryId(catRaw),sid=categoryId(subRaw);
+    const cid=categoryId(fd.get('category_id')),sid=categoryId(fd.get('subcategory_id'));
     const cats=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM categories WHERE id=${cid} AND is_active='yes' FOR SHARE`;
     const subs=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM sub_categories WHERE id=${sid} AND category_id=${cid} AND active=1 FOR SHARE`;
     const defs=await tx.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions WHERE subcategory_id=${sid} FOR SHARE`;

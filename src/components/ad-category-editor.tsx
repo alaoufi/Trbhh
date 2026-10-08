@@ -39,9 +39,10 @@ export function AdCategoryEditor({initial,categoryId,action}:{initial?:Subcatego
       {f.type==='number'&&(['min','max'] as const).map(k=><label key={k}>{k==='min'?'الحد الأدنى':'الحد الأعلى'}<input className={input} type="number" step="any" value={f[k]??''} onChange={e=>update(i,{[k]:e.target.value===''?undefined:Number(e.target.value)})}/></label>)}
       {(f.type==='select'||f.type==='multiselect')&&<label className="sm:col-span-3">الخيارات — خيار بكل سطر<textarea className={input} required value={f.options.join('\n')} onChange={e=>update(i,{options:e.target.value.split('\n')})}/></label>}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:col-span-3">
-        <Seg label="الظهور" on={f.visible} offLabel="مخفي" onLabel="ظاهر" onColor="bg-emerald-600" set={v=>update(i,{visible:v})}/>
-        <Seg label="الإلزام" on={f.required} offLabel="اختياري" onLabel="إجباري" onColor="bg-primary" set={v=>update(i,{required:v})}/>
-        <span className="text-[11px] text-muted-foreground">الإلزام يسري فقط عند ظهور الحقل.</span>
+        <Seg label="الظهور" on={f.visible} offLabel="مخفي" onLabel="ظاهر" onColor="bg-emerald-600" set={v=>update(i,v?{visible:true}:{visible:false,required:false})}/>
+        {f.visible
+          ? <Seg label="الإلزام" on={f.required} offLabel="اختياري" onLabel="إجباري" onColor="bg-primary" set={v=>update(i,{required:v})}/>
+          : <span className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-bold text-slate-500">المخفي اختياري دائماً</span>}
         <button type="button" className="ms-auto rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50" onClick={()=>setFields(fields.filter((_,n)=>n!==i))}>إزالة الحقل</button>
       </div>
     </fieldset>)}

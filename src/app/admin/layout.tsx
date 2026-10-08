@@ -19,7 +19,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="grid gap-4 md:grid-cols-[230px_1fr]">
-      <aside id="admin-nav" className="h-fit card-3d rounded-xl p-3">
+      {/* على الجوال: القائمة الجانبية (الهامبرغر ☰ «قائمة الإدارة») تكفي، فلا نكرّر هذه
+          القائمة ونزحم المكان — تظهر كشريط جانبي على الشاشات الكبيرة فقط. */}
+      <aside id="admin-nav" className="hidden h-fit card-3d rounded-xl p-3 md:block">
         <div className="mb-3 border-b pb-3">
           <div className="text-base font-extrabold text-primary">لوحة التحكم</div>
           <div className="mt-2 flex flex-wrap gap-1">{access.roles.map(role => <span key={role.id} className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">{role.name}</span>)}</div>
@@ -53,7 +55,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </nav>
       </aside>
       <section id="admin-content" className="min-w-0 scroll-mt-20 font-bold">{children}</section>
-      <ScrollTop targetId="admin-nav" />
+      <ScrollTop targetId="admin-content" />
     </div>
   );
 }

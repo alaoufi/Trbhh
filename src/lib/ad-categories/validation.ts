@@ -44,7 +44,8 @@ export function validateDefinition(raw: unknown): CategoryField[] {
     if (typeof f.min === 'number' && typeof f.max === 'number' && f.min > f.max) throw new CategoryValidationError(key, 'الحد الأدنى أكبر من الأعلى');
     if (f.unit !== undefined && (typeof f.unit !== 'string' || f.unit.length > 30)) throw new CategoryValidationError(key, 'وحدة القياس غير صالحة');
     return { key, label: f.label.trim(), type: f.type as CategoryFieldType, group: f.group.trim(),
-      required: f.required, visible: f.visible, order: f.order as number, options,
+      // قاعدة ثابتة: لا يوجد حقل مخفي إجباري — المخفي اختياري دائماً.
+      required: f.visible ? f.required : false, visible: f.visible, order: f.order as number, options,
       ...(typeof f.min === 'number' ? { min: f.min } : {}), ...(typeof f.max === 'number' ? { max: f.max } : {}),
       ...(typeof f.unit === 'string' ? { unit: f.unit.trim() } : {}),
     };

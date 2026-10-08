@@ -135,6 +135,22 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
                     {isAdmin && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">إدارة</span>}
                   </span>
                 </div>
+                {/* الحساب النشط بلا صلاحيات إدارية لكن حساباً مرتبطاً يملكها → زر تبديل واضح
+                    (يحلّ «لا تظهر لي الإدارة» عند تبديل الحساب — الصلاحيات لكل حساب على حدة). */}
+                {!isAdmin && linkedAccounts.some((a) => a.id !== currentUid && a.isAdmin) && (
+                  <div className="mt-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
+                    <p className="font-bold">هذا الحساب لا يملك صلاحيات إدارية.</p>
+                    <p className="mt-0.5">للوصول إلى لوحة الإدارة، بدّل إلى حسابك الإداري:</p>
+                    {linkedAccounts.filter((a) => a.id !== currentUid && a.isAdmin).map((a) => (
+                      <form key={a.id} action={switchAccountAction} onSubmit={close} className="mt-1">
+                        <input type="hidden" name="userId" value={a.id} />
+                        <button type="submit" className="flex w-full items-center justify-center gap-1.5 rounded-md bg-amber-600 px-2 py-1.5 font-bold text-white hover:bg-amber-700">
+                          <Shield className="h-3.5 w-3.5 shrink-0" /> بدّل إلى «{a.name}» (إدارة)
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                )}
                 {myStoreId > 0 && (
                   <Link href="/store" onClick={close} className="mt-0.5 flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
                     <span className="flex min-w-0 items-center gap-2"><Store className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">واجهة «{myStoreName || 'متجري'}»</span></span>

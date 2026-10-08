@@ -31,7 +31,7 @@ export function categoryEditorPath(id: number, section: CategoryEditorSection) {
 
 const safeId = (v: string | undefined) =>
   v === undefined || v === '' || (/^[1-9]\d*$/.test(v) && Number(v) <= 2147483647);
-export type CategoryAdminQuery = { view?: string; sub?: string; section?: string; category?: string; subcategory?: string; page?: string; review?: string; saved?: string; error?: string };
+export type CategoryAdminQuery = { view?: string; sub?: string; section?: string; category?: string; subcategory?: string; page?: string; review?: string; saved?: string; error?: string; filled?: string };
 export function categoryAdminQuery(q: CategoryAdminQuery) {
   return {
     page: Math.min(100000, Math.max(1, Math.floor(Number(q.page)) || 1)),

@@ -128,10 +128,20 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
             </form>
           </AccessBoundary>
           {(() => {
-            const empty = cfg.subcategories.filter((s) => s.version < 1 || s.fields.length === 0).length;
-            return empty > 0
-              ? <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">أقسام فرعية بلا حقول بعد: <b>{empty}</b> — تُعبّأ تلقائياً من القوالب المطابقة عند أول إقلاع بعد النشر. إن بقيت بعد النشر فأسماؤها لا تطابق أي قالب؛ أخبرني لأضيف المطابقة.</p>
-              : <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">كل الأقسام الفرعية لها حقول ✓</p>;
+            const emptySubs = cfg.subcategories.filter((s) => s.version < 1 || s.fields.length === 0);
+            if (emptySubs.length === 0) return <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">كل الأقسام الفرعية لها حقول ✓</p>;
+            return (
+              <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="font-bold">أقسام فرعية بلا حقول بعد: {emptySubs.length}</p>
+                <p className="mt-1 text-xs">تُعبّأ تلقائياً من القوالب المطابقة بالاسم عند الإقلاع. إن بقيت، فاسمها لا يطابق أي قالب — أرسل لي هذه الأسماء لأضيف مطابقتها:</p>
+                <ul className="mt-2 list-inside list-disc text-xs">
+                  {emptySubs.slice(0, 60).map((s) => {
+                    const cat = cfg.categories.find((c) => c.id === s.categoryId)?.name || '';
+                    return <li key={s.id}>{cat} / {s.name}</li>;
+                  })}
+                </ul>
+              </div>
+            );
           })()}
           {cfg.categories.map((c) => (
             <details key={c.id} open={filter.category === c.id} className="space-y-3 rounded-xl border p-3">

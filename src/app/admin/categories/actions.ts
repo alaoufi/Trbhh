@@ -7,9 +7,7 @@ import {setSetting} from '@/lib/settings';
 import {bustAdCaches} from '@/lib/data';
 import {categoryId,CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
 import {parseSubcategoryDefinition} from '@/lib/ad-categories/admin-input';
-import {CategoryValidationError,validateDefinition} from '@/lib/ad-categories/validation';
-import {getCategoryFormConfig} from '@/lib/ad-categories/service';
-import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
+import {CategoryValidationError} from '@/lib/ad-categories/validation';
 
 async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 /** يعيد التوجيه إلى الصفحة/التبويب الذي جاء منه الحفظ (return_to) أو الصفحة الرئيسية. */
@@ -20,36 +18,6 @@ export async function saveCategorySettings(fd:FormData){
   await setSetting('categories_v2_enabled',fd.get('enabled')==='1'?'1':'0');
   for(const [k,fallback] of Object.entries(CATEGORY_LABELS)) await setSetting(`categories_v2_label_${k}`,String(fd.get(`label_${k}`)||fallback).trim().slice(0,500));
   await refresh();redirect(back(fd,'saved'));
-}
-/**
- * تعبئة حقول الأقسام الفرعية الفارغة من القوالب النظامية المطابقة بالاسم — غير
- * متلفة إطلاقاً: تملأ فقط الأقسام الفرعية التي لا تعريف حقول لها (version<1)،
- * ولا تمسّ أي قسم فرعي عُرّفت حقوله فعلاً. تطابق القالب بـ(اسم القسم + اسم الفرعي).
- */
-export async function fillEmptyCategoryFields(fd:FormData){
-  const actor=await requireAccess('categories','edit');
-  const cfg=await getCategoryFormConfig(true);
-  const catName=new Map(cfg.categories.map(c=>[c.id,c.name]));
-  let filled=0;
-  await prisma.$transaction(async tx=>{
-    for(const s of cfg.subcategories){
-      if(s.version>0&&s.fields.length>0) continue; // عُرّفت حقوله — لا نمسّه
-      const tpl=CATEGORY_SEED_TEMPLATES.find(t=>t.categoryName===catName.get(s.categoryId)&&t.name===s.name);
-      if(!tpl) continue; // لا قالب مطابق بالاسم
-      const fields=validateDefinition(tpl.fields.map((f,i)=>({...f,order:i})));
-      await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json)
-        VALUES (${BigInt(s.id)},1,${tpl.kind},${Number(tpl.priceEnabled)},${Number(tpl.goodsEnabled)},${JSON.stringify(fields)})
-        ON DUPLICATE KEY UPDATE
-          kind=IF(version<1,VALUES(kind),kind),
-          price_enabled=IF(version<1,VALUES(price_enabled),price_enabled),
-          goods_enabled=IF(version<1,VALUES(goods_enabled),goods_enabled),
-          fields_json=IF(version<1,VALUES(fields_json),fields_json),
-          version=IF(version<1,1,version)`;
-      filled++;
-    }
-    await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'fill_empty_fields',${JSON.stringify({filled})})`;
-  });
-  await refresh();redirect(`/admin/categories?view=manage&saved=1&filled=${filled}`);
 }
 export async function saveCategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;

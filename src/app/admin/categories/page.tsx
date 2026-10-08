@@ -12,7 +12,7 @@ import {
   isCategoryAdminView, isCategoryEditorSection, categoryAdminQuery, categoryEditorPath,
   type CategoryAdminQuery,
 } from '@/lib/ad-categories/admin-navigation';
-import { saveCategory, saveCategorySettings, saveSubcategory, toggleCategory, fillEmptyCategoryFields } from './actions';
+import { saveCategory, saveCategorySettings, saveSubcategory, toggleCategory } from './actions';
 
 const input = 'min-h-11 w-full min-w-0 rounded-lg border p-2 text-sm';
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold';
@@ -29,7 +29,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   const notice = (
     <>
       {q.error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{q.error === 'input' ? 'لم يتم الحفظ. راجع المدخلات أو أعد تحميل الصفحة إن تغيّر التعريف.' : 'تعذّر إتمام العملية.'}</p>}
-      {q.saved && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-900">{q.filled !== undefined ? `تم ✓ — عُبّئت حقول ${q.filled} قسماً فرعياً من القوالب المطابقة.` : 'تم الحفظ ✓'}</p>}
+      {q.saved && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-900">تم الحفظ ✓</p>}
     </>
   );
 
@@ -119,13 +119,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
 
       {view === 'manage' && (
         <>
-          <AccessBoundary module="categories" action="edit">
-            <form action={fillEmptyCategoryFields} className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
-              <p className="mb-2 text-sm font-bold text-emerald-900">تعبئة الحقول تلقائياً للأقسام الفرعية الفارغة</p>
-              <p className="mb-3 text-xs text-emerald-900/80">يملأ حقول كل قسم فرعي لا تعريف له من القالب النظامي المطابق بالاسم (مثل «رافعات ومناولة»). آمن تماماً: لا يمسّ أي قسم عُرّفت حقوله فعلاً.</p>
-              <button className={`${button} bg-emerald-600 text-white`}>🪄 عبّئ حقول الأقسام الفارغة الآن</button>
-            </form>
-          </AccessBoundary>
           <AccessBoundary module="categories" action="create">
             <form action={saveCategory} className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
               <input type="hidden" name="return_to" value="/admin/categories?view=manage" />

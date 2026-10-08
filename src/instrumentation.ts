@@ -8,6 +8,15 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { ensureSchema } = await import('@/data/schema-sync');
     await ensureSchema().catch((e) => console.error('[schema-sync] failed at boot:', e));
+    // تعبئة حقول الأقسام الفرعية الفارغة من القوالب المطابقة — تلقائياً مرّة واحدة
+    // (بعلامة دائمة)، غير متلفة. لا يكسر الإقلاع إن فشل.
+    try {
+      const { seedEmptyCategoryFields } = await import('@/lib/ad-categories/seed-fields');
+      const n = await seedEmptyCategoryFields();
+      if (n > 0) console.log(`[seed-fields] filled ${n} empty subcategory field definitions`);
+    } catch (e) {
+      console.error('[seed-fields] failed at boot:', e);
+    }
   }
 }
 

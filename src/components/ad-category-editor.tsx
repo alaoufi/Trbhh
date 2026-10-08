@@ -5,6 +5,18 @@ import type {CategoryField} from '@/lib/ad-categories/validation';
 import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
 import {nextCategoryFieldKey} from '@/lib/ad-categories/admin-input';
 const input='w-full rounded-lg border border-primary/25 bg-white p-2 text-sm';
+
+/** مفتاح مجزّأ بحالتين بنفس أسلوب (اختياري/إجباري) — إدخال سلس بنقرة واحدة. */
+function Seg({label,on,offLabel,onLabel,onColor,set}:{label:string;on:boolean;offLabel:string;onLabel:string;onColor:string;set:(v:boolean)=>void}){
+  const base='min-w-[68px] rounded-md px-3 py-2 text-xs font-bold transition';
+  return <div className="flex items-center gap-2">
+    <span className="text-xs font-bold text-muted-foreground">{label}</span>
+    <div className="inline-flex rounded-lg border border-primary/25 bg-white p-0.5">
+      <button type="button" aria-pressed={!on} onClick={()=>set(false)} className={!on?`${base} bg-slate-500 text-white`:`${base} text-slate-500`}>{offLabel}</button>
+      <button type="button" aria-pressed={on} onClick={()=>set(true)} className={on?`${base} ${onColor} text-white`:`${base} text-slate-500`}>{onLabel}</button>
+    </div>
+  </div>;
+}
 export function AdCategoryEditor({initial,categoryId,action}:{initial?:SubcategoryOption;categoryId:number;action:(fd:FormData)=>Promise<void>}){
   const [fields,setFields]=useState<CategoryField[]>(initial?.fields||[]);
   const [kind,setKind]=useState<CategoryKind>(initial?.kind||'other');
@@ -17,7 +29,7 @@ export function AdCategoryEditor({initial,categoryId,action}:{initial?:Subcatego
     <div className="grid gap-2 sm:grid-cols-3"><label>اسم القسم الفرعي<input name="name" className={input} required maxLength={200} defaultValue={initial?.name}/></label><label>الترتيب<input name="order" type="number" min={0} max={10000} className={input} defaultValue={initial?.order??0}/></label><label>النوع<select name="kind" className={input} value={kind} onChange={e=>setKind(e.target.value as CategoryKind)}>{CATEGORY_KINDS.map(k=><option key={k} value={k}>{({goods:'سلع',property:'عقارات',jobs:'وظائف',service:'خدمات',livestock:'مواشٍ',plants:'نباتات',other:'أخرى'})[k]}</option>)}</select></label></div>
     <div className="flex flex-wrap gap-4"><label><input type="checkbox" name="price_enabled" value="1" checked={kind!=='jobs'&&price} disabled={kind==='jobs'} onChange={e=>setPrice(e.target.checked)}/> إظهار السعر العام</label><label><input type="checkbox" name="goods_enabled" value="1" checked={kind!=='jobs'&&goods} disabled={kind==='jobs'} onChange={e=>setGoods(e.target.checked)}/> إظهار تفاصيل السلع العامة</label></div>
     <div className="flex flex-wrap gap-2"><select aria-label="قالب الحقول" className={input} value={template} onChange={e=>setTemplate(e.target.value)}><option value="">اختر قالباً اختيارياً</option>{CATEGORY_SEED_TEMPLATES.map(t=><option key={t.key} value={t.key}>{t.categoryName} — {t.name}</option>)}</select><button type="button" disabled={!template} className="rounded border px-3 py-2" onClick={()=>{const t=CATEGORY_SEED_TEMPLATES.find(t=>t.key===template);if(t){setFields(t.fields.map(f=>({...f,options:[...f.options]})));setKind(t.kind);setPrice(t.priceEnabled);setGoods(t.goodsEnabled);}}}>استبدال حقول المحرر بالقالب المختار</button><p className="text-xs text-muted-foreground">لا يُطبّق على الإعلانات أو قاعدة البيانات حتى تحفظ هذا القسم الفرعي.</p></div>
-    {fields.map((f,i)=><fieldset key={i} className="grid gap-2 rounded-lg border bg-primary/5 p-3 sm:grid-cols-3"><legend>حقل {i+1}</legend>
+    {fields.map((f,i)=><fieldset key={i} className={`grid gap-2 rounded-lg border bg-primary/5 p-3 sm:grid-cols-3 ${f.visible?'':'opacity-70'}`}><legend className="px-1 text-sm font-bold">حقل {i+1}{!f.visible&&' — مخفي'}</legend>
       <label>المعرف الثابت<input className={input} required pattern="[a-z][a-z0-9_]{0,47}" value={f.key} onChange={e=>update(i,{key:e.target.value})}/></label>
       <label>اسم الحقل<input className={input} required maxLength={120} value={f.label} onChange={e=>update(i,{label:e.target.value})}/></label>
       <label>النوع<select className={input} value={f.type} onChange={e=>update(i,{type:e.target.value as CategoryField['type']})}>{(['text','textarea','number','select','multiselect','boolean','date'] as const).map(t=><option key={t} value={t}>{({text:'نص',textarea:'نص طويل',number:'رقم',select:'اختيار واحد',multiselect:'اختيارات متعددة',boolean:'نعم / لا',date:'تاريخ'})[t]}</option>)}</select></label>
@@ -26,7 +38,12 @@ export function AdCategoryEditor({initial,categoryId,action}:{initial?:Subcatego
       <label>الوحدة<input className={input} maxLength={30} value={f.unit||''} onChange={e=>update(i,{unit:e.target.value})}/></label>
       {f.type==='number'&&(['min','max'] as const).map(k=><label key={k}>{k==='min'?'الحد الأدنى':'الحد الأعلى'}<input className={input} type="number" step="any" value={f[k]??''} onChange={e=>update(i,{[k]:e.target.value===''?undefined:Number(e.target.value)})}/></label>)}
       {(f.type==='select'||f.type==='multiselect')&&<label className="sm:col-span-3">الخيارات — خيار بكل سطر<textarea className={input} required value={f.options.join('\n')} onChange={e=>update(i,{options:e.target.value.split('\n')})}/></label>}
-      <label><input type="checkbox" checked={f.required} onChange={e=>update(i,{required:e.target.checked})}/> مطلوب عند الظهور</label><label><input type="checkbox" checked={f.visible} onChange={e=>update(i,{visible:e.target.checked})}/> ظاهر</label><button type="button" className="text-red-700" onClick={()=>setFields(fields.filter((_,n)=>n!==i))}>إزالة الحقل</button>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 sm:col-span-3">
+        <Seg label="الظهور" on={f.visible} offLabel="مخفي" onLabel="ظاهر" onColor="bg-emerald-600" set={v=>update(i,{visible:v})}/>
+        <Seg label="الإلزام" on={f.required} offLabel="اختياري" onLabel="إجباري" onColor="bg-primary" set={v=>update(i,{required:v})}/>
+        <span className="text-[11px] text-muted-foreground">الإلزام يسري فقط عند ظهور الحقل.</span>
+        <button type="button" className="ms-auto rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50" onClick={()=>setFields(fields.filter((_,n)=>n!==i))}>إزالة الحقل</button>
+      </div>
     </fieldset>)}
     <div className="flex gap-3"><button type="button" className="rounded border px-3 py-2" onClick={()=>setFields(current=>[...current,{key:nextCategoryFieldKey(current),label:'',type:'text',group:'',required:false,visible:true,order:current.length,options:[]}])}>إضافة حقل</button><button className="rounded bg-primary px-4 py-2 text-white">حفظ القسم الفرعي</button></div>
   </form>;

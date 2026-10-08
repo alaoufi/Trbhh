@@ -6,14 +6,16 @@ const register = readFileSync('src/components/pwa-register.tsx', 'utf8');
 const nextConfig = readFileSync('next.config.mjs', 'utf8');
 
 describe('service worker update policy', () => {
-  it('uses a versioned registration URL so a cached worker cannot block an update', () => {
-    expect(register).toContain("navigator.serviceWorker.register('/sw.js?v=8')");
+  it('uses a release-versioned registration URL + reload-on-takeover so a cached worker cannot block an update', () => {
+    // الرابط مربوط برقم النسخة المنشورة، وإعادة تحميل مرّة واحدة عند تسلّم عامل جديد.
+    expect(register).toContain('`/sw.js?v=${v}`');
+    expect(register).toContain('controllerchange');
     expect(nextConfig).toContain("source: '/sw.js'");
     expect(nextConfig).toContain("value: 'no-cache, no-store, must-revalidate'");
   });
 
   it('fetches application bundles from the network before using an offline copy', () => {
-    expect(worker).toContain("const CACHE = 'trbhh-v8'");
+    expect(worker).toContain("const CACHE = 'trbhh-v10'");
     expect(worker).toContain("fetch(request).then((res) => {");
     expect(worker).toContain(".catch(() => caches.match(request))");
     const staticBlock = worker.slice(worker.indexOf("if (url.pathname.startsWith('/_next/static/'))"), worker.indexOf("if (url.pathname.startsWith('/media/'))"));

@@ -1,84 +1,24 @@
-import { ArrowUp, Target, ListChecks } from 'lucide-react';
-import { ScrollTop } from '@/components/scroll-top';
+import { GuideClassic, type GuideSection } from './guide-classic';
+import { GuideBook } from './guide-book';
+import { getSettingBool } from '@/lib/settings';
+import { GUIDE_BOOK_SETTING, type GuideChapter } from '@/lib/guide-book';
+export type { GuideSection } from './guide-classic';
 
-export type GuideSection = {
-  id: string; title: string; icon: React.ElementType; from: string; to: string;
-  goal: string; steps: string[]; links?: { href: string; label: string }[];
-};
-
-/** Shared rich guide renderer: gradient header, index, and per-section goal + numbered steps. */
-export function GuideView({
-  topId, headerIcon: HeaderIcon, title, subtitle, fromColor = '#3287da', toColor = '#1b4f8a', sections, children,
-}: {
-  topId: string; headerIcon: React.ElementType; title: string; subtitle: string; fromColor?: string; toColor?: string;
-  sections: GuideSection[]; children?: React.ReactNode;
-}) {
-  return (
-    <div id={topId} className="space-y-5 scroll-mt-20">
-      <ScrollTop targetId={topId} />
-
-      {/* header */}
-      {/* تدرّج بأسلوب inline لأن card-3d تفرض خلفية فاتحة تطمس تدرّجات Tailwind */}
-      <div className="card-3d overflow-hidden rounded-2xl p-5 text-white shadow-lg" style={{ backgroundImage: `linear-gradient(135deg, ${fromColor}, ${toColor})` }}>
-        <div className="flex items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20"><HeaderIcon className="h-7 w-7" /></span>
-          <div>
-            <h1 className="text-xl font-extrabold drop-shadow">{title}</h1>
-            <p className="text-sm font-bold text-white/85">{subtitle}</p>
-          </div>
-        </div>
-      </div>
-
-      {children}
-
-      {/* index */}
-      <div id="guide-index" className="card-3d scroll-mt-20 rounded-2xl p-4">
-        <div className="mb-3 flex items-center gap-2 font-extrabold text-primary"><ListChecks className="h-5 w-5" /> الفهرس — اضغط للانتقال</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {sections.map((s, i) => (
-            <a key={s.id} href={`#${s.id}`} className="flex items-center gap-2 rounded-xl border-2 border-primary/15 bg-white px-3 py-2.5 text-sm font-bold text-primary transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundImage: `linear-gradient(135deg, ${s.from}, ${s.to})` }}><s.icon className="h-4 w-4" /></span>
-              <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">{i + 1}. {s.title}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      {/* sections */}
-      {sections.map((s, i) => (
-        <section key={s.id} id={s.id} className="card-3d scroll-mt-20 overflow-hidden rounded-2xl">
-          <div className="flex items-center justify-between gap-3 p-4 text-white" style={{ backgroundImage: `linear-gradient(135deg, ${s.from}, ${s.to})` }}>
-            <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20 shadow-inner ring-1 ring-white/30"><s.icon className="h-7 w-7" /></span>
-              <h2 className="text-lg font-extrabold drop-shadow">{i + 1}. {s.title}</h2>
-            </div>
-            <a href="#guide-index" className="flex items-center gap-1 rounded-full bg-white/20 px-3 py-1.5 text-xs font-bold hover:bg-white/30" title="العودة للفهرس">
-              <ArrowUp className="h-4 w-4" /> الفهرس
-            </a>
-          </div>
-
-          <div className="space-y-3 p-4">
-            <div className="flex items-start gap-2 rounded-xl bg-primary/5 p-3">
-              <Target className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <div><div className="text-xs font-extrabold text-primary">الهدف</div><p className="text-sm font-bold text-foreground/90">{s.goal}</p></div>
-            </div>
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-primary"><ListChecks className="h-4 w-4" /> الإجراء والطريقة</div>
-              <ol className="space-y-2">
-                {s.steps.map((st, j) => (
-                  <li key={j} className="flex items-start gap-2 rounded-lg border border-primary/10 bg-accent/20 p-2.5">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-extrabold text-white">{j + 1}</span>
-                    <span className="text-sm font-bold text-foreground/90">{st}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-            {s.links && s.links.length > 0 && <div className="flex flex-wrap gap-2 border-t border-primary/10 pt-3">
-              {s.links.map((link) => <a key={link.href} href={link.href} className="rounded-lg bg-primary px-3 py-2 text-xs font-extrabold text-white hover:bg-primary/90">{link.label} ←</a>)}
-            </div>}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
+/**
+ * عارض الأدلة: افتراضياً «الكتاب المجسّم» ثلاثي الأبعاد الملوّن المطعّم بالصور،
+ * مع إمكانية الرجوع للعرض الكلاسيكي من الإعدادات (guide_book_enabled).
+ * المحتوى نفسه يأتي من صفحات الدليل فيبقى مطابقاً للواقع.
+ */
+export async function GuideView(props: React.ComponentProps<typeof GuideClassic>) {
+  if (!(await getSettingBool(GUIDE_BOOK_SETTING, true).catch(() => true))) return <GuideClassic {...props} />;
+  const admin = props.topId === 'admin-guide-top';
+  // لقطات الأقسام والحقول تُطعّم قسم «إدارة الأقسام والحقول» في دليل الإدارة.
+  const images: Record<string, string[]> = { 'category-definitions': ['manage', 'fields', 'requirements', 'display', 'ads', 'settings'] };
+  const imageTitles: Record<string, string> = { manage: 'إضافة وتعديل الأقسام', fields: 'إضافة وتعديل الحقول', requirements: 'الحقول الإجبارية والاختيارية', display: 'إظهار وإخفاء الحقول', ads: 'إعلانات الأقسام', settings: 'إعدادات الأقسام' };
+  const sections: GuideChapter[] = props.sections.map((s: GuideSection) => ({
+    id: s.id, title: s.title, goal: s.goal, steps: s.steps,
+    ...(s.links ? { links: s.links } : {}),
+    ...(admin && images[s.id] ? { images: images[s.id].map((key) => ({ src: `/help/categories/${key}.webp`, alt: `لقطة تعليمية ببيانات تجريبية — ${imageTitles[key]}` })) } : {}),
+  }));
+  return <GuideBook topId={props.topId} title={props.title} subtitle={props.subtitle} sections={sections}>{props.children}</GuideBook>;
 }

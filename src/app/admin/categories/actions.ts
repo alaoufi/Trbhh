@@ -10,12 +10,14 @@ import {parseSubcategoryDefinition} from '@/lib/ad-categories/admin-input';
 import {CategoryValidationError} from '@/lib/ad-categories/validation';
 
 async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
+/** يعيد التوجيه إلى الصفحة/التبويب الذي جاء منه الحفظ (return_to) أو الصفحة الرئيسية. */
+function back(fd:FormData,status:'saved'|'error',code='1'){const r=String(fd.get('return_to')||'');const base=/^\/admin\/categories(\?|$)/.test(r)?r:'/admin/categories';return `${base}${base.includes('?')?'&':'?'}${status}=${code}`;}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
 export async function saveCategorySettings(fd:FormData){
   await requireAccess('categories', 'manage_settings');
   await setSetting('categories_v2_enabled',fd.get('enabled')==='1'?'1':'0');
   for(const [k,fallback] of Object.entries(CATEGORY_LABELS)) await setSetting(`categories_v2_label_${k}`,String(fd.get(`label_${k}`)||fallback).trim().slice(0,500));
-  await refresh();redirect('/admin/categories?saved=1');
+  await refresh();redirect(back(fd,'saved'));
 }
 export async function saveCategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
@@ -26,8 +28,8 @@ export async function saveCategory(fd:FormData){
       const c=id?await tx.categories.update({where:{id:BigInt(id)},data:{name,ordered:order}}):await tx.categories.create({data:{name,ordered:order,photo_path:'',is_active:'no'}});
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_category',${JSON.stringify({id:Number(c.id),name,order})})`;
     });
-  }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories?error=input');throw e;}
-  await refresh();redirect('/admin/categories?saved=1');
+  }catch(e){if(e instanceof CategoryValidationError)redirect(back(fd,'error','input'));throw e;}
+  await refresh();redirect(back(fd,'saved'));
 }
 export async function toggleCategory(fd:FormData){
   const actor=await requireAccess('categories','suspend');const id=categoryId(fd.get('id'));const sub=fd.get('sub')==='1';const active=fd.get('active')==='1';
@@ -35,7 +37,7 @@ export async function toggleCategory(fd:FormData){
     if(sub)await tx.sub_categories.update({where:{id:BigInt(id)},data:{active:active?1:0}});
     else await tx.categories.update({where:{id:BigInt(id)},data:{is_active:active?'yes':'no'}});
     await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'visibility',${JSON.stringify({id,sub,active})})`;
-  });await refresh();redirect('/admin/categories?saved=1');
+  });await refresh();redirect(back(fd,'saved'));
 }
 export async function saveSubcategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
@@ -56,6 +58,6 @@ export async function saveSubcategory(fd:FormData){
       await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(def.fields)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json)`;
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_subcategory',${JSON.stringify({id:Number(sid),categoryId:cid,name,...def})})`;
     });
-  }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories?error=input');throw e;}
-  await refresh();redirect('/admin/categories?saved=1');
+  }catch(e){if(e instanceof CategoryValidationError)redirect(back(fd,'error','input'));throw e;}
+  await refresh();redirect(back(fd,'saved'));
 }

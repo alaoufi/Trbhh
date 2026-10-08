@@ -1,29 +1,178 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { AccessBoundary } from '@/components/access-boundary';
 import { requireAdminPage, readActorAccess } from '@/lib/access-control/guards';
+import { prisma } from '@/lib/prisma';
+import { getCategoryFormConfig } from '@/lib/ad-categories/service';
+import { AdCategoryEditor } from '@/components/ad-category-editor';
+import { CategoryAdminNavigation } from '@/components/category-admin-navigation';
+import { CategoryFieldPicker } from '@/components/category-field-picker';
+import {
+  CATEGORY_ADMIN_PAGES, CATEGORY_EDITOR_SECTIONS,
+  isCategoryAdminView, isCategoryEditorSection, categoryAdminQuery, categoryEditorPath,
+  type CategoryAdminQuery,
+} from '@/lib/ad-categories/admin-navigation';
+import { saveCategory, saveCategorySettings, saveSubcategory, toggleCategory } from './actions';
 
-import {prisma} from '@/lib/prisma';
-import {getCategoryFormConfig} from '@/lib/ad-categories/service';
-import {AdCategoryEditor} from '@/components/ad-category-editor';
-import {saveCategory,saveCategorySettings,saveSubcategory,toggleCategory} from './actions';
-const input='rounded border p-2';
-export default async function CategoriesPage({searchParams}:{searchParams:Promise<{error?:string;saved?:string;page?:string}>}){
-  const session=await requireAdminPage('/admin/categories');
-  const {keys}=await readActorAccess(session.uid);
-  const cfg=await getCategoryFormConfig(true),q=await searchParams;
-  const page=Math.max(1,Math.min(100000,Number(q.page)||1));
-  const otherIds=cfg.categories.filter(c=>c.name==='عروض أخرى').map(c=>BigInt(c.id));
-  const unclassified=keys.has('ads:view')?await prisma.ads.findMany({where:{OR:[{cat_reviewed:0},{subcategory_id:null},{category_id:{in:otherIds}}]},select:{id:true,title:true,category_id:true,subcategory_id:true},orderBy:{id:'desc'},take:50,skip:(Math.floor(page)-1)*50}):[];
-  return <div dir="rtl" className="space-y-5"><h1 className="text-xl font-bold">إدارة الأقسام والحقول</h1>
-    {q.error&&<p role="alert" className="rounded bg-red-50 p-3 text-red-800">لم يتم الحفظ. راجع البيانات أو أعد تحميل الصفحة إذا تغيّر التعريف.</p>}{q.saved&&<p role="status">تم الحفظ</p>}
-    <AccessBoundary module={'categories'} action={'manage_settings'}><form action={saveCategorySettings} className="space-y-3 rounded-xl border p-4"><label><input type="checkbox" name="enabled" value="1" defaultChecked={cfg.enabled}/> تفعيل الأقسام في الإعلانات الفعلية</label><div className="grid gap-2 sm:grid-cols-2">{Object.entries(cfg.labels).map(([k,v])=><label key={k}>{k}<input className={`${input} w-full`} name={`label_${k}`} defaultValue={v} maxLength={500}/></label>)}</div><button className={input}>حفظ الإعدادات والنصوص</button></form></AccessBoundary>
-    <AccessBoundary module="categories" action="create"><form action={saveCategory} className="flex flex-wrap gap-2"><input className={input} name="name" placeholder="اسم قسم جديد" aria-label="اسم قسم جديد" required/><input className={input} name="order" type="number" min={0} max={10000} defaultValue={0} aria-label="ترتيب القسم"/><button className={input}>إضافة قسم مخفي</button></form></AccessBoundary>
-    <p className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">🎛️ <b>للتحكم بالحقول (إظهار/إخفاء/إلزام لكل حقل):</b> اضغط اسم <b>القسم</b> ليتوسّع، ثم اضغط اسم <b>القسم الفرعي</b> ليظهر محرّر الحقول.</p>
-    {cfg.categories.map(c=><details key={c.id} className="space-y-3 rounded-xl border p-4"><summary className="flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 font-bold hover:bg-secondary"><span>{c.name} — {c.active?'ظاهر':'مخفي'} (#{c.id})</span><span className="text-xs font-normal text-muted-foreground">اضغط لفتح الأقسام الفرعية ▾</span></summary>
-      <AccessBoundary module="categories" action="edit"><form action={saveCategory} className="mt-3 flex flex-wrap gap-2"><input type="hidden" name="id" value={c.id}/><input className={input} name="name" aria-label="اسم القسم" required defaultValue={c.name}/><input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order} aria-label="الترتيب"/><button className={input}>حفظ القسم</button></form></AccessBoundary>
-      <AccessBoundary module={'categories'} action={'suspend'}><form action={toggleCategory}><input type="hidden" name="id" value={c.id}/><input type="hidden" name="active" value={c.active?'0':'1'}/><button className={input}>{c.active?'إخفاء القسم':'إظهار القسم'}</button></form></AccessBoundary>
-      {cfg.subcategories.filter(s=>s.categoryId===c.id).map(s=><details key={s.id} className="rounded border p-3"><summary className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/10 px-3 py-2 font-bold text-primary hover:bg-primary/15"><span>{s.name} — {s.active?'ظاهر':'مخفي'} — نسخة {s.version}</span><span className="text-xs font-normal text-primary/80">✏️ عرض وتعديل الحقول (إظهار/إخفاء/إلزام) — اضغط</span></summary><AccessBoundary module="categories" action="edit"><AdCategoryEditor initial={s} categoryId={c.id} action={saveSubcategory}/></AccessBoundary><AccessBoundary module={'categories'} action={'suspend'}><form action={toggleCategory}><input type="hidden" name="sub" value="1"/><input type="hidden" name="id" value={s.id}/><input type="hidden" name="active" value={s.active?'0':'1'}/><button className={input}>{s.active?'إخفاء القسم الفرعي':'إظهار القسم الفرعي'}</button></form></AccessBoundary></details>)}
-      <details><summary>إضافة قسم فرعي مخفي</summary><AccessBoundary module="categories" action="create"><AdCategoryEditor categoryId={c.id} action={saveSubcategory}/></AccessBoundary></details>
-    </details>)}
-    <section className="space-y-3"><h2 className="font-bold">إعلانات غير مصنفة أو بانتظار المراجعة</h2><p className="text-sm">عرض فقط؛ لا إسناد تلقائي ولا تغيير للعناوين أو الصور.</p><table className="w-full text-sm"><thead><tr><th>الرقم</th><th>العنوان</th><th>القسم الحالي</th></tr></thead><tbody>{unclassified.map(a=><tr key={String(a.id)}><td>{String(a.id)}</td><td><a href={`/ads/${a.id}`}>{a.title}</a></td><td>{cfg.categories.find(c=>c.id===Number(a.category_id))?.name||String(a.category_id)}</td></tr>)}</tbody></table><div className="flex gap-4">{page>1&&<a href={`?page=${page-1}`}>السابق</a>}{unclassified.length===50&&<a href={`?page=${page+1}`}>التالي</a>}</div></section>
-  </div>;
+const input = 'min-h-11 w-full min-w-0 rounded-lg border p-2 text-sm';
+const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold';
+const labelNames: Record<string, string> = { section: 'عنوان مجموعة التصنيف', category: 'اسم خانة القسم', subcategory: 'اسم خانة القسم الفرعي', choose: 'عبارة الاختيار', error: 'رسالة خطأ التصنيف', details: 'عنوان مواصفات الإعلان', preserve: 'خيار إبقاء التصنيف', reclassify: 'خيار تغيير التصنيف', preserveHint: 'شرح إبقاء التصنيف', browse: 'زر عرض الإعلانات', clear: 'زر مسح التصفية', resultsTitle: 'عنوان نتائج القسم', emptyText: 'رسالة عدم وجود إعلانات' };
+
+export default async function CategoriesPage({ searchParams }: { searchParams: Promise<CategoryAdminQuery> }) {
+  const session = await requireAdminPage('/admin/categories');
+  const { keys } = await readActorAccess(session.uid);
+  const q = await searchParams;
+  const cfg = await getCategoryFormConfig(true);
+  const filter = categoryAdminQuery(q);
+  if (filter.invalid) notFound();
+
+  const notice = (
+    <>
+      {q.error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{q.error === 'input' ? 'لم يتم الحفظ. راجع المدخلات أو أعد تحميل الصفحة إن تغيّر التعريف.' : 'تعذّر إتمام العملية.'}</p>}
+      {q.saved && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-emerald-900">تم الحفظ ✓</p>}
+    </>
+  );
+
+  // ===== محرّر قسم فرعي مركّز (?sub=&section=) =====
+  if (q.sub && /^[1-9]\d*$/.test(q.sub)) {
+    const sid = Number(q.sub);
+    const sub = cfg.subcategories.find((s) => s.id === sid);
+    if (!sub) notFound();
+    const section = isCategoryEditorSection(q.section) ? q.section : 'fields';
+    const category = cfg.categories.find((c) => c.id === sub.categoryId);
+    const here = categoryEditorPath(sid, section);
+    return (
+      <div dir="rtl" className="min-w-0 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <Link className={button} href="/admin/categories">▸ الأقسام وحقولها</Link>
+          <Link className={button} href="/admin/categories?view=fields">اختيار قسم آخر</Link>
+        </div>
+        <h1 className="text-xl font-bold">{CATEGORY_EDITOR_SECTIONS[section]} — {sub.name}</h1>
+        <p className="text-sm text-muted-foreground">{category?.name} / {sub.name} — احفظ قبل الانتقال لتبويب آخر.</p>
+        <nav aria-label="تبويبات الحقول" className="flex flex-wrap gap-2">
+          {(Object.entries(CATEGORY_EDITOR_SECTIONS) as [keyof typeof CATEGORY_EDITOR_SECTIONS, string][]).map(([k, label]) => (
+            <Link key={k} href={categoryEditorPath(sid, k)} aria-current={section === k ? 'page' : undefined} className={`${button} ${section === k ? 'bg-primary text-white' : ''}`}>{label}</Link>
+          ))}
+        </nav>
+        {section === 'requirements' && <p className="rounded-lg bg-slate-50 p-3 text-sm">إجباري: يجب على العضو تعبئته عند ظهوره. اختياري: يمكن تركه فارغاً. الحقل المخفي اختياري دائماً.</p>}
+        {section === 'display' && <p className="rounded-lg bg-slate-50 p-3 text-sm">تحكّم بظهور كل حقل في نموذج الإعلان. إخفاء الحقل يجعله اختيارياً تلقائياً.</p>}
+        {notice}
+        <AccessBoundary module="categories" action="edit">
+          <AdCategoryEditor key={`${sid}:${sub.version}:${section}`} initial={sub} categoryId={sub.categoryId} section={section} returnTo={here} action={saveSubcategory} />
+        </AccessBoundary>
+      </div>
+    );
+  }
+
+  const view = isCategoryAdminView(q.view) ? q.view : undefined;
+
+  // ===== الصفحة الرئيسية (بطاقات المهام) =====
+  if (!view) {
+    return (
+      <div dir="rtl" className="min-w-0 space-y-4">
+        <h1 className="text-xl font-bold">الأقسام وحقولها</h1>
+        <p className="text-sm text-muted-foreground">اختر المهمة مباشرةً — كل مهمة في صفحتها المرتّبة:</p>
+        {notice}
+        <CategoryAdminNavigation home />
+      </div>
+    );
+  }
+
+  if (filter.category && !cfg.categories.some((c) => c.id === filter.category)) notFound();
+  if (filter.subcategory && !cfg.subcategories.some((s) => s.id === filter.subcategory)) notFound();
+
+  const ads = view === 'ads' && keys.has('ads:view')
+    ? await prisma.ads.findMany({
+        where: {
+          ...(filter.category ? { category_id: BigInt(filter.category) } : {}),
+          ...(filter.subcategory ? { subcategory_id: filter.subcategory } : {}),
+          ...(q.review === '1' ? { OR: [{ cat_reviewed: 0 }, { subcategory_id: null }] } : {}),
+        },
+        select: { id: true, title: true, category_id: true, subcategory_id: true },
+        orderBy: { id: 'desc' }, take: 51, skip: (filter.page - 1) * 50,
+      })
+    : [];
+  const adsPage = (page: number) => {
+    const p = new URLSearchParams({ view: 'ads', page: String(page) });
+    if (filter.category) p.set('category', String(filter.category));
+    if (filter.subcategory) p.set('subcategory', String(filter.subcategory));
+    if (q.review === '1') p.set('review', '1');
+    return `/admin/categories?${p}`;
+  };
+
+  return (
+    <div dir="rtl" className="min-w-0 space-y-4">
+      <h1 className="text-xl font-bold">{CATEGORY_ADMIN_PAGES[view].title}</h1>
+      <CategoryAdminNavigation current={view} />
+      {notice}
+
+      {view === 'settings' && (
+        <AccessBoundary module="categories" action="manage_settings">
+          <form action={saveCategorySettings} className="space-y-3 rounded-xl border p-4">
+            <input type="hidden" name="return_to" value="/admin/categories?view=settings" />
+            <label className="flex min-h-11 items-center gap-2"><input type="checkbox" name="enabled" value="1" defaultChecked={cfg.enabled} /> تفعيل الأقسام في الإعلانات الفعلية</label>
+            <div className="grid gap-2 sm:grid-cols-2">{Object.entries(cfg.labels).map(([k, v]) => <label key={k}>{labelNames[k] || k}<input className={input} name={`label_${k}`} defaultValue={v} maxLength={500} /></label>)}</div>
+            <button className={`${button} bg-primary text-white`}>حفظ الإعدادات والنصوص</button>
+          </form>
+        </AccessBoundary>
+      )}
+
+      {view === 'manage' && (
+        <>
+          <AccessBoundary module="categories" action="create">
+            <form action={saveCategory} className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
+              <input type="hidden" name="return_to" value="/admin/categories?view=manage" />
+              <label className="min-w-0 flex-1">اسم قسم رئيسي جديد<input className={input} name="name" placeholder="اسم القسم" required /></label>
+              <label>الترتيب<input className={input} name="order" type="number" min={0} max={10000} defaultValue={0} /></label>
+              <button className={`${button} bg-primary text-white`}>إضافة قسم مخفي</button>
+            </form>
+          </AccessBoundary>
+          {cfg.categories.map((c) => (
+            <details key={c.id} open={filter.category === c.id} className="space-y-3 rounded-xl border p-3">
+              <summary className="flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 font-bold hover:bg-secondary"><span>{c.name} — {c.active ? 'ظاهر' : 'مخفي'} (#{c.id})</span><span className="text-xs font-normal text-muted-foreground">اضغط ▾</span></summary>
+              <AccessBoundary module="categories" action="edit">
+                <form action={saveCategory} className="flex flex-wrap items-end gap-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="return_to" value="/admin/categories?view=manage" /><label className="min-w-0 flex-1">اسم القسم<input className={input} name="name" required defaultValue={c.name} /></label><label>الترتيب<input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order} /></label><button className={button}>حفظ القسم</button></form>
+              </AccessBoundary>
+              <AccessBoundary module="categories" action="suspend">
+                <form action={toggleCategory}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="active" value={c.active ? '0' : '1'} /><input type="hidden" name="return_to" value="/admin/categories?view=manage" /><button className={button}>{c.active ? 'إخفاء القسم' : 'إظهار القسم'}</button></form>
+              </AccessBoundary>
+              {cfg.subcategories.filter((s) => s.categoryId === c.id).map((s) => (
+                <section key={s.id} className="space-y-2 rounded-lg border bg-slate-50 p-3">
+                  <h3 className="break-words font-bold">{s.name} — {s.active ? 'ظاهر' : 'مخفي'} — نسخة {s.version}</h3>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Link className={`${button} bg-primary text-white`} href={categoryEditorPath(s.id, 'fields')}>✏️ تعديل الحقول</Link>
+                    <Link className={button} href={`/admin/categories?view=ads&category=${c.id}&subcategory=${s.id}`}>إعلانات هذا القسم</Link>
+                    <AccessBoundary module="categories" action="suspend"><form action={toggleCategory}><input type="hidden" name="sub" value="1" /><input type="hidden" name="id" value={s.id} /><input type="hidden" name="active" value={s.active ? '0' : '1'} /><input type="hidden" name="return_to" value="/admin/categories?view=manage" /><button className={`${button} w-full`}>{s.active ? 'إخفاء الفرعي' : 'إظهار الفرعي'}</button></form></AccessBoundary>
+                  </div>
+                </section>
+              ))}
+              {!cfg.subcategories.some((s) => s.categoryId === c.id) && <p className="text-sm">لا توجد أقسام فرعية بعد. أضِفها أدناه.</p>}
+              <AccessBoundary module="categories" action="create">
+                <details className="rounded-lg border p-2"><summary className="cursor-pointer px-2 py-2 text-sm font-bold">➕ إضافة قسم فرعي مخفي</summary><div className="pt-2"><AdCategoryEditor categoryId={c.id} returnTo="/admin/categories?view=manage" action={saveSubcategory} /></div></details>
+              </AccessBoundary>
+            </details>
+          ))}
+        </>
+      )}
+
+      {(view === 'fields' || view === 'requirements' || view === 'display') && (
+        <CategoryFieldPicker key={`${view}:${filter.category}:${filter.subcategory}`} section={view} categories={cfg.categories.map(({ id, name }) => ({ id, name }))} subcategories={cfg.subcategories.map(({ id, name, categoryId }) => ({ id, name, categoryId }))} initialCategory={filter.category} initialSubcategory={filter.subcategory} />
+      )}
+
+      {view === 'ads' && (
+        <section aria-label="قائمة إعلانات الأقسام" className="space-y-3">
+          <p className="text-sm text-muted-foreground">عرض إداري فقط؛ لا يُغيّر التصنيف أو بيانات الإعلانات.</p>
+          {ads.slice(0, 50).map((ad) => (
+            <article key={String(ad.id)} className="min-w-0 space-y-2 rounded-xl border p-3">
+              <h3 className="break-words font-bold">{ad.title || 'إعلان بلا عنوان'}</h3>
+              <p className="break-words text-sm">#{String(ad.id)} · {cfg.categories.find((c) => c.id === Number(ad.category_id))?.name || 'قسم غير متاح'} · {cfg.subcategories.find((s) => s.id === ad.subcategory_id)?.name || 'بدون قسم فرعي'}</p>
+              <Link className={button} href={`/ads/${ad.id}`}>فتح الإعلان</Link>
+            </article>
+          ))}
+          {ads.length === 0 && <p>لا توجد إعلانات مطابقة لهذه التصفية.</p>}
+          <nav aria-label="صفحات الإعلانات" className="flex flex-wrap gap-2">{filter.page > 1 && <Link className={button} href={adsPage(filter.page - 1)}>السابق</Link>}{ads.length > 50 && <Link className={button} href={adsPage(filter.page + 1)}>التالي</Link>}</nav>
+        </section>
+      )}
+    </div>
+  );
 }

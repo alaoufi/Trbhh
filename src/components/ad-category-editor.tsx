@@ -4,6 +4,7 @@ import {CATEGORY_KINDS,type CategoryKind,type SubcategoryOption} from '@/lib/ad-
 import type {CategoryField} from '@/lib/ad-categories/validation';
 import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
 import {nextCategoryFieldKey} from '@/lib/ad-categories/admin-input';
+import type {CategoryEditorSection} from '@/lib/ad-categories/admin-navigation';
 const input='w-full rounded-lg border border-primary/25 bg-white p-2 text-sm';
 
 /** مفتاح مجزّأ بحالتين بنفس أسلوب (اختياري/إجباري) — إدخال سلس بنقرة واحدة. */
@@ -17,15 +18,38 @@ function Seg({label,on,offLabel,onLabel,onColor,set}:{label:string;on:boolean;of
     </div>
   </div>;
 }
-export function AdCategoryEditor({initial,categoryId,action}:{initial?:SubcategoryOption;categoryId:number;action:(fd:FormData)=>Promise<void>}){
+export function AdCategoryEditor({initial,categoryId,action,section,returnTo}:{initial?:SubcategoryOption;categoryId:number;action:(fd:FormData)=>Promise<void>;section?:CategoryEditorSection;returnTo?:string}){
   const [fields,setFields]=useState<CategoryField[]>(initial?.fields||[]);
   const [kind,setKind]=useState<CategoryKind>(initial?.kind||'other');
   const [price,setPrice]=useState(initial?.priceEnabled??false),[goods,setGoods]=useState(initial?.goodsEnabled??false);
   const [template,setTemplate]=useState('');
   const update=(i:number,patch:Partial<CategoryField>)=>setFields(fields.map((f,n)=>n===i?{...f,...patch}:f));
-  return <form action={action} className="space-y-3 rounded-xl border p-3">
+  const common=<>
     {initial&&<input type="hidden" name="id" value={initial.id}/>}
     <input type="hidden" name="category_id" value={categoryId}/><input type="hidden" name="version" value={initial?.version??0}/><input type="hidden" name="fields_json" value={JSON.stringify(fields)}/>
+    {returnTo&&<input type="hidden" name="return_to" value={returnTo}/>}
+  </>;
+  // تبويبان مركّزان: الإلزام فقط (requirements) أو الظهور فقط (display) — يحفظان
+  // كامل تعريف الحقول دون تغيير بقية خصائصها، مع إبقاء البيانات الوصفية مخفيّة.
+  if(section==='requirements'||section==='display'){
+    return <form action={action} className="space-y-3 rounded-xl border p-3">
+      {common}
+      <input type="hidden" name="name" value={initial?.name??''}/><input type="hidden" name="order" value={initial?.order??0}/><input type="hidden" name="kind" value={kind}/>
+      {kind!=='jobs'&&price&&<input type="hidden" name="price_enabled" value="1"/>}{kind!=='jobs'&&goods&&<input type="hidden" name="goods_enabled" value="1"/>}
+      {fields.length===0&&<p className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 text-center text-sm">لا توجد حقول بعد. أضِفها من تبويب <b>«إضافة وتعديل الحقول»</b>.</p>}
+      {fields.map((f,i)=><div key={i} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-primary/5 p-3 ${f.visible?'':'opacity-70'}`}>
+        <span className="min-w-0 break-words font-bold">{f.label||f.key}{!f.visible&&' — مخفي'}</span>
+        {section==='display'
+          ? <Seg label="الظهور" on={f.visible} offLabel="مخفي" onLabel="ظاهر" onColor="bg-emerald-600" set={v=>update(i,v?{visible:true}:{visible:false,required:false})}/>
+          : (f.visible
+            ? <Seg label="الإلزام" on={f.required} offLabel="اختياري" onLabel="إجباري" onColor="bg-primary" set={v=>update(i,{required:v})}/>
+            : <span className="rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-bold text-slate-500">المخفي اختياري دائماً</span>)}
+      </div>)}
+      {fields.length>0&&<button className="rounded bg-primary px-4 py-2 font-bold text-white">حفظ التغييرات</button>}
+    </form>;
+  }
+  return <form action={action} className="space-y-3 rounded-xl border p-3">
+    {common}
     <div className="grid gap-2 sm:grid-cols-3"><label>اسم القسم الفرعي<input name="name" className={input} required maxLength={200} defaultValue={initial?.name}/></label><label>الترتيب<input name="order" type="number" min={0} max={10000} className={input} defaultValue={initial?.order??0}/></label><label>النوع<select name="kind" className={input} value={kind} onChange={e=>setKind(e.target.value as CategoryKind)}>{CATEGORY_KINDS.map(k=><option key={k} value={k}>{({goods:'سلع',property:'عقارات',jobs:'وظائف',service:'خدمات',livestock:'مواشٍ',plants:'نباتات',other:'أخرى'})[k]}</option>)}</select></label></div>
     <div className="flex flex-wrap gap-4"><label><input type="checkbox" name="price_enabled" value="1" checked={kind!=='jobs'&&price} disabled={kind==='jobs'} onChange={e=>setPrice(e.target.checked)}/> إظهار السعر العام</label><label><input type="checkbox" name="goods_enabled" value="1" checked={kind!=='jobs'&&goods} disabled={kind==='jobs'} onChange={e=>setGoods(e.target.checked)}/> إظهار تفاصيل السلع العامة</label></div>
     <div className="flex flex-wrap gap-2"><select aria-label="قالب الحقول" className={input} value={template} onChange={e=>setTemplate(e.target.value)}><option value="">اختر قالباً اختيارياً</option>{CATEGORY_SEED_TEMPLATES.map(t=><option key={t.key} value={t.key}>{t.categoryName} — {t.name}</option>)}</select><button type="button" disabled={!template} className="rounded border px-3 py-2" onClick={()=>{const t=CATEGORY_SEED_TEMPLATES.find(t=>t.key===template);if(t){setFields(t.fields.map(f=>({...f,options:[...f.options]})));setKind(t.kind);setPrice(t.priceEnabled);setGoods(t.goodsEnabled);}}}>استبدال حقول المحرر بالقالب المختار</button><p className="text-xs text-muted-foreground">لا يُطبّق على الإعلانات أو قاعدة البيانات حتى تحفظ هذا القسم الفرعي.</p></div>

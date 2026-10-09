@@ -248,6 +248,12 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
       'commerce_customer_addresses.id','commerce_customer_addresses.member_id','commerce_customer_addresses.label','commerce_customer_addresses.snapshot','commerce_customer_addresses.is_default','commerce_customer_addresses.created_at','commerce_customer_addresses.updated_at',
       'commerce_customer_carts.member_id','commerce_customer_carts.items','commerce_customer_carts.updated_at',
       'cj_products.availability_json','cj_products.availability_checked_at','cj_products.source_category',
+      // أعمدة الطبقة المالية لـCJ (الدفع/الموافقة/التحقق) المضافة على cj_orders.
+      'cj_orders.cj_shipment_order_id','cj_orders.cj_pay_id','cj_orders.approved_cap_usd_minor','cj_orders.actual_payment_usd_minor','cj_orders.approved_at','cj_orders.approved_by','cj_orders.paid_at','cj_orders.verified_at','cj_orders.verified_source','cj_orders.is_test','cj_orders.last_polled_at',
+      // أعمدة معالجة أحداث webhook من CJ.
+      'cj_webhook_events.cj_order_id','cj_webhook_events.order_number','cj_webhook_events.raw_status','cj_webhook_events.track_number','cj_webhook_events.processed','cj_webhook_events.payload',
+      // جدول دفتر محاسبة CJ الجديد بالكامل.
+      'cj_ledger.id','cj_ledger.entry_key','cj_ledger.order_id','cj_ledger.entry_type','cj_ledger.amount_usd_minor','cj_ledger.currency','cj_ledger.cj_ref','cj_ledger.source','cj_ledger.note','cj_ledger.reconciled','cj_ledger.created_at',
     ].sort());
     expect(added.find((c) => c.table_name === 'users')).toMatchObject({ column_type: 'varchar(64)', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'auth_mfa' && c.column_name === 'last_step')).toMatchObject({ column_type: 'bigint', is_nullable: 'NO', column_default: '-1' });

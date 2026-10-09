@@ -29,31 +29,36 @@ export async function recordLedgerEntry(input: RecordLedgerInput): Promise<boole
   if (!entryKey) return false;
   const amount = Math.trunc(Number(input.amountUsdMinor));
   if (!Number.isFinite(amount)) return false;
-  const r = await prisma.cj_ledger.createMany({
-    data: [{
-      entry_key: entryKey,
-      order_id: input.orderId == null ? null : bid(input.orderId),
-      entry_type: (input.entryType ?? 'charge').slice(0, 24),
-      amount_usd_minor: amount,
-      currency: 'USD',
-      cj_ref: (input.cjRef ?? '').slice(0, 64),
-      source: (input.source ?? 'internal').slice(0, 24),
-      note: (input.note ?? '').slice(0, 500),
-    }],
-    skipDuplicates: true,
-  }).catch(() => ({ count: 0 }));
-  return r.count > 0;
+  try {
+    const r = await prisma.cj_ledger.createMany({
+      data: [{
+        entry_key: entryKey,
+        order_id: input.orderId == null ? null : bid(input.orderId),
+        entry_type: (input.entryType ?? 'charge').slice(0, 24),
+        amount_usd_minor: amount,
+        currency: 'USD',
+        cj_ref: (input.cjRef ?? '').slice(0, 64),
+        source: (input.source ?? 'internal').slice(0, 24),
+        note: (input.note ?? '').slice(0, 500),
+      }],
+      skipDuplicates: true,
+    });
+    return r.count > 0;
+  } catch { return false; }
 }
 
-/** قيود طلب واحد (للعرض في صفحة الطلب). */
+/** قيود طلب واحد (للعرض في صفحة الطلب). try/catch يحمي من غياب الجدول/النموذج. */
 export async function listOrderLedger(orderId: number | bigint) {
-  return prisma.cj_ledger.findMany({ where: { order_id: bid(orderId) }, orderBy: { id: 'asc' } }).catch(() => []);
+  try { return await prisma.cj_ledger.findMany({ where: { order_id: bid(orderId) }, orderBy: { id: 'asc' } }); }
+  catch { return []; }
 }
 
 /** إجمالي الخصم الصافي من المحفظة (بالدولار، minor) عبر كل الدفتر. */
 export async function ledgerNetOutflowUsdMinor(): Promise<number> {
-  const agg = await prisma.cj_ledger.aggregate({ _sum: { amount_usd_minor: true } }).catch(() => null);
-  return agg?._sum.amount_usd_minor ?? 0;
+  try {
+    const agg = await prisma.cj_ledger.aggregate({ _sum: { amount_usd_minor: true } });
+    return agg?._sum.amount_usd_minor ?? 0;
+  } catch { return 0; }
 }
 
 /**
@@ -69,7 +74,8 @@ export type ReconcileReport = {
 
 export async function reconcileReport(cjSpentUsdMinor: number | null): Promise<ReconcileReport> {
   const net = await ledgerNetOutflowUsdMinor();
-  const count = await prisma.cj_ledger.count().catch(() => 0);
+  let count = 0;
+  try { count = await prisma.cj_ledger.count(); } catch { count = 0; }
   return {
     ledgerNetUsdMinor: net,
     cjSpentUsdMinor,

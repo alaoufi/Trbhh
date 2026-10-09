@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { hasAccess } from '@/lib/access-control/guards';
-import { translateToArabicCached, isArabicText } from '@/lib/cj/translate';
+import { translateToArabicForDisplay, isArabicText } from '@/lib/cj/translate';
 
 /**
  * ترجمة نص واحد عند الطلب (للترجمة الفورية عند التحميل والنقر على كلمة غير مترجمة).
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   const trimmed = text.trim().slice(0, 2000);
   if (!trimmed) return NextResponse.json({ error: 'empty' }, { status: 400, headers });
   if (isArabicText(trimmed)) return NextResponse.json({ ar: trimmed }, { headers });
-  const ar = await translateToArabicCached(trimmed).catch(() => null);
-  if (!ar || !isArabicText(ar)) return NextResponse.json({ ar: null }, { headers });
-  return NextResponse.json({ ar }, { headers });
+  // ترجمة عرض متساهلة: النتيجة محقّقة أنها عربية ذات معنى داخل الدالة (ولو بقيت ماركات
+  // إنجليزية في عنوان تسويقي)، فلا نُعيد تطبيق الفحص الصارم الذي يرفض المختلط.
+  const ar = await translateToArabicForDisplay(trimmed).catch(() => null);
+  return NextResponse.json({ ar: ar || null }, { headers });
 }

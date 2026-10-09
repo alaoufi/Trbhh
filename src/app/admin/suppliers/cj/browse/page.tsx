@@ -9,7 +9,7 @@ import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { importedCjPids, listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
-import { getCachedArabic, translateManyCached, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
+import { getCachedArabic, translateManyForDisplay, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
 import { SubmitButton } from '@/components/cj/submit-button';
@@ -72,8 +72,8 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   // يتعذّر ترجمته ضمن الميزانية يُترجَم في المتصفح عبر CjText. عناوين الشبكة والأقسام
   // لها الأولوية (أكثر ظهوراً)؛ المستوردة تُقرأ من المخزَّن (أسماؤها محرَّرة يدوياً غالباً).
   const [gridAr, catAr, importedAr] = await Promise.all([
-    translateManyCached([...titleTexts, ...cardCats], 60),
-    translateManyCached(catNames, 80),
+    translateManyForDisplay([...titleTexts, ...cardCats], 60),
+    translateManyForDisplay(catNames, 80),
     getCachedArabic(importedList.flatMap(r => [r.name, r.trbhh_category])),
   ]);
   for (const [k, v] of importedAr) if (!gridAr.has(k)) gridAr.set(k, v);
@@ -98,7 +98,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
   // تفاصيل المصدر قد تُقرأ من CJ؛ لا اتصال بمزوّد ترجمة ولا كتابة أثناء GET.
   const detailAr = detail && detail.ok
-    ? await translateManyCached([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')], 40)
+    ? await translateManyForDisplay([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')], 40)
     : new Map<string, string>();
   const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t.trim())) ? detailAr.get(t.trim())! : arText(t);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);

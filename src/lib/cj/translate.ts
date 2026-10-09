@@ -363,3 +363,80 @@ export async function translateManyCached(texts: (string | null | undefined)[], 
   }
   return map;
 }
+
+/* ---------- ترجمة عرض متساهلة (تقبل أي ناتج فيه عربية ذات معنى) ----------
+ * عناوين منتجات CJ تسويقية طويلة تبقى فيها أسماء ماركات/مصطلحات إنجليزية (3D/WiFi/LED/
+ * اسم العلامة)، فيرفضها الفحص الصارم isArabicText فتظهر إنجليزية بالكامل. للعرض فقط نقبل
+ * أي ترجمة فيها عربية حقيقية (≥ حرفين) ولو بقيت بعض الكلمات الإنجليزية — أفضل من الإنجليزية
+ * الكاملة. تُخزَّن بمفتاح عرض مستقل حتى لا تختلط بالمخزَّن الصارم المستخدم في مواضع الجودة.
+ */
+const displayKeyOf = (src: string) => createHash('sha1').update('en:ar:disp-v1:' + src).digest('hex');
+
+async function translateEnToArLoose(src: string): Promise<string | null> {
+  const deadline = Date.now() + TIMEOUT_MS + 6000;
+  const { libreUrl, libreKey, deeplKey, email } = await translationProviders();
+  const accept = (t: string | undefined | null) => { const v = (t ?? '').trim(); return meaningfulArabic(v) ? v : null; };
+  if (libreUrl) {
+    const b = (await fetchJson(`${libreUrl}/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: src, source: 'en', target: 'ar', format: 'text', ...(libreKey ? { api_key: libreKey } : {}) }) })) as { translatedText?: string } | null;
+    const v = accept(b?.translatedText); if (v) return v;
+  }
+  if (deeplKey) {
+    const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
+    const b = (await fetchJson(`https://${host}/v2/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `DeepL-Auth-Key ${deeplKey}` }, body: `text=${encodeURIComponent(src)}&source_lang=EN&target_lang=AR` })) as { translations?: { text?: string }[] } | null;
+    const v = accept(b?.translations?.[0]?.text); if (v) return v;
+  }
+  {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(src)}&langpair=en|ar${email ? `&de=${encodeURIComponent(email)}` : ''}`;
+    const b = (await fetchJson(url, deadline)) as { responseStatus?: number; responseData?: { translatedText?: string } } | null;
+    if (b?.responseStatus === 200) { const raw = b.responseData?.translatedText ?? ''; if (!/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (EMAIL|LANGUAGE)/i.test(raw)) { const v = accept(raw); if (v) return v; } }
+  }
+  {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(src)}`;
+    const b = await fetchJson(url, deadline);
+    if (Array.isArray(b) && Array.isArray(b[0])) { const joined = (b[0] as unknown[]).map((s) => (Array.isArray(s) && typeof s[0] === 'string' ? s[0] : '')).join(''); const v = accept(joined); if (v) return v; }
+  }
+  return null;
+}
+
+/** ترجمة نص للعرض (متساهلة) مع تخزين. تُفضّل المخزَّن الصارم (ترجمة يدوية سليمة) ثم العرض. */
+export async function translateToArabicForDisplay(text: string | null | undefined): Promise<string | null> {
+  const src = (text ?? '').trim();
+  if (!src) return null;
+  if (isArabicText(src)) return src;
+  const strict = (await getCachedArabic([src])).get(src);
+  if (strict) return strict;
+  try { const row = await prisma.cj_translations.findUnique({ where: { source_key: displayKeyOf(src) }, select: { target_ar: true } }); if (row && meaningfulArabic(row.target_ar)) return row.target_ar; } catch { /* المخزن غير جاهز */ }
+  const loose = await translateEnToArLoose(src).catch(() => null);
+  if (!loose) return null;
+  try { await prisma.cj_translations.upsert({ where: { source_key: displayKeyOf(src) }, create: { source_key: displayKeyOf(src), target_ar: loose }, update: { target_ar: loose } }); } catch { /* تجاهل */ }
+  return loose;
+}
+
+/** نسخة دفعة للعرض: تقرأ المخزَّن (الصارم + العرض) دفعةً، ثم تترجم المفقود متساهلاً. */
+export async function translateManyForDisplay(texts: (string | null | undefined)[], max = 40): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const clean = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !isArabicText(t)))];
+  if (!clean.length) return map;
+  const strict = await getCachedArabic(clean);
+  for (const [k, v] of strict) map.set(k, v);
+  const needDisplay = clean.filter((s) => !map.has(s));
+  if (needDisplay.length) {
+    try {
+      const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: needDisplay.map(displayKeyOf) } }, select: { source_key: true, target_ar: true } });
+      const byKey = new Map(rows.map((r) => [r.source_key, r.target_ar]));
+      for (const s of needDisplay) { const v = byKey.get(displayKeyOf(s)); if (v && meaningfulArabic(v)) map.set(s, v); }
+    } catch { /* المخزن غير جاهز */ }
+  }
+  const missing = clean.filter((s) => !map.has(s)).slice(0, Math.max(0, Math.floor(max)));
+  const CONCURRENCY = 5;
+  for (let i = 0; i < missing.length; i += CONCURRENCY) {
+    const batch = missing.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map(async (s) => [s, await translateEnToArLoose(s).catch(() => null)] as const));
+    let wins = 0;
+    for (const [s, v] of results) {
+      if (v) { wins++; map.set(s, v); prisma.cj_translations.upsert({ where: { source_key: displayKeyOf(s) }, create: { source_key: displayKeyOf(s), target_ar: v }, update: { target_ar: v } }).catch(() => {}); }
+    }
+    if (wins === 0) break; // قاطع دائرة
+  }
+  return map;
+}

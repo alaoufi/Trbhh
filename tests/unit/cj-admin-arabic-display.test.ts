@@ -35,7 +35,7 @@ vi.mock('@/lib/cj/translate',async(importOriginal)=>{
   const actual=await importOriginal<typeof import('@/lib/cj/translate')>();
   // الترجمة الفورية عند التحميل تتم عبر translateManyCached على الخادم؛ في الاختبار نجعلها
   // قراءةً من المخزَّن فقط (بلا شبكة ولا كتابة) لنتحقق من سلوك الصفحة بثبات.
-  return {...actual,getCachedArabic:async(texts:string[])=>{state.read(texts);return actual.getCachedArabic(texts);},translateManyCached:async(texts:string[])=>{state.translate(texts);return actual.getCachedArabic(texts);},translateToArabic:state.translate};
+  return {...actual,getCachedArabic:async(texts:string[])=>{state.read(texts);return actual.getCachedArabic(texts);},translateManyCached:async(texts:string[])=>{state.translate(texts);return actual.getCachedArabic(texts);},translateManyForDisplay:async(texts:string[])=>{state.translate(texts);return actual.getCachedArabic(texts);},translateToArabicForDisplay:state.translate,translateToArabic:state.translate};
 });
 vi.mock('@/app/admin/suppliers/cj/actions',()=>({importCjProduct:state.write,removeCjProduct:state.write,saveCjArabic:state.write,saveCjPrice:state.write,toggleCjHidden:state.write,translateCjProduct:state.write,translateCjBrowsePage:state.write,translateAllCj:state.write,translateCjCategories:state.write,runCjTranslateWarm:state.write,refreshCjMediaAction:state.write,refreshCjImportedAvailability:state.write,saveCjTranslationSettings:state.write,processAllCjImported:state.write,setCjStorefront:state.write,approveCjProduct:state.write,saveCjReview:state.write}));
 import Browse from '@/app/admin/suppliers/cj/browse/page';

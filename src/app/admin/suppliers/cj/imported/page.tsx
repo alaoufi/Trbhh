@@ -7,7 +7,7 @@ import { SubmitButton } from '@/components/cj/submit-button';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { translateManyCached, isArabicText } from '@/lib/cj/translate';
+import { translateManyForDisplay, isArabicText } from '@/lib/cj/translate';
 import { saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, removeCjProduct } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const importedList = await listCjProducts(200);
   // ترجمة فورية عند التحميل لأسماء السلع غير العربية عبر المترجم المحلي ثم تُخزَّن.
-  const ar = await translateManyCached(importedList.flatMap((r) => [r.name, r.trbhh_category]), 120);
+  const ar = await translateManyForDisplay(importedList.flatMap((r) => [r.name, r.trbhh_category]), 120);
   const nameOf = (r: { name: string; name_ar: string }) => isArabicText(r.name_ar) ? r.name_ar : (ar.get((r.name || '').trim()) ?? null);
 
   return (

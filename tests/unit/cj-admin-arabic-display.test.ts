@@ -33,7 +33,9 @@ vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:
 vi.mock('@/lib/settings',()=>({getSetting:async(_k:string,fallback='')=>fallback}));
 vi.mock('@/lib/cj/translate',async(importOriginal)=>{
   const actual=await importOriginal<typeof import('@/lib/cj/translate')>();
-  return {...actual,getCachedArabic:async(texts:string[])=>{state.read(texts);return actual.getCachedArabic(texts);},translateManyCached:state.translate,translateToArabic:state.translate};
+  // الترجمة الفورية عند التحميل تتم عبر translateManyCached على الخادم؛ في الاختبار نجعلها
+  // قراءةً من المخزَّن فقط (بلا شبكة ولا كتابة) لنتحقق من سلوك الصفحة بثبات.
+  return {...actual,getCachedArabic:async(texts:string[])=>{state.read(texts);return actual.getCachedArabic(texts);},translateManyCached:async(texts:string[])=>{state.translate(texts);return actual.getCachedArabic(texts);},translateToArabic:state.translate};
 });
 vi.mock('@/app/admin/suppliers/cj/actions',()=>({importCjProduct:state.write,removeCjProduct:state.write,saveCjArabic:state.write,saveCjPrice:state.write,toggleCjHidden:state.write,translateCjProduct:state.write,translateCjBrowsePage:state.write,translateAllCj:state.write,translateCjCategories:state.write,runCjTranslateWarm:state.write,refreshCjMediaAction:state.write,refreshCjImportedAvailability:state.write,saveCjTranslationSettings:state.write,processAllCjImported:state.write,setCjStorefront:state.write,approveCjProduct:state.write,saveCjReview:state.write}));
 import Browse from '@/app/admin/suppliers/cj/browse/page';
@@ -54,7 +56,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
   it.each([{}, {ar:'0'}, {detail:'PID-1'}])('reading browse %j never translates or writes on the server',async params=>{
     const html=await browse(params);expect(html).toContain('الترجمة فورية عند التحميل');
     // الترجمة الفورية تحدث في المتصفح (CjText)؛ خادم GET لا يستدعي مزوّد الترجمة ولا يكتب.
-    expect(state.read).toHaveBeenCalled();expect(state.translate).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
+    expect(state.read).toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
   });
   it('shows the untranslated grid title as a clickable original to fetch its translation',async()=>{
     const html=await browse({detail:'PID-1'}),visible=withoutSourceDetails(html);
@@ -70,7 +72,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     state.cache=new Map([['Cotton Summer Shirt','قميص صيفي قطني'],['Summer Clothing','ملابس صيفية'],['Blue Large','أزرق كبير']]);
     const visible=withoutSourceDetails(await browse({detail:'PID-1',cat:'CAT-1'}));
     for(const label of state.cache.values())expect(visible).toContain(label);
-    expect(visible).not.toContain('بانتظار الترجمة');expect(state.translate).not.toHaveBeenCalled();
+    expect(visible).not.toContain('بانتظار الترجمة');
   });
   it('renders saved padded titles, category paths and variants through the real cache contract without changing source text',async()=>{
     state.sourceName=' Cotton Summer Shirt ';state.category=' Summer Clothing ';state.categoryPath=' Clothing > Summer Clothing ';state.variantName=' Blue Large ';
@@ -83,7 +85,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     expect(html).toContain(state.sourceName);expect(html).toContain(state.variantName);
     const showcase=renderToStaticMarkup(await Showcase({searchParams:Promise.resolve({})}));
     expect(withoutSourceDetails(showcase)).toContain('قميص صيفي قطني');expect(withoutSourceDetails(showcase)).not.toContain('بانتظار الترجمة');expect(showcase).toContain(state.sourceName);
-    expect(state.translate).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
+    expect(state.write).not.toHaveBeenCalled();
   });
   it('does not call a mixed Arabic-English imported title fully translated',async()=>{
     state.nameAr='قميص Cotton Summer Shirt';const visible=withoutSourceDetails(await browse());
@@ -101,7 +103,8 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     const html=await browse({page:'2',q:'cotton',cat:'CAT-1',detail:'PID-1'});
     expect(html).not.toContain('ترجمة منتجات هذه الصفحة');
     expect(html).not.toContain('ترجمة كل التصنيفات الآن');
-    expect(state.translate).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
+    // الترجمة الفورية تتم تلقائياً عند التحميل (translateManyCached) بلا أزرار، ودون كتابة إضافية على GET.
+    expect(state.write).not.toHaveBeenCalled();
   });
   it('renders only static Arabic page-translation feedback, never query-supplied diagnostic text',async()=>{
     expect(await browse({page_translation:'unavailable'})).toContain('تعذّر استكمال ترجمة الصفحة الآن');

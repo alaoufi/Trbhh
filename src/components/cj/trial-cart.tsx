@@ -39,7 +39,7 @@ export function TrialCart({accountId}:{accountId:number}){
         const result=await response.json() as TrialCartQuote;
         if(controller.signal.aborted||generation.current!==current)return;
         setQuoteKey(JSON.stringify(items));setQuote(result);
-        setFeedback(result.rejected.length?'تغيّر السعر أو المخزون أو الشحن، أو تعذر التحقق. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'تمت إعادة التحقق من كل خيار؛ يمكنك إنشاء الطلب. لا خصم ولا دفع في هذه المرحلة.');
+        setFeedback(result.rejected.length?'تغيّر السعر أو المخزون أو الشحن، أو تعذر التحقق. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'تمت إعادة التحقق من كل خيار؛ أنشئ الطلب ثم اعتمده وادفع من صفحة الطلب.');
       }catch(cause){if(!controller.signal.aborted&&generation.current===current)setError(cause instanceof Error&&cause.message==='permission'?'انتهت الجلسة أو لم تعد صلاحية عرض المنتجات متاحة. أعد تسجيل الدخول.':'تعذر تحديث السلة. لا يوجد إجمالي معتمد؛ أعد المحاولة.');}
       finally{window.clearTimeout(timeout);if(!controller.signal.aborted&&generation.current===current)setBusy(false);}
     })();return()=>{window.clearTimeout(timeout);controller.abort();};
@@ -51,8 +51,8 @@ export function TrialCart({accountId}:{accountId:number}){
   // Never show a previous quantity's amount during the render before the refresh effect.
   const currentQuote=quote&&quoteKey===JSON.stringify(items)?quote:null;
   return <div className="mx-auto min-w-0 max-w-4xl space-y-5 px-4 py-6 [overflow-wrap:anywhere]" dir="rtl">
-    <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold text-primary">سلة التجربة</h1><Link href="/cj" className="min-h-11 rounded-xl border border-primary/25 px-4 py-2 font-bold text-primary">متابعة تصفح المنتجات</Link></header>
-    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-6">سلة لتجميع منتجاتك وإنشاء طلبك. لا خصم ولا دفع في هذه المرحلة.</p>
+    <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold text-primary">سلة الشراء (إدارة)</h1><Link href="/cj" className="min-h-11 rounded-xl border border-primary/25 px-4 py-2 font-bold text-primary">متابعة تصفح المنتجات</Link></header>
+    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-6">سلة شراء خاصة بالإدارة. بعد إنشاء الطلب يُعتمد ويُدفع من المحفظة من صفحة الطلب، ثم يُتابَع حتى التسليم.</p>
     <details className="rounded-xl border border-primary/15 px-3 text-sm leading-6"><summary className="min-h-11 cursor-pointer py-2.5 font-bold text-primary">معلومات الأسعار والتوفر</summary><div className="space-y-2 pb-3"><p>قبل عرض الإجمالي، تربح يعيد التحقق من الخيار والسعر والمخزون والشحن. إذا تغيّر أي منها تتوقف إعادة التسعير وتحتاج مراجعة المنتج. الضريبة لا تُحسب هنا ما لم تفعّلها سياسة مالية معتمدة.</p><p>حتى ٥٠ خيارًا و٩٩ قطعة لكل سطر. إنشاء الطلب لا يخصم رصيدًا ولا يُرسل الطلب تلقائيًا.</p></div></details>
     <p role="status" aria-live="polite" className="text-sm text-primary">{[notice,feedback].filter(Boolean).join(' ')}</p>
     {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
@@ -69,7 +69,7 @@ export function TrialCart({accountId}:{accountId:number}){
           <button type="button" onClick={()=>save(items.filter(row=>row.id!==item.id||row.variantId!==item.variantId),'أُزيل الخيار من السلة.')} className="min-h-11 text-sm font-bold text-red-700" aria-label={`إزالة ${label}${line?.variantName?`، ${line.variantName}`:''}`}>إزالة</button></div>
         </article>;})}
       </section>
-      {currentQuote&&!currentQuote.rejected.length&&!busy&&!error&&<section aria-label="إجمالي السلة" className="rounded-2xl border-2 border-primary bg-primary p-5 text-white shadow-sm"><p className="text-sm font-bold text-white/80">الإجمالي بعد التحقق الحي · السلع + الشحن</p><p className="mt-1 text-3xl font-black tracking-tight">{formatSar(currentQuote.totalMinor)} <span className="text-lg">ر.س</span></p><p className="mt-2 text-xs leading-5 text-white/75">الإجمالي بعد التحقق الحي. لا خصم حتى تفعيل الدفع.</p></section>}
+      {currentQuote&&!currentQuote.rejected.length&&!busy&&!error&&<section aria-label="إجمالي السلة" className="rounded-2xl border-2 border-primary bg-primary p-5 text-white shadow-sm"><p className="text-sm font-bold text-white/80">الإجمالي بعد التحقق الحي · السلع + الشحن</p><p className="mt-1 text-3xl font-black tracking-tight">{formatSar(currentQuote.totalMinor)} <span className="text-lg">ر.س</span></p><p className="mt-2 text-xs leading-5 text-white/75">الإجمالي بعد التحقق الحيّ. الخصم يتمّ عند الاعتماد والدفع من صفحة الطلب ضمن السقف.</p></section>}
     </>}
     {items.length>0&&currentQuote&&!currentQuote.rejected.length&&!busy&&!error
       ? <form action={placeCjTrialOrder} aria-label="إتمام الطلب" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -83,8 +83,8 @@ export function TrialCart({accountId}:{accountId:number}){
             <input name="shipAddress1" required maxLength={400} placeholder="العنوان التفصيلي" className={`${shipInput} sm:col-span-2`}/>
             <input name="shipAddress2" maxLength={400} placeholder="تفاصيل إضافية (اختياري)" className={`${shipInput} sm:col-span-2`}/>
           </div>
-          <button type="submit" className="flex min-h-14 w-full items-center justify-center rounded-xl bg-primary px-4 text-lg font-extrabold text-white">إنشاء الطلب (بانتظار الدفع)</button>
-          <p className="text-center text-xs text-slate-600">يُنشأ طلب داخلي للإدارة بعد تحقّق حيّ من السعر والمخزون والشحن — بلا خصم أو دفع أو إرسال للمورد. الدفع لاحقاً بعد التفعيل.</p>
+          <button type="submit" className="flex min-h-14 w-full items-center justify-center rounded-xl bg-primary px-4 text-lg font-extrabold text-white">إنشاء الطلب ثم الاعتماد والدفع</button>
+          <p className="text-center text-xs text-slate-600">يُنشأ الطلب بعد تحقّق حيّ من السعر والمخزون والشحن، ثم تنتقل لصفحة الطلب لاعتماده والدفع من المحفظة ضمن السقف، ومتابعته حتى التسليم.</p>
         </form>
       : <section aria-label="إتمام الطلب" className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-600">أضِف خياراً متحقّقاً إلى السلّة لإتمام الطلب.</section>}
   </div>;

@@ -45,7 +45,7 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
       </div>
       {sp.moved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تغيير الحالة.</p>}
       {sp.tracked === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث التتبّع.</p>}
-      {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ الطلب بحالة «بانتظار الدفع». لا خصم ولا دفع.</p>}
+      {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ الطلب بعد تحقّق حيّ. الخطوة التالية: «اعتماد ودفع» من لوحة الدفع أدناه (ضمن السقف)، ثم يُتابَع حتى التسليم.</p>}
       {sp.sent === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُرسل الطلب إلى المورد.</p>}
       {sp.senderr === 'blocked' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">الشراء الحيّ غير مفعّل — الطلب جاهز للإرسال، ولن يُرسَل فعلياً للمورد إلا بعد التفعيل اليدوي. لم يحدث أي خصم أو شراء.</p>}
       {typeof sp.senderr === 'string' && sp.senderr !== 'blocked' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الإرسال: {sp.senderr === 'not_ready' ? 'الطلب ليس بحالة مؤكَّدة الدفع بعد' : sp.senderr === 'no_lines' ? 'لا توجد بنود قابلة للإرسال' : sp.senderr}</p>}

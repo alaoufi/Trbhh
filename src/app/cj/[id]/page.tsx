@@ -90,7 +90,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
-    {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>معاينة خاصة</b> — تجميع السلع فقط؛ الشراء والدفع غير مفعّلين.</p>{session && <CartLink accountId={session.uid} />}</div>}
+    {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>شراء خاص بالإدارة</b> — تحقّق حيّ من السعر والمخزون والشحن، ثم السلة ← إنشاء الطلب ← الاعتماد والدفع من محفظة CJ ← التتبّع حتى التسليم.</p>{session && <CartLink accountId={session.uid} />}</div>}
     {sp.edited === '1' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">تم حفظ تعديل السلعة.</p>}
     {sp.err === 'has_activity' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر الحذف لوجود نشاط على السلعة. يمكنك إخفاؤها.</p>}
     <nav aria-label="مسار التنقل" className="flex flex-wrap items-center gap-2 text-sm text-slate-500"><Link href="/cj" className="font-bold text-primary hover:underline">المتجر</Link><span aria-hidden="true">/</span><span>تفاصيل المنتج</span></nav>

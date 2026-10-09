@@ -56,10 +56,10 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
       {ship&&ship.additionalMinor>0&&<p className="flex justify-between"><span>رسوم إضافية</span><b>{money(ship.additionalMinor)}</b></p>}
       {ship?.vatEnabled&&<p className="flex justify-between"><span>ضريبة القيمة المضافة</span><b>{money(ship.vatMinor)}</b></p>}
       <p className="flex justify-between border-t border-emerald-200 pt-2 text-base"><span>الإجمالي بعد الرسوم والضريبة</span><b className="text-xl text-emerald-800">{total==null?'—':money(total)}</b></p>
-      <p className="text-xs text-slate-600">السعر والشحن محسوبان لكمية {verificationQuantity} بعد التحقق الحي. لا ينشأ طلب أو حجز مخزون في وضع التجربة.</p>
+      <p className="text-xs text-slate-600">السعر والشحن محسوبان لكمية {verificationQuantity} بعد التحقق الحيّ من CJ. يُعاد التحقق مرة أخرى قبل الدفع.</p>
     </div>}
-    <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية<input id={`${id}-qty`} type="number" min={1} max={quote?.stockQuantity??99} value={qty} onChange={event=>setQty(Math.max(1,Math.min(99,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">أضف لسلة التجربة</button><CartLink accountId={accountId}/></div>
+    <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية<input id={`${id}-qty`} type="number" min={1} max={quote?.stockQuantity??99} value={qty} onChange={event=>setQty(Math.max(1,Math.min(99,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">أضف إلى السلة</button><CartLink accountId={accountId}/></div>
     {notice&&<p role="alert" className="text-sm text-red-700">{notice}</p>}
-    <p className="text-xs leading-6 text-slate-600">هذه تجربة للسلة فقط: لا خصم ولا حجز للمخزون ولا طلب. الشراء الحقيقي مقفل من إعداد المنصة.</p>
+    <p className="text-xs leading-6 text-slate-600">شراء خاص بالإدارة: أضِف الخيار المتحقّق إلى السلة، ثم من السلة يُنشأ الطلب ويُعتمد ويُدفع من المحفظة ويُتابع حتى التسليم.</p>
   </section>;
 }

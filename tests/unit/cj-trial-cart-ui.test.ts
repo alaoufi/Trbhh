@@ -11,7 +11,7 @@ beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
 describe('private CJ trial cart presentation',()=>{
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{
     const tree=await CartPage();expect(mock.access).toHaveBeenCalledExactlyOnceWith('products','view');expect(tree.props.accountId).toBe(9);
-    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة التجربة');expect(html).toContain('يعيد التحقق من الخيار والسعر والمخزون والشحن');
+    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة الشراء');expect(html).toContain('يعيد التحقق من الخيار والسعر والمخزون والشحن');
     expect(html).toContain('role="status"');expect(html).toContain('aria-live="polite"');
     expect(html).not.toContain('CJ');
     expect(html).not.toMatch(/name="ship(?:Name|Phone|City|Address1)"|href="\/(?:shop|account\/orders)/);
@@ -30,9 +30,9 @@ describe('private CJ trial cart presentation',()=>{
     const html=renderToStaticMarkup(createElement(AddToTrialCart,{productId:4,accountId:9,variants:[{vid:'blue-s',name:'أزرق صغير',optionKey:'اللون: أزرق، المقاس: S',sku:'SKU-BS',stock:2}]}));
     expect(html).toContain('اللون: أزرق، المقاس: S');expect(html).toContain('SKU-BS');expect(html).toContain('المتاح الموثق: 2');expect(html).toContain('اختر اللون أو المقاس');
   });
-  it('states no charge or payment happens and shows no supplier name in the trial cart',()=>{
+  it('describes the admin purchase flow and never leaks the supplier name in the cart',()=>{
     const html=renderToStaticMarkup(createElement(TrialCart,{accountId:9}));
-    expect(html).toContain('لا خصم ولا دفع');expect(html).toContain('أضِف خياراً متحقّقاً');
+    expect(html).toContain('سلة شراء خاصة بالإدارة');expect(html).toContain('أضِف خياراً متحقّقاً');
     expect(html).not.toContain('CJ');expect(html).not.toMatch(/name="ship(?:Name|Phone|City|Address1)"/);
   });
 });

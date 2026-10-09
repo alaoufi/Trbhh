@@ -1,7 +1,18 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {translateArabicCjSearch} from '@/lib/cj/search';
+import {normalizeArabicForSearch} from '@/lib/cj/translate';
 
 afterEach(()=>vi.unstubAllGlobals());
+
+describe('توحيد العربية للبحث',()=>{
+  it('يهمل الهمزات والتشكيل والتطويل ويوحّد ة→ه و ى→ي',()=>{
+    expect(normalizeArabicForSearch('أحمــد')).toBe('احمد');
+    expect(normalizeArabicForSearch('شاشة')).toBe('شاشه');
+    expect(normalizeArabicForSearch('شاشه')).toBe('شاشه');
+    expect(normalizeArabicForSearch('مُستلزَمات')).toBe('مستلزمات');
+    expect(normalizeArabicForSearch('إلكترونيّات')).toBe('الكترونيات');
+  });
+});
 
 describe('CJ Arabic catalog search',()=>{
   it('converts an Arabic product name to the source-language term CJ indexes',async()=>{

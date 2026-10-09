@@ -180,10 +180,25 @@ async function viaGoogle(text: string, deadline: number): Promise<string | null>
  * على نقاط عامّة قد تُحجب. لا تخزين (عبارات البحث عابرة).
  */
 const looksEnglish = (t: string) => !!t && /\p{Script=Latin}/u.test(t) && !/\p{Script=Arabic}/u.test(t) && t.length <= 100;
+/** توحيد عربي قبل الترجمة: إزالة التشكيل والتطويل والهمزات، وتوحيد أإآ→ا، ة→ه، ى→ي، ؤ→و، ئ→ي. */
+export function normalizeArabicForSearch(value: string): string {
+  return String(value || '')
+    .replace(/[ً-ٰٟ]/g, '') // تشكيل
+    .replace(/ـ/g, '')                      // تطويل
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/ء/g, '')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 export async function translateArabicToEnglish(text: string | null | undefined): Promise<string | null> {
-  const src = (text ?? '').trim().slice(0, 100);
-  if (!src) return '';
-  if (!/\p{Script=Arabic}/u.test(src)) return src; // ليست عربية — تُستخدم كما هي
+  const raw = (text ?? '').trim().slice(0, 100);
+  if (!raw) return '';
+  if (!/\p{Script=Arabic}/u.test(raw)) return raw; // ليست عربية — تُستخدم كما هي
+  const src = normalizeArabicForSearch(raw) || raw; // توحيد يتجاهل الهمزات وة/ه لتحسين المطابقة
   const deadline = Date.now() + 4500;
   const { libreUrl, libreKey, deeplKey, email } = await translationProviders();
   if (libreUrl) {

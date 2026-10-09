@@ -57,7 +57,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   // search using the saved Arabic display title. Translate only the query;
   // keep the Arabic text in the URL and search box.
   const sourceQuery = q ? await translateArabicCjSearch(q) : '';
-  const listing = await listProductsPage(page, PAGE_SIZE, { productName: sourceQuery || q || undefined, categoryId: cat || undefined });
+  // CJ يفهرس بالاسم المصدر الإنجليزي. عند فشل ترجمة عبارة عربية لا نرسل العربية إلى CJ
+  // (تُرجِع نتائج غير ذات صلة)، بل نُلغي فلتر الاسم ونعرض تنبيهاً للمستخدم.
+  const queryIsArabic = !!q && /\p{Script=Arabic}/u.test(q);
+  const searchName = sourceQuery ? sourceQuery : (queryIsArabic ? undefined : (q || undefined));
+  const listing = await listProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined });
   const items = listing.ok ? listing.data.items : [];
   // صلاحية العرض تقرأ الترجمات المحفوظة فقط؛ الترجمة والكتابة إجراءات تحرير صريحة.
   const importedList = await listCjProducts(60);

@@ -171,6 +171,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           {listing.ok ? <>إجمالي المنتجات{activeCat ? ` في «${categoryLabels.get(activeCat.id)}»` : ''}{q ? ` للبحث «${q}»` : ''}: <b className="text-primary">{total.toLocaleString('en')}</b> · صفحة {page.toLocaleString('en')} من {totalPages.toLocaleString('en')}</> : '—'}
         </span>
       </div>
+      {q && queryIsArabic && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600" dir="auto">{searchName ? <>البحث في CJ تمّ بالمصطلح الإنجليزي: <b dir="ltr">«{searchName}»</b>. إن كانت الترجمة غير دقيقة فالنتائج قد تكون غير مطابقة — جرّب كلمة إنجليزية مباشرة (مثل <code>screen</code>) للمقارنة.</> : 'تعذّرت ترجمة العبارة العربية إلى الإنجليزية الآن (مزوّد الترجمة غير جاهز) — عُرضت منتجات عامة بلا فلتر اسم. انتظر اكتمال نماذج LibreTranslate أو ابحث بالإنجليزية.'}</p>}
 
       {/* شبكة المنتجات */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

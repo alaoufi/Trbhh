@@ -23,7 +23,7 @@ const minorFromUsd=(usd:number,rate:number)=>Math.round(usd*rate);
  * Verify one selected CJ VID for one requested quantity. No saved availability or
  * sibling variant can make this check pass. CJ errors are normalized before return.
  */
-export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quantity:number,deps:AvailabilityDeps={},usdToSarX100=375,pricing?:{otherCostsMinor?:number;marginBps?:number;saleOverrideMinor?:number|null}):Promise<VariantCheck>{
+export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quantity:number,deps:AvailabilityDeps={},usdToSarX100=375,pricing?:{otherCostsMinor?:number;marginBps?:number;saleOverrideMinor?:number|null},destZip?:string):Promise<VariantCheck>{
   const checkedAt=nowIso();
   if(!/^[A-Za-z0-9_-]{1,64}$/.test(pid)||!/^[A-Za-z0-9_-]{1,64}$/.test(selected.vid)||!Number.isSafeInteger(quantity)||quantity<1||quantity>99||!Number.isSafeInteger(usdToSarX100)||usdToSarX100<1||usdToSarX100>100000)return {status:'invalid_price',checkedAt};
   const [inventoryResult,variantResult]=await Promise.all([
@@ -42,7 +42,9 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   if(!stockQuantity)return {status:'out_of_stock',checkedAt};
   if(quantity>stockQuantity)return {status:'quantity_exceeds_stock',checkedAt};
   const calculate=deps.calculateFreight??calculateFreightToKSA;
-  const freightResults=await Promise.all([...new Set(warehouses.map(row=>row.originCountry))].map(async originCountry=>({originCountry,result:await calculate([{vid:selected.vid,quantity}],undefined,originCountry).catch(()=>null)})));
+  // رمز الوجهة الفعلي للمشتري عند توفّره (5 أرقام سعودية)، وإلا الافتراضي داخل calculate.
+  const zip=typeof destZip==='string'&&/^\d{5}$/.test(destZip.trim())?destZip.trim():undefined;
+  const freightResults=await Promise.all([...new Set(warehouses.map(row=>row.originCountry))].map(async originCountry=>({originCountry,result:await calculate([{vid:selected.vid,quantity}],zip,originCountry).catch(()=>null)})));
   const shippingOptions:SaudiShippingOption[]=[];
   let hadFreightFailure=false;
   for(const {originCountry,result} of freightResults){

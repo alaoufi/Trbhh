@@ -18,6 +18,15 @@ describe('CJ live availability proof',()=>{
     expect(result).toMatchObject({status:'available',vid:'vid-7',stockQuantity:8,supplierPriceMinor:4500,salePriceMinor:5850,shippingOptions:[{name:'Saudi Standard',priceMinor:750,deliveryDays:'7-12 days'}]});
     expect(freight).toHaveBeenCalledExactlyOnceWith([{vid:'vid-7',quantity:3}],undefined,'CN');
   });
+
+  it('يمرّر رمز وجهة المشتري الفعلي للشحن الحيّ متى كان 5 أرقام صحيحة، وإلا يتجاهله',async()=>{
+    const freightReal=vi.fn(async()=>ok(options()));
+    await verifyCjVariantForSaudi('pid',variant('vid-7',12),1,{getInventoryByVid:async vid=>ok([inventory(vid,8)]),getVariants:async()=>ok([variant('vid-7',12)]),calculateFreight:freightReal},375,undefined,'23455');
+    expect(freightReal).toHaveBeenCalledExactlyOnceWith([{vid:'vid-7',quantity:1}],'23455','CN');
+    const freightBad=vi.fn(async()=>ok(options()));
+    await verifyCjVariantForSaudi('pid',variant('vid-7',12),1,{getInventoryByVid:async vid=>ok([inventory(vid,8)]),getVariants:async()=>ok([variant('vid-7',12)]),calculateFreight:freightBad},375,undefined,'abc');
+    expect(freightBad).toHaveBeenCalledExactlyOnceWith([{vid:'vid-7',quantity:1}],undefined,'CN');
+  });
   it('uses live VID price instead of parent or stale variant price',async()=>{
     const result=await verifyCjVariantForSaudi('pid',variant('vid-7',9),1,{
       getInventoryByVid:async vid=>ok([inventory(vid,2)]),getVariants:async()=>ok([variant('vid-7',12)]),calculateFreight:async()=>ok(options()),

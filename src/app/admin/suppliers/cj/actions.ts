@@ -326,6 +326,7 @@ export async function createRealCjTestOrder(form: FormData) {
     { vid: variant!.vid, variantSku: variant!.sku, variantName: variant!.name, variantKey: variant!.optionKey, variantSellPrice: variant!.priceUsd, variantImage: null, variantWeight: variant!.weight, attributes: variant!.attributes },
     quantity, {}, settings.usdToSarX100,
     { otherCostsMinor: row!.other_costs_minor, marginBps: row!.margin_bps, saleOverrideMinor: row!.sale_price_override_minor },
+    String(form.get('shipZip') || '').trim(), // الشحن الحيّ لرمز وجهة المشتري الفعلي
   );
   if (checked.status !== 'available') back(`err=unavailable&reason=${encodeURIComponent(checked.status)}`);
   const avail = checked as Extract<typeof checked, { status: 'available' }>;

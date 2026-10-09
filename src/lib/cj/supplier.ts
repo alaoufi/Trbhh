@@ -28,8 +28,7 @@ const cjSupplier: CommerceSupplier = {
   capabilities: CJ_CAPABILITIES,
 
   async verifyVariant(input): Promise<SupplierResult<SupplierVariantQuote>> {
-    // عنوان التسليم (zip) يُمرَّر عبر مسار الطلب؛ التحقق هنا للسعر/المخزون/الشحن العام.
-    const { pid, vid, quantity } = input;
+    const { pid, vid, quantity, zip } = input;
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(pid) || !/^[A-Za-z0-9_-]{1,64}$/.test(vid) || !Number.isSafeInteger(quantity) || quantity < 1) {
       return { ok: false, error: 'invalid_request' };
     }
@@ -38,7 +37,7 @@ const cjSupplier: CommerceSupplier = {
     const variant = product.data.variants.find((v) => v.vid === vid);
     if (!variant) return { ok: false, error: 'variant_unavailable' };
     const settings = await cjSyncSettings().catch(() => ({ usdToSarX100: 375 } as { usdToSarX100: number }));
-    const check = await verifyCjVariantForSaudi(pid, variant, quantity, {}, settings.usdToSarX100, {}).catch(() => null);
+    const check = await verifyCjVariantForSaudi(pid, variant, quantity, {}, settings.usdToSarX100, {}, zip).catch(() => null);
     if (!check) return { ok: false, error: 'verification_failed' };
     if (check.status !== 'available') return { ok: false, error: check.status };
     return {

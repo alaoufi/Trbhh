@@ -6,7 +6,9 @@ import { getOrderById, listOrderEvents } from '@/lib/cj/orders/store';
 import { nextStatuses, statusLabel, isException, isStatus } from '@/lib/cj/orders/state';
 import { parseOrderLines } from '@/lib/cj/orders/store';
 import { canDispatch } from '@/lib/cj/orders/dispatch';
-import { advanceCjOrder, setCjOrderTracking, dispatchCjOrderToSupplier } from '../../actions';
+import { listOrderLedger } from '@/lib/cj/orders/ledger';
+import { cjOrderCapUsdMinor } from '@/lib/cj/orders/payment';
+import { advanceCjOrder, setCjOrderTracking, dispatchCjOrderToSupplier, approveAndPayCjOrder } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلب CJ', robots: { index: false, follow: false } };
@@ -30,6 +32,10 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
   const nexts = isStatus(order.status) ? nextStatuses(order.status).filter(status => status !== 'refunded' || canRefund) : [];
   const orderLines = parseOrderLines(order.cj_lines_json);
   const dispatchable = canDispatch(order.status) && !order.cj_order_id && orderLines.length > 0;
+  const ledger = await listOrderLedger(id);
+  const capUsdMinor = order.approved_cap_usd_minor || (await cjOrderCapUsdMinor());
+  const usd = (m: number) => `$${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const canPay = !order.paid_at && orderLines.length > 0 && (order.status === 'awaiting_payment' || order.status === 'awaiting_approval' || order.status === 'needs_action');
 
   return (
     <div className="space-y-4">
@@ -44,6 +50,15 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
       {sp.senderr === 'blocked' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">الشراء الحيّ غير مفعّل — الطلب جاهز للإرسال، ولن يُرسَل فعلياً للمورد إلا بعد التفعيل اليدوي. لم يحدث أي خصم أو شراء.</p>}
       {typeof sp.senderr === 'string' && sp.senderr !== 'blocked' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الإرسال: {sp.senderr === 'not_ready' ? 'الطلب ليس بحالة مؤكَّدة الدفع بعد' : sp.senderr === 'no_lines' ? 'لا توجد بنود قابلة للإرسال' : sp.senderr}</p>}
       {typeof sp.err === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الانتقال: {sp.err === 'invalid_transition' ? 'انتقال غير مسموح من الحالة الحالية' : sp.err}</p>}
+      {sp.paid === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تمّ الدفع من محفظة CJ بنجاح. سُجّل القيد المحاسبي.</p>}
+      {sp.paid === 'already' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">الطلب مدفوع مسبقاً — لم يُكرَّر الخصم.</p>}
+      {sp.payerr === 'over_cap' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">المبلغ الفعلي من CJ ({sp.amount ? usd(Number(sp.amount)) : ''}) تجاوز السقف المعتمَد ({sp.cap ? usd(Number(sp.cap)) : ''}) — مُنع الخصم. ارفع السقف أو راجع الطلب.</p>}
+      {sp.payerr === 'blocked' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">الشراء الحيّ غير مفعّل — اعتُمد الطلب ولن يُخصَم شيء حتى التفعيل اليدوي (مفتاح الشراء + SUPPLIER_ALLOW_LIVE_ORDERS).</p>}
+      {sp.payerr === 'no_amount' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لم يُعِد CJ مبلغاً فعلياً — مُنع الدفع حتى التحقق (لا دفع بمبلغ غير متحقق منه).</p>}
+      {sp.payerr === 'cj_create_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر إنشاء الطلب لدى CJ — راجع الخط الزمني. لم يحدث خصم.</p>}
+      {sp.payerr === 'pay_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الدفع من محفظة CJ — راجع الخط الزمني.</p>}
+      {sp.payerr === 'no_lines' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لا بنود للطلب — تعذّر الدفع.</p>}
+      {sp.payerr === 'confirm_required' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">يلزم تأكيد الدفع صراحةً.</p>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ملخّص الطلب */}
@@ -66,6 +81,43 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
             <div className="font-bold">التتبّع</div>
             <div>شركة الشحن: {order.carrier || '—'} · رقم: <span dir="ltr">{order.tracking_number || '—'}</span></div>
             {order.tracking_url && <a href={order.tracking_url} target="_blank" rel="noreferrer" className="text-primary underline" dir="ltr">رابط التتبّع</a>}
+          </div>
+        </div>
+
+        {/* الدفع والاعتماد — الطبقة المالية */}
+        <div className={card}>
+          <h2 className="font-bold">الدفع من محفظة CJ</h2>
+          <ul className="grid gap-1 text-sm">
+            <li>حالة الدفع: {order.paid_at ? <span className="font-bold text-emerald-700">مدفوع · {dt(order.paid_at)}</span> : <span className="font-bold text-amber-700">غير مدفوع</span>}</li>
+            <li>المبلغ الفعلي من CJ: <span className="font-bold" dir="ltr">{order.actual_payment_usd_minor ? usd(order.actual_payment_usd_minor) : '—'}</span></li>
+            <li>السقف المعتمَد: <span dir="ltr">{usd(capUsdMinor)}</span></li>
+            <li className="text-xs text-muted-foreground">التحقق: {order.verified_source || '—'} · {dt(order.verified_at)}</li>
+            {order.approved_at && <li className="text-xs text-muted-foreground">اعتُمد: {dt(order.approved_at)}{order.approved_by ? ` · بواسطة #${String(order.approved_by)}` : ''}</li>}
+            {order.cj_shipment_order_id && <li className="text-xs text-muted-foreground" dir="ltr">shipmentOrderId: {order.cj_shipment_order_id}</li>}
+          </ul>
+          {canPay ? (
+            <AccessBoundary module="orders" action="edit"><form action={approveAndPayCjOrder} className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-2">
+              <input type="hidden" name="id" value={String(order.id)} />
+              <p className="text-sm font-bold text-red-800">اعتماد ودفع من محفظة CJ</p>
+              <p className="text-xs text-red-700">يُنشئ الطلب لدى CJ (بلا خصم) لمعرفة المبلغ الفعلي، ثم يتحقّق من السقف ويخصم من المحفظة. محجوب ما لم يُفعَّل الشراء الحيّ.</p>
+              <label className="block text-xs">سقف هذه العملية (دولار، اختياري للتجربة)<input className={input} name="capUsd" type="number" step="0.01" min="0" placeholder={`${(capUsdMinor / 100).toFixed(2)}`} dir="ltr" /></label>
+              <label className="flex items-center gap-2 text-xs"><input type="checkbox" name="confirm" value="pay" required /> أؤكّد الخصم من محفظة CJ</label>
+              <button className={`${btn} bg-red-600`}>اعتماد ودفع</button>
+            </form></AccessBoundary>
+          ) : order.paid_at ? <p className="text-xs text-emerald-700">تمّ الدفع — لا يُعاد الخصم (حماية التكرار).</p> : <p className="text-xs text-muted-foreground">الدفع متاح من حالات: بانتظار الدفع/الموافقة أو «يحتاج تدخّلاً».</p>}
+          <div className="border-t pt-2">
+            <div className="text-sm font-bold">الدفتر المحاسبي ({ledger.length})</div>
+            {!ledger.length ? <p className="text-xs text-muted-foreground">لا قيود.</p> : (
+              <ul className="space-y-1 text-xs">
+                {ledger.map((l) => (
+                  <li key={String(l.id)} className="flex items-center justify-between gap-2 border-b pb-1">
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary">{l.entry_type}</span>
+                    <span dir="ltr" className="font-bold">{usd(l.amount_usd_minor)}</span>
+                    <span className="text-muted-foreground" dir="ltr">{dt(l.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 

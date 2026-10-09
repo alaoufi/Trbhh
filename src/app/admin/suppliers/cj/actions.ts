@@ -105,8 +105,11 @@ export async function importCjProduct(form: FormData) {
   const r = await importCjProductByPid(pid, { createOnly: !await hasAccess(s.uid, 'products', 'edit') });
   if (r.ok) await auditCjChange(s.uid, 'products', pid, { imported: existing.length > 0 }, { imported: true, price: r.salePriceMinor, cost: r.supplierCostMinor });
   const sep = back.includes('?') ? '&' : '?';
-  if (r.ok) redirect(`${back}${sep}imported=${encodeURIComponent(r.pid)}`);
-  redirect(`${back}${sep}imperr=${encodeURIComponent(r.error)}`);
+  // مرساة العودة لموضع المنتج ليكمل المسؤول الاستيراد من حيث وقف (لا يبدأ من أعلى الصفحة).
+  const anchorRaw = String(form.get('anchor') || '').trim();
+  const anchor = /^p-[A-Za-z0-9_-]{1,64}$/.test(anchorRaw) ? `#${anchorRaw}` : '';
+  if (r.ok) redirect(`${back}${sep}imported=${encodeURIComponent(r.pid)}${anchor}`);
+  redirect(`${back}${sep}imperr=${encodeURIComponent(r.error)}${anchor}`);
 }
 
 /** حذف منتج مستورد من التخزين الوسيط (لا يمسّ أي منتج عام). */

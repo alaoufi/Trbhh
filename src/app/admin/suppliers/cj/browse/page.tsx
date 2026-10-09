@@ -11,9 +11,11 @@ import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCachedArabic, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
+import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { CjAdminNav } from '@/components/cj/admin-nav';
+import { CjText } from '@/components/cj/cj-text';
+import { BrowseFilter } from '@/components/cj/browse-filter';
 import { getSetting } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
@@ -131,36 +133,10 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
       {!listing.ok && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
 
-      {/* بحث + فلترة بالتصنيف (بالعربية عند توفّر الترجمة) */}
-      <form method="get" className="flex flex-wrap items-end gap-2">
-        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="اكتب اسم المنتج بالعربية أو الإنجليزية" /></label>
-        <label className="text-sm">التصنيف
-          <select name="cat" defaultValue={cat} className={`${input} ms-2 w-72`}>
-            <option value="">كل التصنيفات{total ? ` (${total.toLocaleString('en')})` : ''}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{categoryLabels.get(c.id)}</option>)}
-          </select>
-        </label>
-        <button className={btn}>عرض</button>
-        {(q || cat) && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح الفلاتر</Link>}
-      </form>
+      {/* بحث + فلترة بأقسام البضائع — القسم يُطبَّق فوراً عند الاختيار (بلا زر عرض) */}
+      <BrowseFilter q={q} cat={cat} categories={[{ id: '', label: `كل الأقسام${total ? ` (${total.toLocaleString('en')})` : ''}` }, ...categories.map((c) => ({ id: c.id, label: categoryLabels.get(c.id) || c.path }))]} />
       {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
-      {categories.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-bold">أسماء التصنيفات الأصلية من المصدر</summary><ul className="mt-2 space-y-1">{categories.map((c, index) => <li key={c.id}>التصنيف {index + 1}: <span dir="auto">{c.path}</span> — <code>{c.id}</code></li>)}</ul></details>}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-xs text-muted-foreground">تُعرض الترجمات العربية المحفوظة. الترجمة الجديدة تتطلب إجراءً صريحًا بصلاحية التحرير.</span>
-        <AccessBoundary module="products" action="edit"><form action={translateCjBrowsePage}>
-          <input type="hidden" name="page" value={page} /><input type="hidden" name="q" value={q} /><input type="hidden" name="cat" value={cat} />
-          {detailPid && <input type="hidden" name="detail" value={detailPid} />}
-          <input type="hidden" name="back" value={`${backHref}${detailPid ? `&detail=${encodeURIComponent(detailPid)}` : ''}`} />
-          <SubmitButton className={btn} disabled={!items.length} pendingText="جارٍ الترجمة…">ترجمة منتجات هذه الصفحة</SubmitButton>
-        </form></AccessBoundary>
-        <AccessBoundary module="products" action="edit"><form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة كل التصنيفات الآن</SubmitButton></form></AccessBoundary>
-        <AccessBoundary module="products" action="edit"><form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الترجمات (خادم)</SubmitButton></form></AccessBoundary>
-        <AccessBoundary module="products" action="edit"><form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الصور</SubmitButton></form></AccessBoundary>
-        {typeof sp.mediaref === 'string' && <span className="text-emerald-700">حُدّثت صور {sp.mediaref} سلعة.</span>}
-        {typeof sp.cattr === 'string' && <span className="text-emerald-700">خُزّنت ترجمة {sp.cattr} تصنيفاً (اضغط ثانيةً للباقي).</span>}
-        {typeof sp.warmed === 'string' && <span className="text-emerald-700">تم تحديث الترجمات على الخادم ({sp.warmed}).</span>}
-        {sp.transcfg === '1' && <span className="text-emerald-700">حُفظت إعدادات مزوّد الترجمة.</span>}
-      </div>
+      <p className="text-xs text-muted-foreground">الترجمة فورية عند التحميل؛ أي كلمة بقيت بلغتها اضغط عليها لجلب ترجمتها. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
         <summary className="cursor-pointer font-bold text-primary">مزوّد الترجمة — {libreUrl ? 'LibreTranslate ذاتي ✅' : deeplKeySet ? 'DeepL مُفعّل ✅' : 'خارجي مجاني (محدود)'}</summary>
         <form action={saveCjTranslationSettings} className="mt-3 space-y-2">
@@ -195,21 +171,20 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {/* شبكة المنتجات */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((p) => (
-          <div key={p.pid} className={card}>
-            <CjProductImage src={cjImg(p.productImage)} alt={arText(p.productName)} className="h-36 w-full rounded-lg object-cover" />
-            <div className="text-sm font-bold leading-5 line-clamp-2">{arText(p.productName)}</div>
-            <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{p.productName}</p>{p.categoryName && <p dir="auto">{p.categoryName}</p>}</details>
+          <div key={p.pid} id={`p-${p.pid}`} className={`${card} scroll-mt-24`}>
+            <CjProductImage src={cjImg(p.productImage)} alt={p.productName} className="h-36 w-full rounded-lg object-cover" />
+            <div className="text-sm font-bold leading-5 line-clamp-2"><CjText original={p.productName} ar={gridAr.get(p.productName.trim())} /></div>
             <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
               <span>PID: <span dir="ltr">{p.pid}</span></span>
               <span>SKU: <span dir="ltr">{p.productSku || '—'}</span></span>
-              <span>التصنيف: {arText(p.categoryName)}</span>
+              <span>القسم: {p.categoryName ? <CjText original={p.categoryName} ar={gridAr.get(p.categoryName.trim()) ?? catAr.get(p.categoryName.trim())} /> : '—'}</span>
               <span>سعر CJ: {usd(p.sellPrice)}</span>
             </div>
             <div className="text-sm font-extrabold text-primary">بيع تقديري: {sar(salePreview(p.sellPrice))}</div>
             <div className="flex flex-wrap gap-2 pt-1">
               {imported.has(p.pid)
                 ? <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800">مستورد ✓</span>
-                : <AccessBoundary module="products" action="create"><form action={importCjProduct}><input type="hidden" name="pid" value={p.pid} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={btn} pendingText="جارٍ الاستيراد…">استيراد إلى تربح</SubmitButton></form></AccessBoundary>}
+                : <AccessBoundary module="products" action="create"><form action={importCjProduct}><input type="hidden" name="pid" value={p.pid} /><input type="hidden" name="back" value={backHref} /><input type="hidden" name="anchor" value={`p-${p.pid}`} /><SubmitButton className={btn} pendingText="جارٍ الاستيراد…">استيراد إلى تربح</SubmitButton></form></AccessBoundary>}
               <Link href={`${backHref}&detail=${encodeURIComponent(p.pid)}#cj-detail`} className={ghost}>تفاصيل</Link>
             </div>
           </div>
@@ -248,7 +223,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                 <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر البيع (بعد التحويل)</div><div className="text-base font-extrabold text-primary">{sar(salePreview(detail.data.priceUsd))}</div></div>
                 <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">الشحن التقديري</div><div className="font-bold">{sar(settings.shippingMinor)}</div></div>
                 <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر CJ</div><div className="font-bold">{usd(detail.data.priceUsd)}</div></div>
-                <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">التصنيف الجديد</div><div className="font-bold">{arOf(detail.data.category)}</div></div>
+                <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">القسم الجديد</div><div className="font-bold">{arOf(detail.data.category)}</div></div>
                 <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">المخزون (عيّنة)</div><div className="font-bold">{detail.data.totalStock.toLocaleString('en')}</div></div>
               </div>
               {/* المتغيّرات — مبسّطة ومترجمة */}

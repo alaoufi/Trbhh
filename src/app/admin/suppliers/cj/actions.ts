@@ -8,7 +8,9 @@ import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount, setCjProductAvailability, setCjProductGallery, setCjProductDetails, buildCjDetails } from '@/lib/cj/mapping';
 import { translateToArabicCached, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
 import { upsertGlossaryTerm, deleteGlossaryTerm } from '@/lib/cj/glossary';
-import { readCjAvailability } from '@/lib/cj/availability';
+import { readCjAvailability, verifyCjVariantForSaudi } from '@/lib/cj/availability';
+import { getStorefrontCjProduct, parseCjDetails } from '@/lib/cj/mapping';
+import { quoteCjVat } from '@/lib/cj/tax-quote';
 import { collectCjProductImages } from '@/lib/cj/media';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
@@ -293,6 +295,74 @@ export async function createTestCjOrder() {
   const { id } = await createOrder({ internalRef: ref, userId: s.uid, productName: 'طلب اختبار داخلي', currency: 'SAR' }, s.uid);
   await auditCjChange(s.uid, 'orders', String(id), { exists: false }, { exists: true, status: 'awaiting_payment' });
   redirect(`/admin/suppliers/cj/orders/${id}`);
+}
+
+/**
+ * تجربة شراء حقيقية للإدارة من منتج معروض في تربح — تُنشئ طلباً حقيقياً ببنود فعلية
+ * بعد تحقّق حيّ من CJ (سعر/مخزون/شحن إلى العنوان). لا تخصم شيئاً: الدفع خطوة منفصلة
+ * من صفحة الطلب (اعتماد+سقف). للإدارة فقط. is_test=1 لتمييزها. غياب التوفّر/الشحن يمنع
+ * الإنشاء («السعر والشحن غير المتحقق منهما يمنعان إتمام الشراء»).
+ */
+export async function createRealCjTestOrder(form: FormData) {
+  const s = await requireCjAccess('orders', 'create');
+  const productId = Number(String(form.get('productId') || ''));
+  const variantId = String(form.get('variantId') || '').trim();
+  const quantity = Math.max(1, Math.min(99, Math.trunc(Number(String(form.get('quantity') || '1')))));
+  const back = (q: string) => redirect(`/admin/suppliers/cj/orders/new?product=${productId}&${q}`);
+  if (!Number.isSafeInteger(productId) || productId <= 0 || !/^[A-Za-z0-9_-]{1,64}$/.test(variantId)) back('err=invalid');
+
+  const row = await getStorefrontCjProduct(productId, false);
+  if (!row) back('err=product');
+  const details = parseCjDetails(row!);
+  const variant = details?.variants.find((v) => v.vid === variantId);
+  if (!variant) back('err=variant');
+
+  const settings = await cjSyncSettings();
+  const checked = await verifyCjVariantForSaudi(
+    row!.cj_product_id,
+    { vid: variant!.vid, variantSku: variant!.sku, variantName: variant!.name, variantKey: variant!.optionKey, variantSellPrice: variant!.priceUsd, variantImage: null, variantWeight: variant!.weight, attributes: variant!.attributes },
+    quantity, {}, settings.usdToSarX100,
+    { otherCostsMinor: row!.other_costs_minor, marginBps: row!.margin_bps, saleOverrideMinor: row!.sale_price_override_minor },
+  );
+  if (checked.status !== 'available') back(`err=unavailable&reason=${encodeURIComponent(checked.status)}`);
+  const avail = checked as Extract<typeof checked, { status: 'available' }>;
+
+  // اختيار خيار الشحن: المطلوب بالاسم إن وُجد وإلا الأرخص.
+  const wantLogistic = String(form.get('logisticName') || '').trim();
+  const option = (wantLogistic && avail.shippingOptions.find((o) => o.name === wantLogistic)) || avail.shippingOptions[0];
+  const shippingMinor = option.priceMinor + option.additionalMinor;
+  const tax = await quoteCjVat(avail.salePriceMinor, quantity, shippingMinor);
+  const itemsMinor = avail.salePriceMinor * quantity;
+
+  const ref = `CJTEST-${productId}-${Date.now()}`;
+  const { id } = await createOrder({
+    internalRef: ref,
+    userId: s.uid,
+    cjProductId: row!.cj_product_id,
+    productName: row!.name_ar || row!.name || 'منتج CJ',
+    itemsTotalMinor: itemsMinor,
+    shippingTotalMinor: shippingMinor,
+    taxTotalMinor: tax.vatMinor,
+    grandTotalMinor: tax.totalMinor,
+    currency: 'SAR',
+    lines: [{ vid: avail.vid, quantity, sku: avail.sku, logisticName: option.name }],
+    ship: {
+      name: String(form.get('shipName') || '').trim(),
+      phone: String(form.get('shipPhone') || '').trim(),
+      country: 'SA',
+      region: String(form.get('shipRegion') || '').trim(),
+      city: String(form.get('shipCity') || '').trim(),
+      address1: String(form.get('shipAddress') || '').trim(),
+      zip: String(form.get('shipZip') || '').trim(),
+    },
+  }, Number(s.uid));
+
+  await prisma.cj_orders.update({
+    where: { id },
+    data: { is_test: 1, verified_at: new Date(checked.checkedAt), verified_source: 'cj_live_verify' },
+  }).catch(() => {});
+  await auditCjChange(s.uid, 'orders', String(id), { exists: false }, { exists: true, status: 'awaiting_payment', test: true });
+  redirect(`/admin/suppliers/cj/orders/${id}?created=1`);
 }
 
 /** تحريك حالة الطلب يدوياً (اختبار آلة الحالات) — يتحقق من صلاحية الانتقال server-side. */

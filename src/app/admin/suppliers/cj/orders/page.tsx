@@ -41,7 +41,10 @@ export default async function CjOrdersPage({ searchParams }: { searchParams: Pro
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">تصفّح/استيراد</Link>
           <AccessBoundary module={'orders'} action={'create'}>
-            <form action={createTestCjOrder}><button className={btn}>+ طلب اختبار</button></form>
+            <Link href="/admin/suppliers/cj/orders/new" className={btn}>تجربة شراء حقيقية</Link>
+          </AccessBoundary>
+          <AccessBoundary module={'orders'} action={'create'}>
+            <form action={createTestCjOrder}><button className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">+ طلب اختبار (بلا CJ)</button></form>
           </AccessBoundary>
         </div>
       </div>

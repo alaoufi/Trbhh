@@ -249,7 +249,7 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
       'commerce_customer_carts.member_id','commerce_customer_carts.items','commerce_customer_carts.updated_at',
       'cj_products.availability_json','cj_products.availability_checked_at','cj_products.source_category',
       // أعمدة الطبقة المالية لـCJ (الدفع/الموافقة/التحقق) المضافة على cj_orders.
-      'cj_orders.cj_shipment_order_id','cj_orders.cj_pay_id','cj_orders.approved_cap_usd_minor','cj_orders.actual_payment_usd_minor','cj_orders.approved_at','cj_orders.approved_by','cj_orders.paid_at','cj_orders.verified_at','cj_orders.verified_source','cj_orders.is_test','cj_orders.last_polled_at',
+      'cj_orders.cj_shipment_order_id','cj_orders.cj_pay_id','cj_orders.approved_cap_usd_minor','cj_orders.actual_payment_usd_minor','cj_orders.approved_at','cj_orders.approved_by','cj_orders.paid_at','cj_orders.verified_at','cj_orders.verified_source','cj_orders.is_test','cj_orders.last_polled_at','cj_orders.pay_started_at',
       // أعمدة معالجة أحداث webhook من CJ.
       'cj_webhook_events.cj_order_id','cj_webhook_events.order_number','cj_webhook_events.raw_status','cj_webhook_events.track_number','cj_webhook_events.processed','cj_webhook_events.payload',
       // جدول دفتر محاسبة CJ الجديد بالكامل.

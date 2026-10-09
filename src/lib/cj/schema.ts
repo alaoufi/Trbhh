@@ -144,6 +144,9 @@ export const CJ_DDL: string[] = [
   `ALTER TABLE cj_orders ADD COLUMN verified_source VARCHAR(40) NOT NULL DEFAULT ''`,
   `ALTER TABLE cj_orders ADD COLUMN is_test TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE cj_orders ADD COLUMN last_polled_at DATETIME(3) NULL`,
+  // قفل دفع متفائل: يُضبط ذرّياً قبل استدعاء الدفع فيمنع محاولتين متزامنتين (double-pay).
+  // يُمسح عند الفشل للسماح بإعادة محاولة لاحقة، ويبقى عند النجاح (مع paid_at).
+  `ALTER TABLE cj_orders ADD COLUMN pay_started_at DATETIME(3) NULL`,
 
   // دفتر محاسبة CJ — كل حركة مالية (خصم/رسوم/استرداد/تسوية) سطر واحد. المبالغ بالدولار
   // (عملة محفظة CJ). entry_key فريد يمنع تكرار القيد (idempotency للمحاسبة). للمطابقة مع

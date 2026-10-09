@@ -416,7 +416,7 @@ export async function approveAndPayCjOrder(form: FormData) {
   }
   const q = r.ok
     ? (r.alreadyPaid ? 'paid=already' : 'paid=1')
-    : `payerr=${encodeURIComponent(r.reason)}${r.reason === 'over_cap' && r.actualPaymentUsdMinor ? `&amount=${r.actualPaymentUsdMinor}&cap=${r.capUsdMinor}` : ''}`;
+    : `payerr=${encodeURIComponent(r.reason)}${r.reason === 'over_cap' && r.actualPaymentUsdMinor ? `&amount=${r.actualPaymentUsdMinor}&cap=${r.capUsdMinor}` : ''}${r.reason === 'insufficient_balance' ? `&amount=${r.actualPaymentUsdMinor}&bal=${r.balanceUsdMinor}` : ''}`;
   revalidatePath(`/admin/suppliers/cj/orders/${id}`);
   redirect(`/admin/suppliers/cj/orders/${id}?${q}`);
 }

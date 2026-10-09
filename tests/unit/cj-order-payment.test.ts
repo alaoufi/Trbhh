@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({
   createCjOrder: vi.fn(),
   payCjOrderBalance: vi.fn(),
+  getCjBalance: vi.fn(),
   getOrderById: vi.fn(),
   parseOrderLines: vi.fn(),
   transitionOrder: vi.fn(),
@@ -10,8 +11,9 @@ const mock = vi.hoisted(() => ({
   recordLedgerEntry: vi.fn(),
   getSettingNum: vi.fn(),
   update: vi.fn(),
+  updateMany: vi.fn(),
 }));
-vi.mock('@/lib/cj/client', () => ({ createCjOrder: mock.createCjOrder, payCjOrderBalance: mock.payCjOrderBalance }));
+vi.mock('@/lib/cj/client', () => ({ createCjOrder: mock.createCjOrder, payCjOrderBalance: mock.payCjOrderBalance, getCjBalance: mock.getCjBalance }));
 vi.mock('@/lib/cj/orders/dispatch', () => ({ buildCjOrderPayload: () => ({ orderNumber: 'ref', products: [{ vid: 'v1', quantity: 1 }] }) }));
 vi.mock('@/lib/cj/orders/store', () => ({
   getOrderById: mock.getOrderById,
@@ -21,7 +23,7 @@ vi.mock('@/lib/cj/orders/store', () => ({
 }));
 vi.mock('@/lib/cj/orders/ledger', () => ({ recordLedgerEntry: mock.recordLedgerEntry }));
 vi.mock('@/lib/settings', () => ({ getSettingNum: mock.getSettingNum }));
-vi.mock('@/lib/prisma', () => ({ prisma: { cj_orders: { update: mock.update } } }));
+vi.mock('@/lib/prisma', () => ({ prisma: { cj_orders: { update: mock.update, updateMany: mock.updateMany } } }));
 
 import { approveAndPayOrder, cjOrderCapUsdMinor } from '@/lib/cj/orders/payment';
 
@@ -40,8 +42,10 @@ beforeEach(() => {
   mock.recordLedgerEntry.mockResolvedValue(true);
   mock.getSettingNum.mockResolvedValue(50); // سقف 50$ = 5000 minor
   mock.update.mockResolvedValue({});
+  mock.updateMany.mockResolvedValue({ count: 1 }); // المطالبة بالقفل تنجح افتراضياً
   mock.createCjOrder.mockResolvedValue({ ok: true, data: { orderId: 'CJ-1', shipmentOrderId: '', actualPaymentUsd: 12, orderStatus: 'created' } });
   mock.payCjOrderBalance.mockResolvedValue({ ok: true, data: { paid: true } });
+  mock.getCjBalance.mockResolvedValue({ ok: true, data: { amountUsd: 1000, bonusUsd: 0, frozenUsd: 0 } }); // رصيد وافٍ افتراضياً
 });
 
 describe('cjOrderCapUsdMinor — سقف التكلفة', () => {
@@ -112,6 +116,23 @@ describe('approveAndPayOrder — بوابات المنع قبل أي خصم', ()
   });
 });
 
+describe('approveAndPayOrder — رصيد المحفظة غير كافٍ (Phase 3)', () => {
+  it('رصيد أقل من المستحق → insufficient_balance، لا دفع، يبقى الطلب', async () => {
+    mock.getCjBalance.mockResolvedValue({ ok: true, data: { amountUsd: 5, bonusUsd: 0, frozenUsd: 0 } }); // $5 < $12
+    const r = await approveAndPayOrder(7n);
+    expect(r).toMatchObject({ ok: false, reason: 'insufficient_balance', actualPaymentUsdMinor: 1200, balanceUsdMinor: 500 });
+    expect(mock.payCjOrderBalance).not.toHaveBeenCalled();
+    expect(mock.recordLedgerEntry).not.toHaveBeenCalled();
+  });
+
+  it('تعذّر جلب الرصيد لا يمنع الدفع (الدفع نفسه يرفض آمناً لو نقص)', async () => {
+    mock.getCjBalance.mockResolvedValue({ ok: false, error: 'network' });
+    const r = await approveAndPayOrder(7n);
+    expect(r).toMatchObject({ ok: true });
+    expect(mock.payCjOrderBalance).toHaveBeenCalled();
+  });
+});
+
 describe('approveAndPayOrder — مسار الدفع الناجح', () => {
   it('ضمن السقف: ينشئ (payType=3) → يدفع → paid + قيد محاسبي واحد', async () => {
     const r = await approveAndPayOrder(7n, { actorId: 3 });
@@ -146,5 +167,31 @@ describe('approveAndPayOrder — مسار الدفع الناجح', () => {
   it('الطلب غير موجود → not_found', async () => {
     mock.getOrderById.mockResolvedValue(null);
     expect(await approveAndPayOrder(7n)).toMatchObject({ ok: false, reason: 'not_found' });
+  });
+});
+
+describe('approveAndPayOrder — قفل الدفع المتزامن (منع double-pay)', () => {
+  it('فشل المطالبة بالقفل (محاولة متزامنة) → pay_in_progress بلا إنشاء ولا دفع', async () => {
+    mock.updateMany.mockResolvedValue({ count: 0 }); // قفل مملوك لمحاولة أخرى
+    mock.getOrderById.mockResolvedValueOnce({ ...baseOrder }).mockResolvedValueOnce({ ...baseOrder, paid_at: null });
+    const r = await approveAndPayOrder(7n);
+    expect(r).toMatchObject({ ok: false, reason: 'pay_in_progress' });
+    expect(mock.createCjOrder).not.toHaveBeenCalled();
+    expect(mock.payCjOrderBalance).not.toHaveBeenCalled();
+  });
+
+  it('فشل المطالبة لأن طلباً دُفع للتوّ → alreadyPaid (idempotent)', async () => {
+    mock.updateMany.mockResolvedValue({ count: 0 });
+    mock.getOrderById.mockResolvedValueOnce({ ...baseOrder }).mockResolvedValueOnce({ ...baseOrder, paid_at: new Date(), cj_order_id: 'CJ-1', actual_payment_usd_minor: 1200 });
+    const r = await approveAndPayOrder(7n);
+    expect(r).toMatchObject({ ok: true, alreadyPaid: true });
+    expect(mock.payCjOrderBalance).not.toHaveBeenCalled();
+  });
+
+  it('عند فشل الدفع يُحرَّر القفل (updateMany لتصفير pay_started_at)', async () => {
+    mock.payCjOrderBalance.mockResolvedValue({ ok: false, error: 'network' });
+    await approveAndPayOrder(7n);
+    // مطالبة أولى + تحرير واحد على الأقل
+    expect(mock.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { pay_started_at: null } }));
   });
 });

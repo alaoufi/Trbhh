@@ -34,6 +34,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
   const dispatchable = canDispatch(order.status) && !order.cj_order_id && orderLines.length > 0;
   const ledger = await listOrderLedger(id);
   const capUsdMinor = order.approved_cap_usd_minor || (await cjOrderCapUsdMinor());
+  const { getSetting } = await import('@/lib/settings');
+  const topupUrl = (await getSetting('cj_wallet_topup_url', 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge').catch(() => '')) || 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge';
   const usd = (m: number) => `$${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const canPay = !order.paid_at && orderLines.length > 0 && (order.status === 'awaiting_payment' || order.status === 'awaiting_approval' || order.status === 'needs_action');
 
@@ -59,6 +61,12 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
       {sp.payerr === 'pay_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الدفع من محفظة CJ — راجع الخط الزمني.</p>}
       {sp.payerr === 'no_lines' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لا بنود للطلب — تعذّر الدفع.</p>}
       {sp.payerr === 'confirm_required' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">يلزم تأكيد الدفع صراحةً.</p>}
+      {sp.payerr === 'pay_in_progress' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">هناك محاولة دفع قائمة على هذا الطلب — مُنع الخصم المكرّر. حدّث الصفحة بعد لحظات للتأكد من النتيجة.</p>}
+      {sp.payerr === 'insufficient_balance' && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 space-y-2">
+        <p>رصيد محفظة CJ غير كافٍ — لم يُخصم شيء ولم يُكرَّر الطلب. المستحق: <b dir="ltr">{sp.amount ? usd(Number(sp.amount)) : '—'}</b> · الرصيد: <b dir="ltr">{sp.bal ? usd(Number(sp.bal)) : '—'}</b> · الفرق: <b dir="ltr">{sp.amount && sp.bal ? usd(Number(sp.amount) - Number(sp.bal)) : '—'}</b></p>
+        <a href={topupUrl} target="_blank" rel="noreferrer" className={`${btn} inline-block text-xs`}>شحن محفظة CJ (الموقع الرسمي) ↗</a>
+        <p className="text-xs">بعد الشحن، عُد لهذه الصفحة واضغط «اعتماد ودفع» على نفس الطلب — سيُعاد فحص الرصيد والمبلغ قبل الخصم.</p>
+      </div>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ملخّص الطلب */}

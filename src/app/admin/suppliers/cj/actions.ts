@@ -15,6 +15,8 @@ import { cjProductCapabilities } from '@/lib/cj/access';
 import { getCategories, getProduct, listProductsPage, getVariants as cjGetVariants } from '@/lib/cj/client';
 import { createOrder, getOrderById, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { dispatchOrderToCj } from '@/lib/cj/orders/dispatch';
+import { approveAndPayOrder, cjOrderCapUsdMinor } from '@/lib/cj/orders/payment';
+import { setSetting } from '@/lib/settings';
 import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
 import { cjStorefrontPublic, setCjStorefrontPublic } from '@/lib/cj/storefront';
 import { getAgent, defaultAgentWeeklyQuota, upsertAgent, setDefaultAgentWeeklyQuota, setAgentActive, assignProductAgent, unassignProductAgent } from '@/lib/cj/agents';
@@ -320,6 +322,45 @@ export async function dispatchCjOrderToSupplier(form: FormData) {
   const q = r.ok ? 'sent=1' : `senderr=${encodeURIComponent(r.reason)}`;
   revalidatePath(`/admin/suppliers/cj/orders/${id}`);
   redirect(`/admin/suppliers/cj/orders/${id}?${q}`);
+}
+
+/**
+ * اعتماد الطلب والدفع من محفظة CJ — الإجراء المالي الوحيد الذي يخصم فعلياً. محجوب
+ * بحارسَي الشراء داخل الطبقة الدنيا، ويتطلّب تأكيداً صريحاً (confirm=pay). يتحقّق من
+ * المبلغ الفعلي والسقف قبل الخصم، ويمنع تكرار الدفع. يقبل سقفاً أدنى للتجربة (capUsd).
+ */
+export async function approveAndPayCjOrder(form: FormData) {
+  const s = await requireCjAccess('orders', 'edit');
+  const id = Number(String(form.get('id') || ''));
+  if (String(form.get('confirm') || '') !== 'pay') {
+    redirect(`/admin/suppliers/cj/orders/${id}?payerr=${encodeURIComponent('confirm_required')}`);
+  }
+  const capOverride = Number(String(form.get('capUsd') || ''));
+  const capUsdMinor = Number.isFinite(capOverride) && capOverride > 0 ? Math.round(capOverride * 100) : undefined;
+  const before = await getOrderById(id);
+  const r = await approveAndPayOrder(id, { actorId: Number(s.uid), capUsdMinor });
+  if (r.ok) {
+    await auditCjChange(s.uid, 'orders', id,
+      { status: before?.status ?? null, paid: !!before?.paid_at },
+      { status: 'paid', paid: true, cj_order_id: cjAuditFingerprint(r.cjOrderId), amount_usd_minor: r.actualPaymentUsdMinor });
+  }
+  const q = r.ok
+    ? (r.alreadyPaid ? 'paid=already' : 'paid=1')
+    : `payerr=${encodeURIComponent(r.reason)}${r.reason === 'over_cap' && r.actualPaymentUsdMinor ? `&amount=${r.actualPaymentUsdMinor}&cap=${r.capUsdMinor}` : ''}`;
+  revalidatePath(`/admin/suppliers/cj/orders/${id}`);
+  redirect(`/admin/suppliers/cj/orders/${id}?${q}`);
+}
+
+/** ضبط سقف تكلفة الطلب الواحد (بالدولار) من لوحة الإدارة. */
+export async function setCjOrderCap(form: FormData) {
+  const s = await requireCjAccess('orders', 'edit');
+  const usd = Number(String(form.get('capUsd') || ''));
+  const safe = Number.isFinite(usd) && usd > 0 && usd <= 100000 ? usd : 50;
+  const before = await cjOrderCapUsdMinor();
+  await setSetting('cj_order_cap_usd', String(safe));
+  await auditCjChange(s.uid, 'orders', 'cap', { cap_usd_minor: before }, { cap_usd_minor: Math.round(safe * 100) });
+  revalidatePath('/admin/suppliers/cj/orders');
+  redirect('/admin/suppliers/cj/orders?capset=1');
 }
 
 /** تحديث بيانات التتبّع يدوياً (اختبار) — شركة الشحن ورقم/رابط التتبّع. */

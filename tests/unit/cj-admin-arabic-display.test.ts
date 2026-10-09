@@ -22,7 +22,7 @@ vi.mock('@/components/access-boundary',()=>({AccessBoundary:({children,action}:{
 vi.mock('@/lib/cj/config',()=>({cjConfig:()=>({configured:true})}));
 vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({shippingMinor:500,usdToSarX100:375})}));
 vi.mock('@/lib/cj/pricing',()=>({defaultMarginBps:async()=>3000,computePrice:()=>({salePriceMinor:5525})}));
-vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listProductsPage:state.list}));
+vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listProductsPage:state.list,getInventoryByPid:async()=>({ok:true,data:[{vid:'VID-1',cjInventoryQuantity:7,countryCode:'CN',areaId:'CN',areaName:'CN'}]})}));
 vi.mock('@/lib/cj/search',()=>({translateArabicCjSearch:state.translateSearch}));
 vi.mock('@/lib/cj/sample',()=>({sampleOneCjProduct:async()=>({ok:true,data:{name:state.sourceName,category:state.category,priceUsd:10,totalStock:7,images:[],variants:[{vid:'VID-1',sku:'SKU-BLUE',name:state.variantName,priceUsd:10,weight:100,stock:7}]}})}));
 vi.mock('@/lib/cj/mapping',()=>{

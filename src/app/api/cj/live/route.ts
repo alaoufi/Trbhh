@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { hasAccess } from '@/lib/access-control/guards';
-import { sampleOneCjProduct } from '@/lib/cj/sample';
+import { getProduct, getInventoryByPid } from '@/lib/cj/client';
 import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps } from '@/lib/cj/pricing';
@@ -27,24 +27,39 @@ export async function GET(request: Request) {
   const zipRaw = new URL(request.url).searchParams.get('zip')?.trim() ?? '';
   const zip = /^\d{5}$/.test(zipRaw) ? zipRaw : undefined;
 
-  const sample = await sampleOneCjProduct(pid).catch(() => null);
-  if (!sample?.ok) return NextResponse.json({ status: 'unavailable' }, { headers });
+  // طلبان فقط هنا (getProduct + getInventoryByPid) ثم شحن واحد داخل verify ≈ ٣ طلبات/بطاقة
+  // بدل ٩. getInventoryByPid يجلب مخزون كل المتغيّرات دفعةً واحدة، فنختار المتغيّر الأعلى
+  // مخزوناً في مستودع CJ فعلياً (لا المصنع) — فلا نفشل بـ out_of_stock على متغيّر غير مباع.
+  const [product, pidInventory] = await Promise.all([
+    getProduct(pid).catch(() => null),
+    getInventoryByPid(pid).catch(() => null),
+  ]);
+  if (!product?.ok) return NextResponse.json({ status: 'unavailable' }, { headers });
 
   const [settings, marginBps] = await Promise.all([
     cjSyncSettings().catch(() => ({ usdToSarX100: 375 } as { usdToSarX100: number })),
     defaultMarginBps().catch(() => 3000),
   ]);
 
-  // المتغيّر الأعلى مخزوناً (الأرجح توفّراً) ليظهر الشحن/المخزون الحيّ بدل الفشل على متغيّر نافد.
-  const variant = [...sample.data.variants]
-    .filter((v) => typeof v.priceUsd === 'number' && v.priceUsd! > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid))
-    .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0))[0];
-  if (!variant) return NextResponse.json({ status: 'unavailable' }, { headers });
+  const eligible = product.data.variants.filter((v) => typeof v.variantSellPrice === 'number' && v.variantSellPrice > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid));
+  if (!eligible.length) return NextResponse.json({ status: 'unavailable' }, { headers });
+
+  // مخزون مستودع CJ المُباع فعلاً لكل vid (cjInventoryQuantity) من الطلب الواحد.
+  const cjStockByVid = new Map<string, number>();
+  if (pidInventory?.ok) for (const row of pidInventory.data) {
+    const q = typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0;
+    if (row.vid && q) cjStockByVid.set(row.vid, (cjStockByVid.get(row.vid) ?? 0) + q);
+  }
+  // المتغيّر الأعلى مخزوناً في CJ؛ فإن لم يُعرف مخزون لأيّها نعود لأرخص متغيّر.
+  const variant = [...eligible].sort((a, b) => (cjStockByVid.get(b.vid) ?? 0) - (cjStockByVid.get(a.vid) ?? 0) || (a.variantSellPrice ?? 0) - (b.variantSellPrice ?? 0))[0];
 
   const check = await verifyCjVariantForSaudi(
-    pid,
-    { vid: variant.vid, variantSku: variant.sku, variantName: variant.name, variantKey: null, variantSellPrice: variant.priceUsd, variantImage: null, variantWeight: variant.weight, attributes: {} },
-    1, {}, settings.usdToSarX100, { marginBps }, zip,
+    pid, variant, 1,
+    {
+      getVariants: async () => ({ ok: true, data: product.data.variants }),
+      ...(pidInventory?.ok ? { getInventoryByVid: async (vid: string) => ({ ok: true as const, data: pidInventory.data.filter((r) => r.vid === vid) }) } : {}),
+    },
+    settings.usdToSarX100, { marginBps }, zip,
   ).catch(() => null);
 
   if (!check || check.status !== 'available') return NextResponse.json({ status: check?.status ?? 'unavailable' }, { headers });

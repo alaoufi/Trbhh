@@ -173,6 +173,47 @@ async function viaGoogle(text: string, deadline: number): Promise<string | null>
   return validOutput(out) ? out : null;
 }
 
+/**
+ * ترجمة عبارة البحث من العربية إلى الإنجليزية (CJ يفهرس بالاسم المصدر الإنجليزي).
+ * تعيد ترتيب المزوّدات نفسها المُعتمَدة: LibreTranslate الذاتي ← DeepL ← MyMemory ← Google.
+ * هذا يجعل البحث العربي يعمل على الخادم حيث يتوفّر LibreTranslate/DeepL، بدل الاعتماد
+ * على نقاط عامّة قد تُحجب. لا تخزين (عبارات البحث عابرة).
+ */
+const looksEnglish = (t: string) => !!t && /\p{Script=Latin}/u.test(t) && !/\p{Script=Arabic}/u.test(t) && t.length <= 100;
+export async function translateArabicToEnglish(text: string | null | undefined): Promise<string | null> {
+  const src = (text ?? '').trim().slice(0, 100);
+  if (!src) return '';
+  if (!/\p{Script=Arabic}/u.test(src)) return src; // ليست عربية — تُستخدم كما هي
+  const deadline = Date.now() + 4500;
+  const { libreUrl, libreKey, deeplKey, email } = await translationProviders();
+  if (libreUrl) {
+    const body = (await fetchJson(`${libreUrl}/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: src, source: 'ar', target: 'en', format: 'text', ...(libreKey ? { api_key: libreKey } : {}) }) })) as { translatedText?: string } | null;
+    const t = typeof body?.translatedText === 'string' ? body.translatedText.trim() : '';
+    if (looksEnglish(t)) return t;
+  }
+  if (deeplKey) {
+    const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
+    const body = (await fetchJson(`https://${host}/v2/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `DeepL-Auth-Key ${deeplKey}` }, body: `text=${encodeURIComponent(src)}&source_lang=AR&target_lang=EN` })) as { translations?: { text?: string }[] } | null;
+    const t = typeof body?.translations?.[0]?.text === 'string' ? body.translations[0].text!.trim() : '';
+    if (looksEnglish(t)) return t;
+  }
+  {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(src)}&langpair=ar|en${email ? `&de=${encodeURIComponent(email)}` : ''}`;
+    const body = (await fetchJson(url, deadline)) as { responseStatus?: number; responseData?: { translatedText?: string } } | null;
+    const t = body?.responseStatus === 200 && typeof body.responseData?.translatedText === 'string' ? body.responseData.translatedText.trim() : '';
+    if (looksEnglish(t) && !/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (EMAIL|LANGUAGE)/i.test(t)) return t;
+  }
+  {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&q=${encodeURIComponent(src)}`;
+    const body = await fetchJson(url, deadline);
+    if (Array.isArray(body) && Array.isArray(body[0])) {
+      const t = (body[0] as unknown[]).map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : '')).join('').trim();
+      if (looksEnglish(t)) return t;
+    }
+  }
+  return null;
+}
+
 /** Full-source translation is all-or-nothing; a failed chunk cannot become a cached description. */
 async function translateRaw(text: string): Promise<string | null> {
   const deadline = Date.now() + TRANSLATION_BUDGET_MS;

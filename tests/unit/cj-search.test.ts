@@ -5,10 +5,12 @@ afterEach(()=>vi.unstubAllGlobals());
 
 describe('CJ Arabic catalog search',()=>{
   it('converts an Arabic product name to the source-language term CJ indexes',async()=>{
-    const fetcher=vi.fn(async(_input:RequestInfo|URL)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'diamond ring'}}),{status:200}));
+    const fetcher=vi.fn(async(_input:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'diamond ring'}}),{status:200}));
     vi.stubGlobal('fetch',fetcher);
     await expect(translateArabicCjSearch('خاتم ألماس')).resolves.toBe('diamond ring');
-    expect(String(fetcher.mock.calls[0][0])).toContain('langpair=ar%7Cen');
+    // يُجرَّب مزوّد ar→en؛ لا نقيّد الترتيب أو المزوّد، لكن لا بد أن أحد النداءات طلب الاتجاه ar→en.
+    const calledArToEn=fetcher.mock.calls.some(c=>{const u=String(c[0]);const b=String((c[1] as RequestInit|undefined)?.body??'');return /langpair=ar(%7C|\|)en/i.test(u)||/\bsl=ar\b/i.test(u)||/"source"\s*:\s*"ar"/i.test(b)||/source_lang=AR/i.test(b);});
+    expect(calledArToEn).toBe(true);
   });
 
   it('passes through a query already written in the source language without a network request',async()=>{

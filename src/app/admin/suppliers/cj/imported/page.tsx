@@ -62,9 +62,11 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
                       <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
                       {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                     </div>
-                    {availability
-                      ? <p className="text-xs font-bold text-emerald-800">مخزون متحقق: {availability.stockQuantity.toLocaleString('en')} · خيارات الشحن: {availability.shippingOptions.length}</p>
-                      : <p className="text-xs font-bold text-amber-800">المخزون أو الشحن غير متحقق حديثًا؛ لن يظهر الإعلان للعامة.</p>}
+                    {availability ? (() => {
+                      const cheapest = [...availability.shippingOptions].sort((a, b) => a.priceMinor - b.priceMinor)[0];
+                      return <p className="text-xs font-bold text-emerald-800">مخزون حقيقي محقّق: {availability.stockQuantity.toLocaleString('en')} · شحن حيّ للسعودية من <b dir="ltr">{cheapest.priceMinor === 0 ? 'مجاني' : sar(cheapest.priceMinor + (cheapest.additionalMinor || 0))}</b>{cheapest.deliveryDays ? ` · ${cheapest.deliveryDays}` : ''}<span className="ms-1 font-normal text-emerald-700" dir="ltr">({new Date(availability.checkedAt).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh', dateStyle: 'short', timeStyle: 'short' })})</span></p>;
+                    })()
+                      : <p className="text-xs font-bold text-amber-800">المخزون والشحن غير محقّقَين حيًّا من CJ حديثًا — اضغط «تحديث الصور والمخزون والشحن» لجلب قيم حقيقية. لن يظهر الإعلان للعامة قبل التحقق.</p>}
                   </div>
                 </div>
                 <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">

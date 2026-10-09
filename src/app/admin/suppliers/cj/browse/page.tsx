@@ -234,13 +234,24 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                 <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">الشحن التقديري</div><div className="font-bold">{sar(settings.shippingMinor)}</div></div>
                 <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر CJ</div><div className="font-bold">{usd(detail.data.priceUsd)}</div></div>
                 <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">القسم الجديد</div><div className="font-bold">{arOf(detail.data.category)}</div></div>
-                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">المخزون (عيّنة)</div><div className="font-bold">{detail.data.totalStock.toLocaleString('en')}</div></div>
+                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">المخزون (عيّنة أوّلية)</div><div className="font-bold">{detail.data.totalStock.toLocaleString('en')}</div></div>
               </div>
-              {/* المتغيّرات — مبسّطة ومترجمة */}
+              <p className="rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">المخزون والشحن هنا <b>قيم أوّلية للعرض فقط</b> (عيّنة من CJ وشحن تقديري). المخزون الحقيقي القابل للبيع والشحن الحيّ إلى السعودية يُحسبان عند <b>«تحديث الصور والمخزون والشحن»</b> في صفحة البضائع المستوردة، وعند إتمام الشراء (تحقّق حيّ من CJ لمخزون المستودع وتكلفة الشحن الفعلية).</p>
+              {/* المتغيّرات — بطاقات بسطرين بلا تمرير أفقي */}
               {detail.data.variants.length > 0 && (
-                <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-right text-xs"><thead className="bg-primary/5"><tr>{['المتغيّر', 'سعر البيع', 'الوزن(غ)', 'المخزون'].map((h) => <th key={h} className="p-2">{h}</th>)}</tr></thead><tbody>
-                  {detail.data.variants.map((v) => <tr key={v.vid} className="border-t"><td className="p-2">{arOf(v.name)}</td><td className="p-2 font-bold text-primary">{sar(salePreview(v.priceUsd))}</td><td className="p-2">{v.weight ?? '—'}</td><td className="p-2">{v.stock ?? '—'}</td></tr>)}
-                </tbody></table></div>
+                <div className="space-y-1.5">
+                  <div className="text-xs font-bold text-slate-600">المتغيّرات ({detail.data.variants.length})</div>
+                  {detail.data.variants.map((v) => (
+                    <div key={v.vid} className="rounded-lg border border-slate-200 bg-white p-2 text-xs">
+                      <div className="font-semibold" dir="auto">{arOf(v.name)}</div>
+                      <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
+                        <span>سعر البيع: <b className="text-primary">{sar(salePreview(v.priceUsd))}</b></span>
+                        <span>الوزن: <b>{v.weight != null ? `${v.weight} غ` : '—'}</b></span>
+                        <span>المخزون (عيّنة): <b>{v.stock ?? '—'}</b></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           ) : <p className="text-sm text-red-700">تعذّر جلب تفاصيل المنتج الآن. أعد المحاولة لاحقًا.</p>}

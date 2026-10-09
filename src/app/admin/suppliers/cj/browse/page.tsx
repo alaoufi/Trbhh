@@ -6,6 +6,7 @@ import { cjConfig } from '@/lib/cj/config';
 import { listProductsPage, getCategories } from '@/lib/cj/client';
 import { translateArabicCjSearch } from '@/lib/cj/search';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
+import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
 import { importedCjPids, listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
@@ -96,11 +97,21 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
-  // تفاصيل المصدر قد تُقرأ من CJ؛ لا اتصال بمزوّد ترجمة ولا كتابة أثناء GET.
+  // سرعة التفاصيل: نترجم الاسم والقسم فورياً فقط؛ أسماء المتغيّرات تُقرأ من المخزَّن بلا
+  // ترجمة حيّة لكل متغيّر (كان سبب البطء عند فتح التفاصيل لمنتج بعشرات الخيارات).
   const detailAr = detail && detail.ok
-    ? await translateManyForDisplay([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')], 40)
+    ? await translateManyForDisplay([detail.data.name, detail.data.category ?? ''], 6)
     : new Map<string, string>();
-  const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t.trim())) ? detailAr.get(t.trim())! : arText(t);
+  const detailVariantAr = detail && detail.ok
+    ? await getCachedArabic(detail.data.variants.map((v) => v.name ?? ''))
+    : new Map<string, string>();
+  const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t.trim()) ?? detailVariantAr.get(t.trim())) ? (detailAr.get(t.trim()) ?? detailVariantAr.get(t.trim()))! : arText(t);
+  // القيم الحقيقية الحيّة (الأصل): السعر والمخزون والشحن من CJ لأوّل متغيّر صالح.
+  const liveVariant = detail && detail.ok ? detail.data.variants.find((v) => typeof v.priceUsd === 'number' && v.priceUsd! > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid)) : null;
+  const detailLive = detail && detail.ok && liveVariant
+    ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, {}, settings.usdToSarX100, { marginBps }).catch(() => null)
+    : null;
+  const liveShip = detailLive?.status === 'available' ? [...detailLive.shippingOptions].sort((a, b) => (a.priceMinor + a.additionalMinor) - (b.priceMinor + b.additionalMinor))[0] : null;
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
   const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
@@ -228,15 +239,27 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               <div className="flex flex-wrap gap-1">{detail.data.images.slice(0, 6).map((src, i) => (
                 <CjProductImage key={i} src={cjImg(src)} alt={arOf(detail.data.name)} className="h-16 w-16 rounded object-cover" />
               ))}</div>
-              {/* أهم الحقائق بوضوح */}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر البيع (بعد التحويل)</div><div className="text-base font-extrabold text-primary">{sar(salePreview(detail.data.priceUsd))}</div></div>
-                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">الشحن التقديري</div><div className="font-bold">{sar(settings.shippingMinor)}</div></div>
-                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر CJ</div><div className="font-bold">{usd(detail.data.priceUsd)}</div></div>
-                <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">القسم الجديد</div><div className="font-bold">{arOf(detail.data.category)}</div></div>
-                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">المخزون (عيّنة أوّلية)</div><div className="font-bold">{detail.data.totalStock.toLocaleString('en')}</div></div>
-              </div>
-              <p className="rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">المخزون والشحن هنا <b>قيم أوّلية للعرض فقط</b> (عيّنة من CJ وشحن تقديري). المخزون الحقيقي القابل للبيع والشحن الحيّ إلى السعودية يُحسبان عند <b>«تحديث الصور والمخزون والشحن»</b> في صفحة البضائع المستوردة، وعند إتمام الشراء (تحقّق حيّ من CJ لمخزون المستودع وتكلفة الشحن الفعلية).</p>
+              {/* القيم الحقيقية الحيّة من CJ — الأصل: السعر والشحن والمخزون */}
+              {detailLive?.status === 'available' ? (
+                <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-3">
+                  <div className="mb-2 text-xs font-extrabold text-emerald-900">✓ قيم حقيقية حيّة من CJ (تم التحقق الآن)</div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">تكلفة CJ</div><div className="font-bold" dir="ltr">{usd(liveVariant!.priceUsd)}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">سعر البيع</div><div className="text-base font-extrabold text-primary">{sar(detailLive.salePriceMinor)}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">الشحن الحيّ للسعودية</div><div className="font-bold text-emerald-800">{liveShip ? ((liveShip.priceMinor + liveShip.additionalMinor) === 0 ? 'مجاني' : sar(liveShip.priceMinor + liveShip.additionalMinor)) : '—'}{liveShip?.deliveryDays ? ` · ${liveShip.deliveryDays}` : ''}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">المخزون الحقيقي</div><div className="font-bold text-emerald-800">{detailLive.stockQuantity.toLocaleString('en')}</div></div>
+                  </div>
+                  <div className="mt-2 rounded-lg bg-primary/5 p-2 text-sm"><span className="text-[11px] text-muted-foreground">القسم الجديد</span> <span className="font-bold" dir="auto">{arOf(detail.data.category)}</span></div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر CJ</div><div className="font-bold" dir="ltr">{usd(detail.data.priceUsd)}</div></div>
+                    <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">القسم الجديد</div><div className="font-bold" dir="auto">{arOf(detail.data.category)}</div></div>
+                  </div>
+                  <p className="rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">تعذّر جلب الشحن/المخزون الحيّ الآن{detailLive ? ` (${detailLive.status})` : ''} — قد يكون الخيار غير متوفّر أو لا شحن للسعودية، أو حدّ طلبات CJ. أعد فتح التفاصيل بعد لحظات.</p>
+                </div>
+              )}
               {/* المتغيّرات — بطاقات بسطرين بلا تمرير أفقي */}
               {detail.data.variants.length > 0 && (
                 <div className="space-y-1.5">

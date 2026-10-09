@@ -16,6 +16,12 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 
+// ذاكرة حيّة قصيرة على الخادم (٥ دقائق) لنتيجة CJ الحقيقية لكل سلعة — ليست تخزيناً مسبقاً
+// لقيم تقديرية، بل حفظ لنتيجة حيّة جُلبت فعلاً كي لا يُعاد نداء CJ (طلب/ثانية) لكل مشاهدة أو
+// تمرير أو مستخدم. السعر/المخزون/الشحن لا تتغيّر خلال دقائق، فتبقى مطابقة لسعر الشراء.
+const LIVE_TTL_MS = 5 * 60 * 1000;
+const liveCache = new Map<string, { at: number; payload: unknown }>();
+
 export async function GET(request: Request) {
   const session = await getSession().catch(() => null);
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers });
@@ -27,14 +33,16 @@ export async function GET(request: Request) {
   const zipRaw = new URL(request.url).searchParams.get('zip')?.trim() ?? '';
   const zip = /^\d{5}$/.test(zipRaw) ? zipRaw : undefined;
 
-  // طلبان فقط هنا (getProduct + getInventoryByPid) ثم شحن واحد داخل verify ≈ ٣ طلبات/بطاقة
-  // بدل ٩. getInventoryByPid يجلب مخزون كل المتغيّرات دفعةً واحدة، فنختار المتغيّر الأعلى
-  // مخزوناً في مستودع CJ فعلياً (لا المصنع) — فلا نفشل بـ out_of_stock على متغيّر غير مباع.
-  const [product, pidInventory] = await Promise.all([
-    getProduct(pid).catch(() => null),
-    getInventoryByPid(pid).catch(() => null),
-  ]);
-  if (!product?.ok) return NextResponse.json({ status: 'unavailable' }, { headers });
+  const cacheKey = `${pid}|${zip ?? ''}`;
+  const cached = liveCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < LIVE_TTL_MS) return NextResponse.json(cached.payload, { headers });
+
+  const respond = (payload: unknown) => { liveCache.set(cacheKey, { at: Date.now(), payload }); return NextResponse.json(payload, { headers }); };
+
+  // getProduct دائماً (للسعر/المتغيّرات). getInventoryByPid فقط عند تعدّد المتغيّرات (لترتيب
+  // الاختيار)؛ فالسلعة ذات متغيّر واحد توفّر هذا الطلب. ثم شحن واحد داخل verify.
+  const product = await getProduct(pid).catch(() => null);
+  if (!product?.ok) return respond({ status: 'unavailable' });
 
   const [settings, marginBps] = await Promise.all([
     cjSyncSettings().catch(() => ({ usdToSarX100: 375 } as { usdToSarX100: number })),
@@ -42,14 +50,17 @@ export async function GET(request: Request) {
   ]);
 
   const eligible = product.data.variants.filter((v) => typeof v.variantSellPrice === 'number' && v.variantSellPrice > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid));
-  if (!eligible.length) return NextResponse.json({ status: 'unavailable' }, { headers });
+  if (!eligible.length) return respond({ status: 'unavailable' });
 
-  // المخزون القابل للبيع لكل vid من الطلب الواحد (كمية CJ إن وُجدت وإلا الكلية المُبلَّغة) —
-  // للترتيب فقط. التحقّق النهائي يبقى على مصدر verify الموثوق (queryByVid) للمتغيّر المختار.
+  // المخزون القابل للبيع لكل vid (كمية CJ إن وُجدت وإلا الكلية المُبلَّغة) — للترتيب فقط، ولا
+  // نطلبه إلا عند تعدّد المتغيّرات. التحقّق النهائي يبقى على مصدر verify الموثوق (queryByVid).
   const stockByVid = new Map<string, number>();
-  if (pidInventory?.ok) for (const row of pidInventory.data) {
-    const q = (typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0) || (typeof row.storageNum === 'number' && row.storageNum > 0 ? row.storageNum : 0);
-    if (row.vid && q) stockByVid.set(row.vid, (stockByVid.get(row.vid) ?? 0) + q);
+  if (eligible.length > 1) {
+    const pidInventory = await getInventoryByPid(pid).catch(() => null);
+    if (pidInventory?.ok) for (const row of pidInventory.data) {
+      const q = (typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0) || (typeof row.storageNum === 'number' && row.storageNum > 0 ? row.storageNum : 0);
+      if (row.vid && q) stockByVid.set(row.vid, (stockByVid.get(row.vid) ?? 0) + q);
+    }
   }
   // المتغيّر الأعلى مخزوناً؛ فإن لم يُعرف مخزون لأيّها نعود لأرخص متغيّر.
   const variant = [...eligible].sort((a, b) => (stockByVid.get(b.vid) ?? 0) - (stockByVid.get(a.vid) ?? 0) || (a.variantSellPrice ?? 0) - (b.variantSellPrice ?? 0))[0];
@@ -60,16 +71,17 @@ export async function GET(request: Request) {
     settings.usdToSarX100, { marginBps }, zip,
   ).catch(() => null);
 
+  // لا نُخزّن حالات الفشل/النفاد (قد تكون عابرة بسبب حدّ المعدّل) كي تُعاد المحاولة فوراً.
   if (!check || check.status !== 'available') return NextResponse.json({ status: check?.status ?? 'unavailable' }, { headers });
 
   const cheapest = [...check.shippingOptions].sort((a, b) => (a.priceMinor + a.additionalMinor) - (b.priceMinor + b.additionalMinor))[0];
   const shipMinor = cheapest ? cheapest.priceMinor + cheapest.additionalMinor : 0;
-  return NextResponse.json({
+  return respond({
     status: 'available',
     priceMinor: check.salePriceMinor,
     shipMinor,
     stock: check.stockQuantity,
     totalMinor: check.salePriceMinor + shipMinor,
     deliveryDays: cheapest?.deliveryDays ?? null,
-  }, { headers });
+  });
 }

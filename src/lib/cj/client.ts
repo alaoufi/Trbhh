@@ -105,7 +105,13 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   }).catch(() => ({ status: 0, body: null }));
   const env = (body || {}) as CjEnvelope<T>;
-  if (status !== 200 || (env.result === false)) return { ok: false, error: env.message || `cj_http_${status}`, status };
+  if (status !== 200 || (env.result === false)) {
+    // سجلّ تشخيصي آمن (بلا توكن/سرّ): المسار + حالة HTTP + رمز/رسالة CJ — ليظهر السبب
+    // الحقيقي في docker logs عند أخطاء مثل inventory_error/freight_error (حدّ معدّل، خيار
+    // غير متوفّر، وجهة غير مدعومة…) بدل ابتلاعه. المسار بلا سلسلة الاستعلام (قد تحوي vid فقط).
+    console.warn(`[cj] ${opts.method || 'GET'} ${path} → http=${status} code=${env.code ?? '-'} msg=${(env.message || '').slice(0, 160)}`);
+    return { ok: false, error: env.message || `cj_http_${status}`, status };
+  }
   return { ok: true, data: (env.data as T) };
 }
 

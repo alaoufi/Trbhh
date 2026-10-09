@@ -7,6 +7,11 @@ cd "$(dirname "$0")/.."
 echo "==> Pulling latest code"
 git pull --ff-only || echo "  (skip git pull — not a clone or has local changes)"
 
+# نخبز الـcommit الحالي في الصورة ليظهر رقم النسخة في التذييل (يرفض Dockerfile أي قيمة غير
+# commit من 40 خانة، فنمرّر الهاش الكامل). بلا هذا تُبنى الصورة بـ development فيختفي الرقم.
+export TRBHH_RELEASE_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo development)"
+echo "==> Release commit: ${TRBHH_RELEASE_COMMIT}"
+
 echo "==> Building and starting containers"
 docker compose pull db redis nginx || true
 docker compose up -d --build

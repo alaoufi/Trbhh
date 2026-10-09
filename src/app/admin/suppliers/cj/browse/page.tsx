@@ -206,7 +206,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               <span>القسم: {p.categoryName ? <CjText original={p.categoryName} ar={gridAr.get(p.categoryName.trim()) ?? catAr.get(p.categoryName.trim())} /> : '—'}</span>
               <span>سعر CJ: {usd(p.sellPrice)}</span>
             </div>
-            <div className="text-sm font-extrabold text-primary">بيع تقديري: {sar(salePreview(p.sellPrice))}</div>
+            {/* الأرقام الأساسية على البطاقة (تقديرية سريعة) — الشحن والمخزون والإجمالي الحيّ الدقيق في «تفاصيل» */}
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-primary/5 p-1.5 text-[11px]">
+              <div><span className="text-muted-foreground">السعر: </span><b className="text-primary">{sar(salePreview(p.sellPrice))}</b></div>
+              <div><span className="text-muted-foreground">الإجمالي: </span><b className="text-primary">{(() => { const s = salePreview(p.sellPrice); return s == null ? '—' : sar(s + settings.shippingMinor); })()}</b></div>
+              <div><span className="text-muted-foreground">الشحن: </span><b>{settings.shippingMinor > 0 ? sar(settings.shippingMinor) : 'بالتفاصيل'}</b></div>
+              <div><span className="text-muted-foreground">المخزون: </span><b>بالتفاصيل</b></div>
+            </div>
             <div className="flex flex-wrap gap-2 pt-1">
               {imported.has(p.pid)
                 ? <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800">مستورد ✓</span>
@@ -249,10 +255,10 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                 <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-3">
                   <div className="mb-2 text-xs font-extrabold text-emerald-900">✓ قيم حقيقية حيّة من CJ (تم التحقق الآن)</div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">تكلفة CJ</div><div className="font-bold" dir="ltr">{usd(liveVariant!.priceUsd)}</div></div>
-                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">سعر البيع</div><div className="text-base font-extrabold text-primary">{sar(detailLive.salePriceMinor)}</div></div>
-                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">الشحن الحيّ للسعودية</div><div className="font-bold text-emerald-800">{liveShip ? ((liveShip.priceMinor + liveShip.additionalMinor) === 0 ? 'مجاني' : sar(liveShip.priceMinor + liveShip.additionalMinor)) : '—'}{liveShip?.deliveryDays ? ` · ${liveShip.deliveryDays}` : ''}</div></div>
-                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">المخزون الحقيقي</div><div className="font-bold text-emerald-800">{detailLive.stockQuantity.toLocaleString('en')}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">السعر</div><div className="text-base font-extrabold text-primary">{sar(detailLive.salePriceMinor)}</div><div className="text-[10px] text-muted-foreground" dir="ltr">تكلفة {usd(liveVariant!.priceUsd)}</div></div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">الشحن الحيّ</div><div className="font-bold text-emerald-800">{liveShip ? ((liveShip.priceMinor + liveShip.additionalMinor) === 0 ? 'مجاني' : sar(liveShip.priceMinor + liveShip.additionalMinor)) : '—'}</div>{liveShip?.deliveryDays && <div className="text-[10px] text-muted-foreground">{liveShip.deliveryDays}</div>}</div>
+                    <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">المخزون</div><div className="font-bold text-emerald-800">{detailLive.stockQuantity.toLocaleString('en')}</div></div>
+                    <div className="rounded-lg border border-emerald-400 bg-emerald-100/60 p-2"><div className="text-[11px] text-emerald-900">الإجمالي (سعر + شحن)</div><div className="text-base font-extrabold text-emerald-900">{sar(detailLive.salePriceMinor + (liveShip ? liveShip.priceMinor + liveShip.additionalMinor : 0))}</div></div>
                   </div>
                   <div className="mt-2 rounded-lg bg-primary/5 p-2 text-sm"><span className="text-[11px] text-muted-foreground">القسم الجديد</span> <span className="font-bold" dir="auto">{arOf(detail.data.category)}</span></div>
                 </div>

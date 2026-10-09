@@ -5,7 +5,8 @@ import Link from 'next/link';
  * التبويب الحالي مميّز. روابط ثابتة فقط (بلا حالة) لتبقى قابلة للتصيير على الخادم.
  */
 const TABS: { key: string; href: string; label: string }[] = [
-  { key: 'browse', href: '/admin/suppliers/cj/browse', label: 'المنتجات والمعالجة' },
+  { key: 'browse', href: '/admin/suppliers/cj/browse', label: 'تصفّح واستيراد' },
+  { key: 'imported', href: '/admin/suppliers/cj/imported', label: 'البضائع المستوردة' },
   { key: 'showcase', href: '/admin/suppliers/cj/showcase', label: 'السلع المعروضة' },
   { key: 'orders', href: '/admin/suppliers/cj/orders', label: 'الطلبات' },
   { key: 'agents', href: '/admin/suppliers/cj/agents', label: 'الوكلاء' },
@@ -13,7 +14,7 @@ const TABS: { key: string; href: string; label: string }[] = [
   { key: 'settings', href: '/admin/suppliers/cj', label: 'الإعدادات والاختبار' },
 ];
 
-export function CjAdminNav({ current }: { current: 'browse' | 'showcase' | 'orders' | 'agents' | 'glossary' | 'settings' }) {
+export function CjAdminNav({ current }: { current: 'browse' | 'imported' | 'showcase' | 'orders' | 'agents' | 'glossary' | 'settings' }) {
   return (
     <nav aria-label="إدارة CJ" className="-mx-1 flex flex-wrap gap-1.5 border-b border-primary/15 pb-2">
       {TABS.map(tab => {

@@ -247,68 +247,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      {/* المنتجات المستوردة — إدارة كاملة */}
-      <div className={card}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-bold">البضائع المستوردة (تخزين وسيط — غير معروضة للعامة): {importedList.length}</h2>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/admin/suppliers/cj/showcase" className={btn}>معاينة السلع المختارة ←</Link>
-            <AccessBoundary module="products" action="edit"><form action={translateAllCj}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة تلقائية للكل</SubmitButton></form></AccessBoundary>
-          </div>
+      {/* البضائع المستوردة — في صفحة فرعية مستقلة لوضوح الهدف (لا تزدحم صفحة التصفّح) */}
+      <div className={`${card} flex flex-wrap items-center justify-between gap-2`}>
+        <div>
+          <h2 className="font-bold">البضائع المستوردة: {importedList.length}</h2>
+          <p className="text-xs text-muted-foreground">إدارة الأسماء والأسعار والترجمة والإخفاء والحذف في صفحة مستقلة.</p>
         </div>
-        {typeof sp.edited === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم الحفظ.</p>}
-        {typeof sp.translated === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تمّت ترجمة {sp.translated} سلعة تلقائياً.</p>}
-        {!importedList.length ? <p className="text-sm text-muted-foreground">لم تستورد أي منتج بعد.</p> : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {importedList.map((r) => {
-              const finalMinor = r.sale_price_override_minor ?? r.sale_price_minor;
-              const availability = parseCjAvailability(r);
-              return (
-                <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${r.hidden ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-primary/20'}`}>
-                  <div className="flex gap-3">
-                    <CjProductImage src={cjImg(cjProductImages(r)[0])} alt={isArabicText(r.name_ar) ? r.name_ar : arText(r.name)} className="h-20 w-20 shrink-0 rounded-lg object-cover" />
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="truncate text-sm font-bold">{isArabicText(r.name_ar) ? r.name_ar : arText(r.name)}</div>
-                      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{r.name}</p><p dir="auto">{r.trbhh_category}</p></details>
-                      <div className="text-[11px] text-muted-foreground"><span dir="ltr">PID {r.cj_product_id}</span> · التكلفة {sar(r.supplier_cost_minor + r.shipping_cost_minor)}</div>
-                      <div className="text-sm font-extrabold text-primary">السعر: {sar(finalMinor)}{r.sale_price_override_minor != null && <span className="ms-1 text-[10px] font-normal text-amber-700">(معدّل يدوياً)</span>}</div>
-                      <div className="flex flex-wrap items-center gap-1 text-[10px]">
-                        {r.trbhh_category && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary">{arText(r.trbhh_category)}</span>}
-                        <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
-                        {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
-                      </div>
-                      {availability
-                        ? <p className="text-xs font-bold text-emerald-800">مخزون متحقق: {availability.stockQuantity.toLocaleString('en')} · خيارات الشحن: {availability.shippingOptions.length}</p>
-                        : <p className="text-xs font-bold text-amber-800">المخزون أو الشحن غير متحقق حديثًا؛ لن يظهر الإعلان للعامة.</p>}
-                    </div>
-                  </div>
-                  {/* تحرير العنوان العربي */}
-                  <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">
-                    <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />
-                    <input className={`${input} flex-1`} name="nameAr" defaultValue={r.name_ar} placeholder="العنوان بالعربية" />
-                    <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ</SubmitButton>
-                  </form></AccessBoundary>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Link href={`/admin/suppliers/cj/review/${r.id}`} className={btn}>مراجعة / تحرير</Link>
-                    <AccessBoundary module="products" action="edit"><form action={refreshCjImportedAvailability}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الصور والمخزون والشحن</SubmitButton></form></AccessBoundary>
-                    {/* تعديل السعر */}
-                    <AccessBoundary module="products" action="edit"><form action={saveCjPrice} className="flex items-center gap-1">
-                      <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />
-                      <input className={`${input} w-24`} name="priceSar" inputMode="decimal" defaultValue={r.sale_price_override_minor != null ? (r.sale_price_override_minor / 100).toString() : ''} placeholder={(r.sale_price_minor / 100).toString()} aria-label="سعر البيع بالريال" />
-                      <SubmitButton className={ghost} pendingText="جارٍ…">سعر</SubmitButton>
-                    </form></AccessBoundary>
-                    {/* ترجمة تلقائية لهذه السلعة */}
-                    <AccessBoundary module="products" action="edit"><form action={translateCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة</SubmitButton></form></AccessBoundary>
-                    {/* إخفاء/إظهار */}
-                    <AccessBoundary module="products" action="suspend"><form action={toggleCjHidden}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="hidden" value={r.hidden ? '0' : '1'} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ…">{r.hidden ? 'إظهار' : 'إخفاء'}</SubmitButton></form></AccessBoundary>
-                    {/* حذف */}
-                    <AccessBoundary module="products" action="delete"><form action={removeCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><SubmitButton className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700" pendingText="جارٍ الحذف…">حذف</SubmitButton></form></AccessBoundary>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <Link href="/admin/suppliers/cj/imported" className={btn}>إدارة البضائع المستوردة ←</Link>
       </div>
     </div>
   );

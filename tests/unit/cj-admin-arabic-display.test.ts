@@ -65,7 +65,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     expect(visible).toContain('اكتب اسم المنتج بالعربية أو الإنجليزية');
     expect(visible).toContain('PID-1');expect(visible).toContain('SKU-1');
     // قسم التفاصيل يبقي النص الأصلي داخل كتلة مصدر مُعلَّمة.
-    expect(html).toContain('النص الأصلي من المصدر');
+    expect(html).toContain('النصوص الأصلية من المصدر');
     const options=html.match(/<option\b[^>]*>[\s\S]*?<\/option>/g)??[];expect(options.join('')).toContain('value="CAT-1"');
   });
   it('uses cached Arabic in titles, category filters and detail variants without English fallback',async()=>{

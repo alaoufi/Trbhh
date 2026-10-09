@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { AccessBoundary } from '@/components/access-boundary';
 import { CjProductImage } from '@/components/cj/product-image';
 import { CjText } from '@/components/cj/cj-text';
+import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { CjAdminNav } from '@/components/cj/admin-nav';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { requireAccess } from '@/lib/access-control/guards';
-import { listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
+import { listCjProducts } from '@/lib/cj/mapping';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { translateManyForDisplay, isArabicText } from '@/lib/cj/translate';
 import { saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, removeCjProduct } from '../actions';
@@ -47,7 +48,6 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
         <div className="grid gap-3 sm:grid-cols-2">
           {importedList.map((r) => {
             const finalMinor = r.sale_price_override_minor ?? r.sale_price_minor;
-            const availability = parseCjAvailability(r);
             return (
               <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${r.hidden ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-primary/20'}`}>
                 <div className="flex gap-3">
@@ -62,23 +62,8 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
                       <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
                       {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                     </div>
-                    {availability ? (() => {
-                      const cheapest = [...availability.shippingOptions].sort((a, b) => (a.priceMinor + (a.additionalMinor || 0)) - (b.priceMinor + (b.additionalMinor || 0)))[0];
-                      const shipMinor = cheapest.priceMinor + (cheapest.additionalMinor || 0);
-                      const totalMinor = finalMinor + shipMinor;
-                      return (
-                        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2">
-                          <div className="grid grid-cols-2 gap-1 text-xs">
-                            <div className="text-emerald-800">السعر: <b dir="ltr">{sar(finalMinor)}</b></div>
-                            <div className="text-emerald-800">الشحن: <b dir="ltr">{shipMinor === 0 ? 'مجاني' : sar(shipMinor)}</b></div>
-                            <div className="text-emerald-800">المخزون: <b dir="ltr">{availability.stockQuantity.toLocaleString('en')}</b></div>
-                            <div className="text-emerald-900">الإجمالي: <b dir="ltr">{sar(totalMinor)}</b></div>
-                          </div>
-                          <p className="mt-1 text-[10px] font-normal text-emerald-700">قيم حقيقية محقّقة من CJ = سعر الشراء الفعلي للعميل{cheapest.deliveryDays ? ` · التسليم ${cheapest.deliveryDays}` : ''} · <span dir="ltr">{new Date(availability.checkedAt).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh', dateStyle: 'short', timeStyle: 'short' })}</span></p>
-                        </div>
-                      );
-                    })()
-                      : <p className="text-xs font-bold text-amber-800">المخزون والشحن غير محقّقَين حيًّا من CJ حديثًا — اضغط «تحديث الصور والمخزون والشحن» لجلب قيم حقيقية. لن يظهر الإعلان للعامة قبل التحقق.</p>}
+                    {/* الأرقام الحقيقية الحيّة تُجلب لحظياً عند تحميل الصفحة (بلا تخزين مسبق). */}
+                    <CjLiveNumbers pid={r.cj_product_id} priceMinor={finalMinor} />
                   </div>
                 </div>
                 <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">

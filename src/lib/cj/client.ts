@@ -227,12 +227,20 @@ export const DEFAULT_KSA_DEST_ZIP = '11564';
 
 export async function calculateFreightToKSA(products: { vid: string; quantity: number }[], zip?: string, originCountry = 'CN'): Promise<CjResult<CjFreightOption[]>> {
   const destZip = (zip && zip.trim()) || DEFAULT_KSA_DEST_ZIP;
-  const r = await call<unknown[]>('/logistic/freightCalculate', {
+  const r = await call<unknown>('/logistic/freightCalculate', {
     method: 'POST',
     body: { startCountryCode: originCountry, endCountryCode: 'SA', zip: destZip, products: products.map((p) => ({ vid: p.vid, quantity: p.quantity })) },
   });
   if (!r.ok) return r;
-  const list = Array.isArray(r.data) ? r.data : [];
+  // بعض استجابات CJ تُغلّف قائمة الشحن داخل كائن (data.freightList/list/…) بدل مصفوفة مباشرة؛
+  // نقبل الحالتين. وإن بقيت فارغة نُسجّل البنية الخام (بلا أسرار) لنعرف اسم الحقل الفعلي.
+  const raw = r.data as unknown;
+  const list = Array.isArray(raw) ? raw
+    : Array.isArray((raw as Record<string, unknown>)?.freightList) ? (raw as { freightList: unknown[] }).freightList
+    : Array.isArray((raw as Record<string, unknown>)?.list) ? (raw as { list: unknown[] }).list
+    : Array.isArray((raw as Record<string, unknown>)?.data) ? (raw as { data: unknown[] }).data
+    : [];
+  if (!list.length) console.warn(`[cj] freightCalculate empty start=${originCountry} end=SA zip=${destZip} vids=${products.map(p => p.vid).join(',').slice(0, 120)} raw=${JSON.stringify(raw).slice(0, 400)}`);
   return { ok: true, data: list.map((o) => mapFreight(o as Record<string, unknown>)) };
 }
 

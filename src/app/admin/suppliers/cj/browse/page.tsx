@@ -96,6 +96,16 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
+  // خريطة القيم الحقيقية المحقّقة (السعر النهائي + المخزون + أرخص شحن) للسلع المستوردة،
+  // تُقرأ من availability_json المخزَّن — تُعرض بدل التقدير متى توفّرت لتطابق سعر الشراء.
+  const realByPid = new Map<string, { finalMinor: number; stock: number; shipMinor: number }>();
+  for (const r of importedList) {
+    const av = parseCjAvailability(r);
+    if (!av) continue;
+    const cheapest = [...av.shippingOptions].sort((a, b) => (a.priceMinor + (a.additionalMinor || 0)) - (b.priceMinor + (b.additionalMinor || 0)))[0];
+    if (!cheapest) continue;
+    realByPid.set(r.cj_product_id, { finalMinor: r.sale_price_override_minor ?? r.sale_price_minor, stock: av.stockQuantity, shipMinor: cheapest.priceMinor + (cheapest.additionalMinor || 0) });
+  }
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
   // سرعة التفاصيل: نترجم الاسم والقسم فورياً فقط؛ أسماء المتغيّرات تُقرأ من المخزَّن بلا
   // ترجمة حيّة لكل متغيّر (كان سبب البطء عند فتح التفاصيل لمنتج بعشرات الخيارات).
@@ -206,13 +216,32 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               <span>القسم: {p.categoryName ? <CjText original={p.categoryName} ar={gridAr.get(p.categoryName.trim()) ?? catAr.get(p.categoryName.trim())} /> : '—'}</span>
               <span>سعر CJ: {usd(p.sellPrice)}</span>
             </div>
-            {/* الأرقام الأساسية على البطاقة (تقديرية سريعة) — الشحن والمخزون والإجمالي الحيّ الدقيق في «تفاصيل» */}
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-primary/5 p-1.5 text-[11px]">
-              <div><span className="text-muted-foreground">السعر: </span><b className="text-primary">{sar(salePreview(p.sellPrice))}</b></div>
-              <div><span className="text-muted-foreground">الإجمالي: </span><b className="text-primary">{(() => { const s = salePreview(p.sellPrice); return s == null ? '—' : sar(s + settings.shippingMinor); })()}</b></div>
-              <div><span className="text-muted-foreground">الشحن: </span><b>{settings.shippingMinor > 0 ? sar(settings.shippingMinor) : 'بالتفاصيل'}</b></div>
-              <div><span className="text-muted-foreground">المخزون: </span><b>بالتفاصيل</b></div>
-            </div>
+            {/* الأرقام الأساسية على البطاقة: قيم حقيقية محقّقة للسلع المستوردة (تطابق سعر الشراء)،
+                وإلا تقدير سريع — الأرقام الحيّة الدقيقة لأي سلعة في «تفاصيل». */}
+            {(() => {
+              const real = realByPid.get(p.pid);
+              if (real) {
+                const totalMinor = real.finalMinor + real.shipMinor;
+                return (
+                  <div className="grid grid-cols-2 gap-1 rounded-lg border border-emerald-300 bg-emerald-50 p-1.5 text-[11px]">
+                    <div><span className="text-emerald-800">السعر: </span><b className="text-emerald-900" dir="ltr">{sar(real.finalMinor)}</b></div>
+                    <div><span className="text-emerald-800">الإجمالي: </span><b className="text-emerald-900" dir="ltr">{sar(totalMinor)}</b></div>
+                    <div><span className="text-emerald-800">الشحن: </span><b dir="ltr">{real.shipMinor === 0 ? 'مجاني' : sar(real.shipMinor)}</b></div>
+                    <div><span className="text-emerald-800">المخزون: </span><b dir="ltr">{real.stock.toLocaleString('en')}</b></div>
+                    <div className="col-span-2 text-[10px] font-normal text-emerald-700">قيم حقيقية محقّقة = سعر الشراء الفعلي للعميل</div>
+                  </div>
+                );
+              }
+              return (
+                <div className="grid grid-cols-2 gap-1 rounded-lg bg-primary/5 p-1.5 text-[11px]">
+                  <div><span className="text-muted-foreground">السعر: </span><b className="text-primary">{sar(salePreview(p.sellPrice))}</b></div>
+                  <div><span className="text-muted-foreground">الإجمالي: </span><b className="text-primary">{(() => { const s = salePreview(p.sellPrice); return s == null ? '—' : sar(s + settings.shippingMinor); })()}</b></div>
+                  <div><span className="text-muted-foreground">الشحن: </span><b>{settings.shippingMinor > 0 ? sar(settings.shippingMinor) : 'بالتفاصيل'}</b></div>
+                  <div><span className="text-muted-foreground">المخزون: </span><b>بالتفاصيل</b></div>
+                  <div className="col-span-2 text-[10px] font-normal text-muted-foreground">تقديري — الأرقام الحقيقية في «تفاصيل» أو بعد الاستيراد والتحقق</div>
+                </div>
+              );
+            })()}
             <div className="flex flex-wrap gap-2 pt-1">
               {imported.has(p.pid)
                 ? <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800">مستورد ✓</span>

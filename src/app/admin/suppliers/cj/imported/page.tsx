@@ -63,8 +63,20 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
                       {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                     </div>
                     {availability ? (() => {
-                      const cheapest = [...availability.shippingOptions].sort((a, b) => a.priceMinor - b.priceMinor)[0];
-                      return <p className="text-xs font-bold text-emerald-800">مخزون حقيقي محقّق: {availability.stockQuantity.toLocaleString('en')} · شحن حيّ للسعودية من <b dir="ltr">{cheapest.priceMinor === 0 ? 'مجاني' : sar(cheapest.priceMinor + (cheapest.additionalMinor || 0))}</b>{cheapest.deliveryDays ? ` · ${cheapest.deliveryDays}` : ''}<span className="ms-1 font-normal text-emerald-700" dir="ltr">({new Date(availability.checkedAt).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh', dateStyle: 'short', timeStyle: 'short' })})</span></p>;
+                      const cheapest = [...availability.shippingOptions].sort((a, b) => (a.priceMinor + (a.additionalMinor || 0)) - (b.priceMinor + (b.additionalMinor || 0)))[0];
+                      const shipMinor = cheapest.priceMinor + (cheapest.additionalMinor || 0);
+                      const totalMinor = finalMinor + shipMinor;
+                      return (
+                        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2">
+                          <div className="grid grid-cols-2 gap-1 text-xs">
+                            <div className="text-emerald-800">السعر: <b dir="ltr">{sar(finalMinor)}</b></div>
+                            <div className="text-emerald-800">الشحن: <b dir="ltr">{shipMinor === 0 ? 'مجاني' : sar(shipMinor)}</b></div>
+                            <div className="text-emerald-800">المخزون: <b dir="ltr">{availability.stockQuantity.toLocaleString('en')}</b></div>
+                            <div className="text-emerald-900">الإجمالي: <b dir="ltr">{sar(totalMinor)}</b></div>
+                          </div>
+                          <p className="mt-1 text-[10px] font-normal text-emerald-700">قيم حقيقية محقّقة من CJ = سعر الشراء الفعلي للعميل{cheapest.deliveryDays ? ` · التسليم ${cheapest.deliveryDays}` : ''} · <span dir="ltr">{new Date(availability.checkedAt).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh', dateStyle: 'short', timeStyle: 'short' })}</span></p>
+                        </div>
+                      );
                     })()
                       : <p className="text-xs font-bold text-amber-800">المخزون والشحن غير محقّقَين حيًّا من CJ حديثًا — اضغط «تحديث الصور والمخزون والشحن» لجلب قيم حقيقية. لن يظهر الإعلان للعامة قبل التحقق.</p>}
                   </div>

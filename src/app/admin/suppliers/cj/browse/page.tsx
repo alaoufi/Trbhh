@@ -106,8 +106,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     ? await getCachedArabic(detail.data.variants.map((v) => v.name ?? ''))
     : new Map<string, string>();
   const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t.trim()) ?? detailVariantAr.get(t.trim())) ? (detailAr.get(t.trim()) ?? detailVariantAr.get(t.trim()))! : arText(t);
-  // القيم الحقيقية الحيّة (الأصل): السعر والمخزون والشحن من CJ لأوّل متغيّر صالح.
-  const liveVariant = detail && detail.ok ? detail.data.variants.find((v) => typeof v.priceUsd === 'number' && v.priceUsd! > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid)) : null;
+  // القيم الحقيقية الحيّة (الأصل): السعر والمخزون والشحن من CJ. نختار المتغيّر الأعلى مخزوناً
+  // في العيّنة (الأرجح توفّراً) ليظهر الشحن/المخزون الحيّ بدل الفشل على متغيّر نافد.
+  const liveVariant = detail && detail.ok
+    ? [...detail.data.variants]
+        .filter((v) => typeof v.priceUsd === 'number' && v.priceUsd! > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid))
+        .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0))[0] ?? null
+    : null;
   const detailLive = detail && detail.ok && liveVariant
     ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, {}, settings.usdToSarX100, { marginBps }).catch(() => null)
     : null;
@@ -266,7 +271,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                   <div className="text-xs font-bold text-slate-600">المتغيّرات ({detail.data.variants.length})</div>
                   {detail.data.variants.map((v) => (
                     <div key={v.vid} className="rounded-lg border border-slate-200 bg-white p-2 text-xs">
-                      <div className="font-semibold" dir="auto">{arOf(v.name)}</div>
+                      <div className="font-semibold" dir="auto">{v.name ? <CjText original={v.name} ar={detailVariantAr.get(v.name.trim())} /> : '—'}</div>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
                         <span>سعر البيع: <b className="text-primary">{sar(salePreview(v.priceUsd))}</b></span>
                         <span>الوزن: <b>{v.weight != null ? `${v.weight} غ` : '—'}</b></span>

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { PriceBreakdown } from './pricing';
 import type { CjVariant } from './types';
-import { translateToArabicCached, isArabicText } from './translate';
+import { translateToArabicCached, translateToArabicForDisplay, isArabicText } from './translate';
 
 /**
  * ربط منتجات CJ بمنتجات تربح (والاحتفاظ بتفصيل التسعير) في جدول cj_products.
@@ -350,6 +350,13 @@ export async function cjArabicName(row: Pick<CjProductRow, 'id' | 'name' | 'name
   if (ar && isArabicText(ar)) {
     if (persist && ar !== row.name_ar) await setCjProductNameAr(Number(row.id), ar).catch(() => {});
     return ar;
+  }
+  // احتياط متساهل للعرض: العناوين المختلطة (عربي + ماركة إنجليزية) يرفضها الفحص الصارم أعلاه
+  // فتبقى إنجليزية. نقبل ترجمة عرض ذات معنى عربي (كما في صفحات الإدارة) فلا تبقى سلعة بلا ترجمة.
+  const display = source ? await translateToArabicForDisplay(source).catch(() => null) : null;
+  if (display) {
+    if (persist && display !== row.name_ar) await setCjProductNameAr(Number(row.id), display).catch(() => {});
+    return display;
   }
   return row.name_ar || row.name || '';
 }

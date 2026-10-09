@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cjConfig } from '@/lib/cj/config';
 import { verifySignature, constantSecret, digest } from '@/lib/suppliers/crypto';
+import { extractCjStatusEvent, applyCjWebhookEvent } from '@/lib/cj/orders/sync-status';
 
 /**
  * مستقبِل webhooks من CJ (تحديثات الطلب/التتبّع). التحقّق عبر توقيع HMAC
@@ -32,6 +33,20 @@ export async function POST(req: NextRequest) {
   const idPart = String(payload?.id ?? payload?.orderId ?? payload?.trackNumber ?? '');
   const eventKey = (idPart ? digest(`${type}:${idPart}`) : digest(raw)).slice(0, 180);
 
-  await prisma.$executeRaw`INSERT INTO cj_webhook_events (event_key, type) VALUES (${eventKey}, ${type}) ON DUPLICATE KEY UPDATE id=id`.catch(() => {});
+  // استخراج حقول الحالة وتخزينها مع الحدث (idempotent)، ثم محاولة التطبيق الفوري على
+  // الطلب. التطبيق لا يمسّ المال — تحديث حالة/تتبّع فقط. أي فشل تطبيق يُترك لمعالجة لاحقة.
+  const ev = extractCjStatusEvent(payload);
+  const rawJson = raw.toString('utf8').slice(0, 60000);
+  await prisma.$executeRaw`INSERT INTO cj_webhook_events (event_key, type, cj_order_id, order_number, raw_status, track_number, payload)
+    VALUES (${eventKey}, ${type}, ${ev.cjOrderId}, ${ev.orderNumber}, ${ev.rawStatus}, ${ev.trackNumber}, ${rawJson})
+    ON DUPLICATE KEY UPDATE id=id`.catch(() => {});
+
+  try {
+    const applied = await applyCjWebhookEvent({ eventKey, ...ev });
+    if (applied.matched) {
+      await prisma.cj_webhook_events.updateMany({ where: { event_key: eventKey }, data: { processed: 1 } }).catch(() => {});
+    }
+  } catch { /* يُعالَج لاحقاً عبر الاستطلاع الدوري */ }
+
   return NextResponse.json({ ok: true });
 }

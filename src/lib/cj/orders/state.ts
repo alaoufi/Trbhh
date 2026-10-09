@@ -6,8 +6,9 @@
 
 /** حالات المسار الطبيعي بالترتيب. */
 export const FLOW_STATUSES = [
-  'awaiting_payment', // بانتظار الدفع
-  'paid',             // تم الدفع
+  'awaiting_payment', // بانتظار الدفع (الطلب جاهز، لم يُعتمد بعد)
+  'awaiting_approval',// بانتظار موافقة الإدارة قبل الخصم من محفظة CJ
+  'paid',             // تم الدفع من محفظة CJ
   'verifying',        // التحقق (سعر/مخزون/شحن server-side)
   'sent_to_cj',       // أُرسل إلى CJ
   'cj_accepted',      // قبله CJ للتنفيذ
@@ -38,6 +39,7 @@ export const ALL_STATUSES: OrderStatus[] = [...FLOW_STATUSES, ...EXCEPTION_STATU
 /** تسميات عربية للعرض (قابلة لاحقاً للنقل إلى إعدادات لوحة الإدارة عند الحاجة). */
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   awaiting_payment: 'بانتظار الدفع',
+  awaiting_approval: 'بانتظار موافقة الإدارة',
   paid: 'تم الدفع',
   verifying: 'قيد التحقق',
   sent_to_cj: 'أُرسل إلى المورد',
@@ -144,7 +146,7 @@ export function mapCjStatus(raw: string | null | undefined): FlowStatus | null {
 
 /** تجميع الحالات في مراحل للوحة المراقبة (العمود ← الحالات التي يضمّها). */
 export const STAGE_GROUPS: { key: string; title: string; statuses: OrderStatus[] }[] = [
-  { key: 'payment', title: 'الدفع', statuses: ['awaiting_payment', 'paid', 'verifying'] },
+  { key: 'payment', title: 'الدفع', statuses: ['awaiting_payment', 'awaiting_approval', 'paid', 'verifying'] },
   { key: 'supplier', title: 'المورد', statuses: ['sent_to_cj', 'cj_accepted'] },
   { key: 'preparing', title: 'التجهيز', statuses: ['preparing'] },
   { key: 'shipping', title: 'الشحن', statuses: ['shipped'] },

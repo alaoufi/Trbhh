@@ -81,6 +81,32 @@ export type CjProductPage = {
 /** نتيجة موحّدة لاستدعاءات CJ (لا ترمي؛ نميّز النجاح من الفشل). */
 export type CjResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
+/** رصيد محفظة CJ (بالدولار) — getBalance. */
+export type CjBalance = {
+  amountUsd: number;        // الرصيد القابل للاستخدام
+  bonusUsd: number;         // رصيد مكافآت غير قابل للسحب (noWithdrawalAmount)
+  frozenUsd: number;        // رصيد مجمّد (freezeAmount)
+};
+
+/** نتيجة إنشاء طلب CJ عبر createOrderV2 (payType=3: إنشاء بلا دفع). */
+export type CjCreatedOrder = {
+  orderId: string;              // معرّف الطلب لدى CJ (للدفع عبر payBalance وللاستعلام)
+  orderNumber: string | null;   // رقمنا المرسَل (orderNumber = internal_ref)
+  shipmentOrderId: string | null; // لـ payBalanceV2 عند تعدّد الطلبات الفرعية
+  actualPaymentUsd: number | null; // المبلغ الفعلي المطلوب من CJ (للتحقق من السقف)
+  orderStatus: string | null;   // حالة CJ الخام عند الإنشاء
+};
+
+/** تفاصيل طلب CJ عبر getOrderDetail — للاستطلاع الدوري وتطبيق الحالة. */
+export type CjOrderDetail = {
+  orderId: string;
+  orderNum: string | null;      // رقمنا (orderNumber)
+  cjOrderId: string | null;
+  orderStatus: string | null;   // الحالة الخام
+  subStatus: string | null;
+  trackNumber: string | null;
+};
+
 /** عيّنة منتج تفصيلية للقراءة فقط — تجمع الملخّص + المتغيّرات + المخزون. */
 export type CjSampleVariant = {
   vid: string;

@@ -131,6 +131,40 @@ export const CJ_DDL: string[] = [
   // بنود الطلب (cj_lines_json) تُنشأ ضمن CREATE أعلاه؛ ترقية القواعد القائمة عبر ALTER
   // مبتلَع في src/data/schema-sync.ts (لتبقى CJ_DDL قابلة لإعادة التطبيق بلا خطأ).
 
+  // أعمدة الدفع من محفظة CJ والموافقة والتحقق (المرحلة المالية). كلها ALTER يُبتلَع خطؤها
+  // عند وجود العمود مسبقاً. المبالغ المالية الخاصة بـ CJ بالدولار (CJ wallet = USD).
+  `ALTER TABLE cj_orders ADD COLUMN cj_shipment_order_id VARCHAR(64) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_orders ADD COLUMN cj_pay_id VARCHAR(64) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_orders ADD COLUMN approved_cap_usd_minor INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE cj_orders ADD COLUMN actual_payment_usd_minor INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE cj_orders ADD COLUMN approved_at DATETIME(3) NULL`,
+  `ALTER TABLE cj_orders ADD COLUMN approved_by BIGINT UNSIGNED NULL`,
+  `ALTER TABLE cj_orders ADD COLUMN paid_at DATETIME(3) NULL`,
+  `ALTER TABLE cj_orders ADD COLUMN verified_at DATETIME(3) NULL`,
+  `ALTER TABLE cj_orders ADD COLUMN verified_source VARCHAR(40) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_orders ADD COLUMN is_test TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE cj_orders ADD COLUMN last_polled_at DATETIME(3) NULL`,
+
+  // دفتر محاسبة CJ — كل حركة مالية (خصم/رسوم/استرداد/تسوية) سطر واحد. المبالغ بالدولار
+  // (عملة محفظة CJ). entry_key فريد يمنع تكرار القيد (idempotency للمحاسبة). للمطابقة مع
+  // كشف CJ: cj_ref يحمل مرجع CJ (orderId) وsource يميّز مصدر القيد.
+  `CREATE TABLE IF NOT EXISTS cj_ledger (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    entry_key VARCHAR(191) NOT NULL,
+    order_id BIGINT UNSIGNED NULL,
+    entry_type VARCHAR(24) NOT NULL DEFAULT 'charge',
+    amount_usd_minor INT NOT NULL DEFAULT 0,
+    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    cj_ref VARCHAR(64) NOT NULL DEFAULT '',
+    source VARCHAR(24) NOT NULL DEFAULT 'internal',
+    note VARCHAR(500) NOT NULL DEFAULT '',
+    reconciled TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY cj_ledger_entry (entry_key),
+    KEY cj_ledger_order (order_id),
+    KEY cj_ledger_ref (cj_ref)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   // سجل أحداث/خط زمني للطلب — event_key فريد يجعل استقبال الأحداث/الـwebhooks idempotent.
   `CREATE TABLE IF NOT EXISTS cj_order_events (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -155,4 +189,12 @@ export const CJ_DDL: string[] = [
     received_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     UNIQUE KEY cj_webhook_event_key (event_key)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // أعمدة معالجة الـwebhook: ربط الحدث بطلب وحالته الخام ومعالجته (idempotent).
+  `ALTER TABLE cj_webhook_events ADD COLUMN cj_order_id VARCHAR(64) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_webhook_events ADD COLUMN order_number VARCHAR(64) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_webhook_events ADD COLUMN raw_status VARCHAR(64) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_webhook_events ADD COLUMN track_number VARCHAR(160) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_webhook_events ADD COLUMN processed TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE cj_webhook_events ADD COLUMN payload MEDIUMTEXT NULL`,
 ];

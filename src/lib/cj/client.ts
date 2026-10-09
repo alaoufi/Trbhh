@@ -4,7 +4,7 @@ import { readCjAuth, writeCjAuth } from './store';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import type {
   CjResult, CjProductSummary, CjProductDetail, CjVariant, CjInventory, CjWarehouse, CjFreightOption, CjTrack,
-  CjCategory, CjProductPage,
+  CjCategory, CjProductPage, CjBalance, CjCreatedOrder, CjOrderDetail,
 } from './types';
 
 /**
@@ -92,7 +92,7 @@ async function accessToken(cfg: CjConfig): Promise<CjResult<string>> {
   return { ok: true, data: data.accessToken };
 }
 
-async function call<T>(path: string, opts: { method?: 'GET' | 'POST'; query?: Record<string, string | number | undefined>; body?: unknown } = {}): Promise<CjResult<T>> {
+async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; query?: Record<string, string | number | undefined>; body?: unknown } = {}): Promise<CjResult<T>> {
   const cfg = cjConfig();
   const tok = await accessToken(cfg);
   if (!tok.ok) return tok;
@@ -238,22 +238,111 @@ export async function getTracking(trackNumber: string): Promise<CjResult<CjTrack
   return { ok: true, data: { trackNumber, logisticName: str(d.logisticName), trackStatus: str(d.trackStatus), details } };
 }
 
-/* ------------------------- الطلبات (مقفلة) ------------------------- */
+/* ------------------------- استعلام حالة الطلب (قراءة فقط) ------------------------- */
 
 /**
- * إنشاء طلب لدى CJ — لا يُنفَّذ إطلاقاً إلا بحارسين: مفتاح الشراء المركزي مفعّل
- * (commerce_purchasing_enabled) و SUPPLIER_ALLOW_LIVE_ORDERS='true'. وإلا يُرفض
- * فوراً بلا أي اتصال شبكي. هذا يمنع أي شراء/خصم حقيقي في الإنتاج قبل التفعيل اليدوي.
+ * تفاصيل طلب CJ (getOrderDetail) — قراءة فقط، للاستطلاع الدوري وتطبيق الحالة.
+ * لا تمسّ المال؛ لا تخضع لحارسَي الشراء (الاستعلام عن طلب قائم آمن دائماً).
  */
-export async function createCjOrder(input: unknown): Promise<CjResult<{ orderId: string }>> {
+export async function getCjOrderDetail(orderId: string): Promise<CjResult<CjOrderDetail>> {
+  const id = String(orderId || '').trim();
+  if (!id) return { ok: false, error: 'order_id_required' };
+  const r = await call<Record<string, unknown>>('/shopping/order/getOrderDetail', { query: { orderId: id } });
+  if (!r.ok) return r;
+  const d = r.data || {};
+  return {
+    ok: true,
+    data: {
+      orderId: String(d.orderId ?? id),
+      orderNum: str(d.orderNum ?? d.orderNumber),
+      cjOrderId: str(d.cjOrderId),
+      orderStatus: str(d.orderStatus),
+      subStatus: str(d.subStatus),
+      trackNumber: str(d.trackNumber),
+    },
+  };
+}
+
+/** رصيد محفظة CJ (getBalance) — قراءة فقط. للعرض والمطابقة قبل الدفع. */
+export async function getCjBalance(): Promise<CjResult<CjBalance>> {
+  const r = await call<Record<string, unknown>>('/shopping/pay/getBalance', {});
+  if (!r.ok) return r;
+  const d = r.data || {};
+  return {
+    ok: true,
+    data: {
+      amountUsd: num(d.amount) ?? 0,
+      bonusUsd: num(d.noWithdrawalAmount) ?? 0,
+      frozenUsd: num(d.freezeAmount) ?? 0,
+    },
+  };
+}
+
+/* ------------------------- الطلبات والدفع (مقفلة بحارسين) ------------------------- */
+
+/** هل يُسمح بعملية حيّة تمسّ المال لدى CJ؟ حارسان معاً: مفتاح الشراء + متغيّر البيئة. */
+async function liveOrdersAllowed(): Promise<boolean> {
   const config = await getCommerceConfig().catch(() => null);
   const liveAllowed = process.env.SUPPLIER_ALLOW_LIVE_ORDERS === 'true';
-  if (!config?.purchasingEnabled || !liveAllowed) {
-    return { ok: false, error: 'cj_purchasing_disabled' };
-  }
-  const r = await call<{ orderId?: string }>('/shopping/order/createOrderV2', { method: 'POST', body: input });
+  return !!config?.purchasingEnabled && liveAllowed;
+}
+
+/**
+ * إنشاء طلب لدى CJ بـ payType=3 (إنشاء بلا دفع) — تفصل الإنشاء عن الدفع فصلاً تاماً
+ * ليمرّ الطلب عبر بوابة موافقة الإدارة ثم يُدفع صراحةً عبر payBalance. لا يُنفَّذ إطلاقاً
+ * إلا بحارسين: commerce_purchasing_enabled + SUPPLIER_ALLOW_LIVE_ORDERS='true'، وإلا
+ * يُرفض فوراً بلا أي اتصال شبكي. يُعيد orderId وshipmentOrderId والمبلغ الفعلي للتحقق من السقف.
+ */
+export async function createCjOrder(input: Record<string, unknown>): Promise<CjResult<CjCreatedOrder>> {
+  if (!(await liveOrdersAllowed())) return { ok: false, error: 'cj_purchasing_disabled' };
+  // payType=3: إنشاء الطلب فقط بلا دفع ولا إضافة للسلة ولا تأكيد (الدفع خطوة منفصلة).
+  const body = { payType: 3, ...input };
+  const r = await call<Record<string, unknown>>('/shopping/order/createOrderV2', { method: 'POST', body });
   if (!r.ok) return r;
-  return { ok: true, data: { orderId: String(r.data?.orderId || '') } };
+  const d = r.data || {};
+  return {
+    ok: true,
+    data: {
+      orderId: String(d.orderId || ''),
+      orderNumber: str(d.orderNumber),
+      shipmentOrderId: str(d.shipmentOrderId),
+      actualPaymentUsd: num(d.actualPayment),
+      orderStatus: str(d.orderStatus),
+    },
+  };
+}
+
+/**
+ * دفع طلب CJ من رصيد المحفظة (payBalance) — الخطوة المالية الوحيدة التي تخصم فعلياً.
+ * محميّة بالحارسين نفسيهما. تتعامل مع الطلب الواحد عبر orderId، وعند تعدّد الطلبات الفرعية
+ * تستخدم payBalanceV2 مع shipmentOrderId وpayId (مفتاح تفرّد الدفع لمنع الخصم المكرّر).
+ * المنطق الأعلى (payment.ts) يتولّى التحقق من السقف وإعادة التحقق ومنع التكرار قبل الاستدعاء.
+ */
+export async function payCjOrderBalance(input: { orderId?: string; shipmentOrderId?: string; payId?: string }): Promise<CjResult<{ paid: true }>> {
+  if (!(await liveOrdersAllowed())) return { ok: false, error: 'cj_purchasing_disabled' };
+  const shipmentOrderId = String(input.shipmentOrderId || '').trim();
+  const orderId = String(input.orderId || '').trim();
+  if (shipmentOrderId) {
+    const body: Record<string, string> = { shipmentOrderId };
+    if (input.payId) body.payId = String(input.payId).slice(0, 200);
+    const r = await call<unknown>('/shopping/pay/payBalanceV2', { method: 'POST', body });
+    if (!r.ok) return r;
+    return { ok: true, data: { paid: true } };
+  }
+  if (!orderId) return { ok: false, error: 'order_id_required' };
+  const r = await call<unknown>('/shopping/pay/payBalance', { method: 'POST', body: { orderId } });
+  if (!r.ok) return r;
+  return { ok: true, data: { paid: true } };
+}
+
+/** تأكيد الطلب لدى CJ (confirmOrder, PATCH) — عند الحاجة قبل الدفع في بعض المسارات. محميّ بالحارسين. */
+export async function confirmCjOrder(orderId: string): Promise<CjResult<{ confirmed: true }>> {
+  if (!(await liveOrdersAllowed())) return { ok: false, error: 'cj_purchasing_disabled' };
+  const id = String(orderId || '').trim();
+  if (!id) return { ok: false, error: 'order_id_required' };
+  const r = await call<unknown>('/shopping/order/confirmOrder', { method: 'PATCH', body: { orderId: id } });
+  if (!r.ok) return r;
+  return { ok: true, data: { confirmed: true } };
 }
 
 /* ------------------------- محوّلات ------------------------- */

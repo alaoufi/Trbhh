@@ -2402,6 +2402,17 @@ model cj_orders {
   ship_zip             String    @default("") @db.VarChar(20)
   placed_at            DateTime? @db.DateTime(3)
   delivered_at         DateTime? @db.DateTime(3)
+  cj_shipment_order_id String    @default("") @db.VarChar(64)
+  cj_pay_id            String    @default("") @db.VarChar(64)
+  approved_cap_usd_minor   Int   @default(0)
+  actual_payment_usd_minor Int   @default(0)
+  approved_at          DateTime? @db.DateTime(3)
+  approved_by          BigInt?   @db.UnsignedBigInt
+  paid_at              DateTime? @db.DateTime(3)
+  verified_at          DateTime? @db.DateTime(3)
+  verified_source      String    @default("") @db.VarChar(40)
+  is_test              Int       @default(0) @db.TinyInt
+  last_polled_at       DateTime? @db.DateTime(3)
   created_at           DateTime  @default(now()) @db.Timestamp(3)
   updated_at           DateTime  @default(now()) @updatedAt @db.Timestamp(3)
 
@@ -2428,10 +2439,33 @@ model cj_order_events {
 }
 
 model cj_webhook_events {
-  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  event_key   String   @unique(map: "cj_webhook_event_key") @db.VarChar(191)
-  type        String   @default("") @db.VarChar(64)
-  received_at DateTime @default(now()) @db.Timestamp(3)
+  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  event_key    String   @unique(map: "cj_webhook_event_key") @db.VarChar(191)
+  type         String   @default("") @db.VarChar(64)
+  cj_order_id  String   @default("") @db.VarChar(64)
+  order_number String   @default("") @db.VarChar(64)
+  raw_status   String   @default("") @db.VarChar(64)
+  track_number String   @default("") @db.VarChar(160)
+  processed    Int      @default(0) @db.TinyInt
+  payload      String?  @db.MediumText
+  received_at  DateTime @default(now()) @db.Timestamp(3)
+}
+
+model cj_ledger {
+  id               BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  entry_key        String   @unique(map: "cj_ledger_entry") @db.VarChar(191)
+  order_id         BigInt?  @db.UnsignedBigInt
+  entry_type       String   @default("charge") @db.VarChar(24)
+  amount_usd_minor Int      @default(0)
+  currency         String   @default("USD") @db.VarChar(3)
+  cj_ref           String   @default("") @db.VarChar(64)
+  source           String   @default("internal") @db.VarChar(24)
+  note             String   @default("") @db.VarChar(500)
+  reconciled       Int      @default(0) @db.TinyInt
+  created_at       DateTime @default(now()) @db.DateTime(3)
+
+  @@index([order_id], map: "cj_ledger_order")
+  @@index([cj_ref], map: "cj_ledger_ref")
 }
 
 // Financial follow-up is additive. CHECK constraints and binary collations are

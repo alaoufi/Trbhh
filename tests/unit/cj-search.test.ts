@@ -34,4 +34,10 @@ describe('CJ Arabic catalog search',()=>{
     vi.stubGlobal('fetch',vi.fn(async(_input:RequestInfo|URL)=>new Response('unavailable',{status:503})));
     await expect(translateArabicCjSearch('خاتم ألماس')).resolves.toBeNull();
   });
+
+  it('ينظّف ناتج الترجمة فيزيل أداة التعريف والترقيم (A screen → screen)',async()=>{
+    const fetcher=vi.fn(async(_input:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'A screen.'}}),{status:200}));
+    vi.stubGlobal('fetch',fetcher);
+    await expect(translateArabicCjSearch('شاشة')).resolves.toBe('screen');
+  });
 });

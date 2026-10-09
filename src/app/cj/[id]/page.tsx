@@ -15,8 +15,6 @@ import { CjPurchasePanel } from '@/components/cj/purchase-panel';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/variant-display';
 import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
-import { translateManyForDisplay } from '@/lib/cj/translate';
-import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { getSetting } from '@/lib/settings';
 import { getCjCategoryOptions } from '@/lib/cj/categories';
 
@@ -74,13 +72,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       optionGroups.set(opt.label, values);
     }
   }
-  // ترجمة فورية عند التحميل لقيم الخيارات وتسمياتها (ألوان/مقاسات بالإنجليزية) عبر المترجم
-  // المحلي، فتظهر «الخيارات المتاحة» بالعربية للزائر. ما يتعذّر يبقى كما هو.
-  const optionTextSet = new Set<string>();
-  for (const [label, values] of optionGroups) { optionTextSet.add(label); for (const val of values) optionTextSet.add(val); }
-  const optionAr = await translateManyForDisplay([...optionTextSet], 120).catch(() => new Map<string, string>());
-  const tr = (t: string) => optionAr.get((t || '').trim()) || t;
-  const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label: tr(label), values: values.slice(0, 40).map(tr) })).slice(0, 8);
+  const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label, values: values.slice(0, 40) })).slice(0, 8);
   // جدول الخيارات بتفاصيلها (كل خيار + وزنه) + شحن تقديري (سعر ثابت من الإدارة + مدّة نصّية).
   const [shipMinorRaw, deliveryDaysText, categoryOptions] = await Promise.all([getSetting('cj_sync_shipping_minor', '0'), getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'), getCjCategoryOptions()]);
   const flatShipMinor = Math.max(0, Math.round(Number(shipMinorRaw) || 0));
@@ -92,8 +84,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const realShipMinor = shipCheapest?.priceMinor ?? shipEstimate?.minor ?? flatShipMinor;
   const shipDeliveryText = shipCheapest?.deliveryDays || shipEstimate?.deliveryDays || (deliveryDaysText || '').trim() || '';
   const variantRows = displayVariants.map(v => {
-    const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${tr(o.label)}: ${tr(o.value)}`).join(' · ');
-    return { key: v.vid, label: opts || tr((v.name || v.optionKey || '').trim()) || '—', weight: v.weight };
+    const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${o.label}: ${o.value}`).join(' · ');
+    return { key: v.vid, label: opts || (v.name || v.optionKey || '').trim() || '—', weight: v.weight };
   }).slice(0, 60);
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
@@ -107,8 +99,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
-        {/* الأرقام الحيّة الحقيقية (السعر/المخزون/الشحن/المدة/الإجمالي) — مهمة، تُجلب لحظياً من CJ. */}
-        <CjLiveNumbers pid={p.cj_product_id} priceMinor={p.sale_price_override_minor ?? p.sale_price_minor} />
         {view.isStaff && session && (verifiedVariants.length > 0
           ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من التوفّر قبل إتاحتها.</p>)}

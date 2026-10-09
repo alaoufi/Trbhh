@@ -44,21 +44,19 @@ export async function GET(request: Request) {
   const eligible = product.data.variants.filter((v) => typeof v.variantSellPrice === 'number' && v.variantSellPrice > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid));
   if (!eligible.length) return NextResponse.json({ status: 'unavailable' }, { headers });
 
-  // مخزون مستودع CJ المُباع فعلاً لكل vid (cjInventoryQuantity) من الطلب الواحد.
-  const cjStockByVid = new Map<string, number>();
+  // المخزون القابل للبيع لكل vid من الطلب الواحد (كمية CJ إن وُجدت وإلا الكلية المُبلَّغة) —
+  // للترتيب فقط. التحقّق النهائي يبقى على مصدر verify الموثوق (queryByVid) للمتغيّر المختار.
+  const stockByVid = new Map<string, number>();
   if (pidInventory?.ok) for (const row of pidInventory.data) {
-    const q = typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0;
-    if (row.vid && q) cjStockByVid.set(row.vid, (cjStockByVid.get(row.vid) ?? 0) + q);
+    const q = (typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0) || (typeof row.storageNum === 'number' && row.storageNum > 0 ? row.storageNum : 0);
+    if (row.vid && q) stockByVid.set(row.vid, (stockByVid.get(row.vid) ?? 0) + q);
   }
-  // المتغيّر الأعلى مخزوناً في CJ؛ فإن لم يُعرف مخزون لأيّها نعود لأرخص متغيّر.
-  const variant = [...eligible].sort((a, b) => (cjStockByVid.get(b.vid) ?? 0) - (cjStockByVid.get(a.vid) ?? 0) || (a.variantSellPrice ?? 0) - (b.variantSellPrice ?? 0))[0];
+  // المتغيّر الأعلى مخزوناً؛ فإن لم يُعرف مخزون لأيّها نعود لأرخص متغيّر.
+  const variant = [...eligible].sort((a, b) => (stockByVid.get(b.vid) ?? 0) - (stockByVid.get(a.vid) ?? 0) || (a.variantSellPrice ?? 0) - (b.variantSellPrice ?? 0))[0];
 
   const check = await verifyCjVariantForSaudi(
     pid, variant, 1,
-    {
-      getVariants: async () => ({ ok: true, data: product.data.variants }),
-      ...(pidInventory?.ok ? { getInventoryByVid: async (vid: string) => ({ ok: true as const, data: pidInventory.data.filter((r) => r.vid === vid) }) } : {}),
-    },
+    { getVariants: async () => ({ ok: true, data: product.data.variants }) },
     settings.usdToSarX100, { marginBps }, zip,
   ).catch(() => null);
 

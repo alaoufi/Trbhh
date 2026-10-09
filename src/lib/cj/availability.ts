@@ -34,10 +34,13 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   if(!variantResult?.ok)return {status:'variant_changed',checkedAt};
   const liveVariant=variantResult.data.find(variant=>variant.vid===selected.vid);
   if(!liveVariant)return {status:'variant_changed',checkedAt};
-  // The queryByVid response includes factory and CJ quantities. Only CJ-managed
-  // quantities can be treated as currently sellable; factory stock is unverified.
+  // CJ يبيع من مخزون مستودعه (cjInventoryQuantity) ومن مخزون المورّد/المصنع المُبلَّغ
+  // (storageNum) معاً — فالاكتفاء بمخزون CJ وحده كان يرفض سلعاً متوفّرة فعلاً كـ out_of_stock.
+  // نعتمد كمية CJ إن وُجدت، وإلا الكمية الكلية المُبلَّغة من CJ. يبقى الشحن هو الحَكَم النهائي
+  // على القابلية للتسليم للسعودية.
+  const sellable=(row:CjInventory)=>safeQuantity(row.cjInventoryQuantity)||safeQuantity(row.storageNum);
   const exactRows=inventoryResult.data.filter(row=>row.vid===selected.vid&&validOrigin(row.countryCode));
-  const warehouses=exactRows.map(row=>({id:row.areaId,name:row.areaName,quantity:safeQuantity(row.cjInventoryQuantity),originCountry:row.countryCode!.toUpperCase()})).filter(row=>row.quantity>0);
+  const warehouses=exactRows.map(row=>({id:row.areaId,name:row.areaName,quantity:sellable(row),originCountry:row.countryCode!.toUpperCase()})).filter(row=>row.quantity>0);
   const stockQuantity=warehouses.reduce((sum,row)=>sum+row.quantity,0);
   if(!stockQuantity)return {status:'out_of_stock',checkedAt};
   if(quantity>stockQuantity)return {status:'quantity_exceeds_stock',checkedAt};
@@ -83,7 +86,7 @@ export async function readCjAvailability(pid:string,variants:CjVariant[],deps:Av
   for(const row of inventory.data){
     const variant=variantByVid.get(row.vid),origin=row.countryCode?.trim().toUpperCase();
     if(!variant||!origin||!/^[A-Z]{2}$/.test(origin))continue;
-    const quantity=safeQuantity(row.cjInventoryQuantity);
+    const quantity=safeQuantity(row.cjInventoryQuantity)||safeQuantity(row.storageNum);
     if(!quantity)continue;
     const key=`${row.vid}\u0000${origin}`;
     quantityByVidOrigin.set(key,(quantityByVidOrigin.get(key)??0)+quantity);

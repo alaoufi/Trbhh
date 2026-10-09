@@ -111,21 +111,21 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     : new Map<string, string>();
   const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t.trim()) ?? detailVariantAr.get(t.trim())) ? (detailAr.get(t.trim()) ?? detailVariantAr.get(t.trim()))! : arText(t);
   // القيم الحقيقية الحيّة (الأصل): السعر والمخزون والشحن من CJ. نختار المتغيّر الأعلى مخزوناً
-  // في مستودع CJ فعلياً (cjInventoryQuantity) لا مخزون المصنع — عبر طلب واحد getInventoryByPid —
-  // كي لا نفشل بـ out_of_stock على متغيّر غير مُباع رغم توفّر غيره. ونعيد استخدام المخزون في verify.
+  // (كمية CJ إن وُجدت وإلا الكلية المُبلَّغة من CJ) عبر طلب واحد getInventoryByPid — للترتيب فقط —
+  // كي لا نفشل بـ out_of_stock على متغيّر فارغ رغم توفّر غيره. التحقّق النهائي على مصدر verify الموثوق.
   const detailPidInventory = detail && detail.ok ? await getInventoryByPid(detailPid).catch(() => null) : null;
-  const cjStockByVid = new Map<string, number>();
+  const stockByVid = new Map<string, number>();
   if (detailPidInventory?.ok) for (const row of detailPidInventory.data) {
-    const q = typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0;
-    if (row.vid && q) cjStockByVid.set(row.vid, (cjStockByVid.get(row.vid) ?? 0) + q);
+    const q = (typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0) || (typeof row.storageNum === 'number' && row.storageNum > 0 ? row.storageNum : 0);
+    if (row.vid && q) stockByVid.set(row.vid, (stockByVid.get(row.vid) ?? 0) + q);
   }
   const liveVariant = detail && detail.ok
     ? [...detail.data.variants]
         .filter((v) => typeof v.priceUsd === 'number' && v.priceUsd! > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid))
-        .sort((a, b) => (cjStockByVid.get(b.vid) ?? 0) - (cjStockByVid.get(a.vid) ?? 0) || (b.stock ?? 0) - (a.stock ?? 0))[0] ?? null
+        .sort((a, b) => (stockByVid.get(b.vid) ?? 0) - (stockByVid.get(a.vid) ?? 0) || (b.stock ?? 0) - (a.stock ?? 0))[0] ?? null
     : null;
   const detailLive = detail && detail.ok && liveVariant
-    ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, detailPidInventory?.ok ? { getInventoryByVid: async (vid: string) => ({ ok: true as const, data: detailPidInventory.data.filter((r) => r.vid === vid) }) } : {}, settings.usdToSarX100, { marginBps }).catch(() => null)
+    ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, {}, settings.usdToSarX100, { marginBps }).catch(() => null)
     : null;
   const liveShip = detailLive?.status === 'available' ? [...detailLive.shippingOptions].sort((a, b) => (a.priceMinor + a.additionalMinor) - (b.priceMinor + b.additionalMinor))[0] : null;
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);

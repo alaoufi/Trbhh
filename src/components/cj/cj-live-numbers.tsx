@@ -54,10 +54,11 @@ export function CjLiveNumbers({ pid, priceMinor }: { pid: string; priceMinor?: n
       {available ? (
         <div className="grid grid-cols-2 gap-1 rounded-lg border border-emerald-300 bg-emerald-50 p-1.5 text-[11px]">
           <div><span className="text-emerald-800">السعر: </span><b className="text-emerald-900" dir="ltr">{sar(price)}</b></div>
-          <div><span className="text-emerald-800">الإجمالي: </span><b className="text-emerald-900" dir="ltr">{sar(price + available.shipMinor)}</b></div>
-          <div><span className="text-emerald-800">الشحن: </span><b dir="ltr">{available.shipMinor === 0 ? 'مجاني' : sar(available.shipMinor)}</b></div>
           <div><span className="text-emerald-800">المخزون: </span><b dir="ltr">{available.stock.toLocaleString('en')}</b></div>
-          <div className="col-span-2 text-[10px] font-normal text-emerald-700">قيم حقيقية حيّة من CJ = سعر الشراء الفعلي للعميل{available.deliveryDays ? ` · التسليم ${available.deliveryDays}` : ''}</div>
+          <div><span className="text-emerald-800">الشحن: </span><b dir="ltr">{available.shipMinor === 0 ? 'مجاني' : sar(available.shipMinor)}</b></div>
+          <div><span className="text-emerald-800">مدة الشحن: </span><b dir="ltr">{available.deliveryDays ? (/[A-Za-z؀-ۿ]/.test(available.deliveryDays) ? available.deliveryDays : `${available.deliveryDays} يوم`) : '—'}</b></div>
+          <div className="col-span-2 border-t border-emerald-200 pt-1"><span className="text-emerald-800">الإجمالي: </span><b className="text-emerald-900" dir="ltr">{sar(price + available.shipMinor)}</b></div>
+          <div className="col-span-2 text-[10px] font-normal text-emerald-700">قيم حقيقية حيّة من CJ = سعر الشراء الفعلي للعميل</div>
         </div>
       ) : loading || !data ? (
         <div className="rounded-lg bg-primary/5 p-1.5 text-[11px] text-muted-foreground">{loading ? 'جارٍ جلب الأرقام الحيّة من CJ…' : 'بانتظار الظهور لجلب الأرقام الحيّة…'}</div>

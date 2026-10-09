@@ -33,12 +33,16 @@ const sqlNormalized = (field: string) =>
 export function memberSearchSql(query: string): { sql: string; args: string[] } {
   const terms = memberSearchTerms(query);
   if (!terms.length) return { sql: '', args: [] };
-  const fields = ['name', 'userName', 'email', 'phoneNumber', 'CAST(id AS CHAR)'];
+  // حقول الحساب الأساسي + حقول الملفات/الهويات (profiles) كي يجد البحث حساباً
+  // اسمه الأساسي «اوتاد سدير» بينما له ملف باسم «أبو ماجد 1/2».
+  const userFields = ['name', 'userName', 'email', 'phoneNumber', 'CAST(id AS CHAR)'];
+  const profileFields = ['p.name', 'p.phone', 'p.whatsapp', 'p.handle'];
   const args: string[] = [];
   const sql = terms.map((term) => {
     const like = `%${term}%`;
-    args.push(...fields.map(() => like));
-    return `(${fields.map((field) => `${sqlNormalized(field)} LIKE ?`).join(' OR ')})`;
+    const userExpr = userFields.map((field) => { args.push(like); return `${sqlNormalized(field)} LIKE ?`; }).join(' OR ');
+    const profExpr = profileFields.map((field) => { args.push(like); return `${sqlNormalized(field)} LIKE ?`; }).join(' OR ');
+    return `(${userExpr} OR EXISTS (SELECT 1 FROM profiles p WHERE p.user_id = users.id AND (${profExpr})))`;
   }).join(' AND ');
   return { sql, args };
 }

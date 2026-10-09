@@ -13,4 +13,10 @@ describe('member administration Arabic search', () => {
     expect(built.args).toContain('%ابو%');
     expect(built.args).toContain('%ماجد%');
   });
+
+  it('also matches profile/identity names (e.g. «أبو ماجد 1» under a store account)', () => {
+    const built = memberSearchSql('أبو ماجد');
+    expect(built.sql).toContain('EXISTS');
+    expect(built.sql).toContain('FROM profiles p WHERE p.user_id = users.id');
+  });
 });

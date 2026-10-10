@@ -54,10 +54,10 @@ describe('private CJ mixed catalog', () => {
     expect(state.reads).not.toHaveBeenCalled();
   });
   it.each([{}, { tab: 'unknown', page: '-3' }, { tab: ['imported'], page: ['2'] }, { page: '1e8' }, { page: '0' }])('normalizes invalid URL input %j', query => {
-    expect(parseCjCatalogQuery(query)).toEqual({ tab: 'all', page: 1 });
+    expect(parseCjCatalogQuery(query)).toEqual({ tab: 'all', page: 1, q: '' });
   });
   it('accepts only named tabs and positive bounded integer pages', () => {
-    expect(parseCjCatalogQuery({ tab: 'verified', page: '4' })).toEqual({ tab: 'verified', page: 4 });
+    expect(parseCjCatalogQuery({ tab: 'verified', page: '4' })).toEqual({ tab: 'verified', page: 4, q: '' });
   });
   it('pages beyond the former sixty-product cap with no duplicates or skipped eligible rows', async () => {
     state.products = Array.from({ length: 65 }, (_, i) => product(i + 1));

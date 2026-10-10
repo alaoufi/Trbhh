@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck, ChevronDown } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
@@ -104,11 +104,14 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}</td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
-        {/* الأرقام الحيّة الحقيقية (السعر/المخزون/الشحن/المدة/الإجمالي) من CJ — في قسم الشحن بتوزيع مرتّب. */}
-        <div className="min-w-0 space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
-          <h2 className="text-base font-extrabold text-emerald-900">الشحن إلى السعودية</h2>
-          <CjLiveNumbers pid={p.cj_product_id} priceMinor={p.sale_price_override_minor ?? p.sale_price_minor} />
-        </div>
+        {/* الشحن إلى السعودية — قسم قابل للطيّ بسهم للأسفل؛ يتمدّد بالنقر ويجلب الأرقام الحيّة عندها. */}
+        <details className="group/s min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-3 text-base font-extrabold text-emerald-900 [&::-webkit-details-marker]:hidden">
+            الشحن إلى السعودية
+            <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open/s:rotate-180" />
+          </summary>
+          <div className="pb-4"><CjLiveNumbers pid={p.cj_product_id} priceMinor={p.sale_price_override_minor ?? p.sale_price_minor} /></div>
+        </details>
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
     </div>

@@ -25,20 +25,20 @@ export function CjProductCard({ product }: { product: CjProductRow }) {
           <span className="rounded-full bg-[#16294a]/95 px-2.5 py-1 text-[10px] font-bold text-white">معروض</span>
         </div>
       </div>
-      <div className="flex min-w-0 flex-col gap-2 p-3 pb-2 sm:p-4 sm:pb-2">
+      <div className="flex min-w-0 flex-col gap-1 p-2.5 pb-1.5 sm:p-3 sm:pb-1.5">
         <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={finalMinor <= 0}>{cjPriceLabel(finalMinor, product.currency)}</PriceText></div>
-        <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(title)}</h3>
+        <h3 className="line-clamp-2 min-h-9 break-words text-[13px] font-bold leading-[1.35] text-slate-800">{compactAdTitle(title)}</h3>
       </div>
     </Link>
     {/* التفاصيل (القسم) مطويّة افتراضياً لتوفير المساحة — سهم يتمدّد/ينكمش. */}
-    {product.trbhh_category && <details className="cj-card-details group/d border-t border-slate-100 px-3 sm:px-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-1 py-2 text-[11px] font-bold text-slate-500 [&::-webkit-details-marker]:hidden">
+    {product.trbhh_category && <details className="cj-card-details group/d border-t border-slate-100 px-2.5 sm:px-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-1 py-1.5 text-[11px] font-bold text-slate-500 [&::-webkit-details-marker]:hidden">
         التفاصيل
         <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open/d:rotate-180" />
       </summary>
-      <p className="pb-2 text-[11px] leading-5 text-slate-500" dir="auto">{product.trbhh_category}</p>
+      <p className="pb-1.5 text-[11px] leading-5 text-slate-500" dir="auto">{product.trbhh_category}</p>
     </details>}
-    <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 text-[10px] text-slate-500 sm:px-4">
+    <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2.5 py-1.5 text-[10px] text-slate-500 sm:px-3">
       <span className="inline-flex min-w-0 items-center gap-1"><BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />تربح</span>
     </div>
   </div>;

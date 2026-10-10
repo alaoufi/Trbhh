@@ -71,16 +71,16 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const panelOptions = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.options]));
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
-  return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
+  return <div className="mx-auto max-w-6xl min-w-0 space-y-3 px-3 pb-32 pt-4 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>شراء خاص بالإدارة</b> — تحقّق حيّ من السعر والمخزون والشحن، ثم السلة ← إنشاء الطلب ← الاعتماد والدفع من المحفظة ← التتبّع حتى التسليم.</p>{session && <CartLink accountId={session.uid} />}</div>}
     {sp.edited === '1' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">تم حفظ تعديل السلعة.</p>}
     {sp.err === 'has_activity' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر الحذف لوجود نشاط على السلعة. يمكنك إخفاؤها.</p>}
     <Breadcrumb items={[{ label: 'منتجات تربح', href: '/cj' }, { label: title }]} />
-    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
+    <div className="grid min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
       <CjProductGallery key={id} images={gallery} title={title} />
-      <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
-        {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
-        <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
+      <section aria-label="معلومات المنتج" className="min-w-0 space-y-2.5">
+        {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
+        <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl">{title}</h1>
         {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) — يُخفى إن لم تُسعّر السلعة بعد. */}
         {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <PriceText size="detail">{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText>

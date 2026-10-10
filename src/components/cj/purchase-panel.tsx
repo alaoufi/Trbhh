@@ -89,10 +89,8 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     {selected&&<div className="grid grid-cols-2 gap-2 text-sm">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">{option.label}</span><b className="break-words" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">الوزن</span><b>{selected.variantWeight} غ</b></div>}</div>}
     <p role="status" aria-live="polite" className={`text-sm font-bold ${quote?'text-emerald-700':'text-amber-800'}`}>{quote?`${quote.priceChanged?'تم تحديث السعر · ':''}متوفر · الكمية المتاحة: ${quote.stockQuantity}`:failureMessage[status]|| (status==='verification_failed'?'تعذّر التحقق، حاول مرة أخرى':status?`تعذّر التحقق من الخيار (${status})`:'اختر اللون أو المقاس لبدء التحقق')}</p>
     {quote&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm">
-      {/* السعر المعروض هو سعر المنتج النهائي (شامل ربح تربح) — ما يهمّ العميل. تفاصيل التكلفة
-          والمستودعات للإدارة فقط داخل قسم قابل للطيّ. */}
-      <p className="text-slate-700">سعر المنتج: <b className="text-lg text-emerald-800" dir="ltr">{money(quote.salePriceMinor)} ر.س</b></p>
-      {isStaff&&<details className="rounded-lg border border-slate-200 bg-white/60 px-3 text-xs"><summary className="cursor-pointer py-2 font-bold text-slate-600">تفاصيل الإدارة (التكلفة والمستودعات)</summary><div className="space-y-2 pb-2"><p>التكلفة (سعر CJ): <b dir="ltr">{money(quote.supplierPriceMinor)} ر.س</b> · الربح: <b dir="ltr">{money(quote.salePriceMinor-quote.supplierPriceMinor)} ر.س</b></p>{quote.warehouses.length>0&&<div><p className="mb-1 font-semibold text-slate-600">المخزون حسب المستودعات</p><ul className="flex flex-wrap gap-2">{quote.warehouses.map(warehouse=><li key={`${warehouse.id}-${warehouse.originCountry}`} className="rounded-full bg-white px-3 py-1">{warehouse.name||warehouse.originCountry}: {warehouse.quantity}</li>)}</ul></div>}</div></details>}
+      {/* يُعرض سعر المنتج النهائي فقط (شامل ربح تربح) — بلا أي ذكر للتكلفة أو المورّد أو المستودع. */}
+      <p className="text-slate-700">سعر المنتج: <b className="text-lg text-emerald-800" dir="ltr">{money(quote.salePriceMinor)}</b></p>
       <div>
         <p className="mb-1.5 font-bold">شركة الشحن إلى السعودية</p>
         {/* قائمة اختيار منسّقة بدل القائمة المنسدلة: شركة · سعر · مدة، بخط صغير وفواصل وخلفية متبادلة. */}
@@ -103,7 +101,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
                 <input type="radio" name={`${id}-ship`} checked={shipping===index} onChange={()=>setShipping(index)} className="h-4 w-4 shrink-0 accent-primary" />
                 <span className="min-w-0 flex-1">
                   <b className="block truncate text-[13px] text-slate-800" dir="auto">{option.name}</b>
-                  <span className="block text-[11px] text-slate-500"><b dir="ltr">{shipMinor===0?'مجاني':`${money(shipMinor)} ر.س`}</b>{days?` · ${days}`:''}</span>
+                  <span className="block text-[11px] text-slate-500"><b dir="ltr">{shipMinor===0?'مجاني':money(shipMinor)}</b>{days?` · ${days}`:''}</span>
                 </span>
               </label>
             </li>
@@ -112,13 +110,13 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
       </div>
       {/* تفصيل شفّاف للإجمالي حتى يتّضح سبب الرقم: السلع (السعر×الكمية) + الشحن + الرسوم + الضريبة. */}
       <div className="space-y-1 rounded-lg bg-white/70 p-2">
-        <p className="flex justify-between"><span>السلع (السعر × {verificationQuantity})</span><b dir="ltr">{money(quote.salePriceMinor*verificationQuantity)} ر.س</b></p>
-        <p className="flex justify-between"><span>الشحن</span><b dir="ltr">{ship?(ship.priceMinor+ship.additionalMinor===0?'مجاني':`${money(ship.priceMinor+ship.additionalMinor)} ر.س`):'—'}</b></p>
-        {ship?.vatEnabled&&<p className="flex justify-between"><span>ضريبة القيمة المضافة</span><b dir="ltr">{money(ship.vatMinor)} ر.س</b></p>}
+        <p className="flex justify-between"><span>السلع (السعر × {verificationQuantity})</span><b dir="ltr">{money(quote.salePriceMinor*verificationQuantity)}</b></p>
+        <p className="flex justify-between"><span>الشحن</span><b dir="ltr">{ship?(ship.priceMinor+ship.additionalMinor===0?'مجاني':money(ship.priceMinor+ship.additionalMinor)):'—'}</b></p>
+        {ship?.vatEnabled&&<p className="flex justify-between"><span>ضريبة القيمة المضافة</span><b dir="ltr">{money(ship.vatMinor)}</b></p>}
         {ship?.deliveryDays&&<p className="flex justify-between"><span>مدّة الشحن</span><b dir="auto">{/[A-Za-z؀-ۿ]/.test(ship.deliveryDays)?ship.deliveryDays:`${ship.deliveryDays} يوم`}</b></p>}
-        <p className="flex justify-between border-t border-emerald-200 pt-1.5 text-base"><span className="font-bold">الإجمالي</span><b className="text-xl text-emerald-800" dir="ltr">{total==null?'—':`${money(total)} ر.س`}</b></p>
+        <p className="flex justify-between border-t border-emerald-200 pt-1.5 text-base"><span className="font-bold">الإجمالي</span><b className="text-xl text-emerald-800" dir="ltr">{total==null?'—':money(total)}</b></p>
       </div>
-      <p className="text-xs text-slate-600">محسوب لكمية {verificationQuantity} بعد التحقق الحيّ من CJ. يُعاد التحقق قبل الدفع. (التكلفة = سعر CJ؛ سعر المنتج = التكلفة + هامش تربح؛ الإجمالي = السلع + الشحن{ship?.vatEnabled?' + الضريبة':''}).</p>
+      <p className="text-xs text-slate-600">محسوب لكمية {verificationQuantity}، ويُعاد التحقق قبل الدفع. الإجمالي = السلع + الشحن{ship?.vatEnabled?' + الضريبة':''}.</p>
     </div>}
     <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية{quote&&<span className="ms-1 text-xs font-normal text-slate-500">(المتاح: {maxQty})</span>}<input id={`${id}-qty`} type="number" min={1} max={maxQty} value={qty} onChange={event=>setQty(Math.max(1,Math.min(maxQty,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{!isStaff?'للإدارة فقط':(selector?!comboComplete:!variantId)?'اختر الخيار أولاً':status==='checking'?'جارٍ التحقق…':!quote?'غير متاح حالياً':!ship?'لا شحن متاح':'أضف إلى السلة'}</button><CartLink accountId={accountId}/></div>
     {notice&&<p role="alert" className="text-sm text-red-700">{notice}</p>}

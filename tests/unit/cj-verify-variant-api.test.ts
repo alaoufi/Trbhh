@@ -7,13 +7,14 @@ vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:mock.settings}));
 vi.mock('@/lib/cj/availability',()=>({verifyCjVariantForSaudi:mock.verify}));
 vi.mock('@/lib/cj/tax-quote',()=>({quoteCjVat:mock.tax}));
 import {POST} from '@/app/api/cj/products/[id]/verify-variant/route';
+import {clearLiveCache} from '@/lib/cj/live-cache';
 
 const origin='https://trbhh.sa',params=Promise.resolve({id:'4'});
 const row={id:4,hidden:0,cj_product_id:'pid-1',other_costs_minor:10,margin_bps:3000,sale_price_override_minor:null};
 const variant={vid:'blue-s',sku:'SKU-BS',name:'Black-XL',optionKey:'Color-Black-Size-XL',priceUsd:12,weight:100,attributes:{plug:'EU'}};
 const available={status:'available',vid:'blue-s',sku:'SKU-BS',variantName:'Black-XL',optionKey:'Color-Black-Size-XL',stockQuantity:3,warehouses:[{id:'1',name:'CN',quantity:3,originCountry:'CN'}],supplierPriceMinor:4500,salePriceMinor:5863,shippingOptions:[{name:'Standard',priceMinor:750,additionalMinor:50,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}],checkedAt:'2026-09-24T00:00:00.000Z'};
 function request(body:unknown={variantId:'blue-s',quantity:1},headers:Record<string,string>={}){return new Request(origin+'/api/cj/products/4/verify-variant',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json',...headers},body:JSON.stringify(body)});}
-beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('NODE_ENV','production');mock.session.mockResolvedValue({uid:9});mock.access.mockResolvedValue(true);mock.row.mockResolvedValue(row);mock.details.mockReturnValue({variants:[variant]});mock.settings.mockResolvedValue({usdToSarX100:375});mock.verify.mockResolvedValue(available);mock.tax.mockResolvedValue({enabled:true,vatMinor:100,totalMinor:6763});});
+beforeEach(()=>{vi.clearAllMocks();clearLiveCache();vi.stubEnv('NODE_ENV','production');mock.session.mockResolvedValue({uid:9});mock.access.mockResolvedValue(true);mock.row.mockResolvedValue(row);mock.details.mockReturnValue({variants:[variant]});mock.settings.mockResolvedValue({usdToSarX100:375});mock.verify.mockResolvedValue(available);mock.tax.mockResolvedValue({enabled:true,vatMinor:100,totalMinor:6763});});
 afterEach(()=>vi.unstubAllEnvs());
 describe('staff-only CJ exact-variant live check',()=>{
  it('validates current product option, live stock, freight and central tax without exposing source errors',async()=>{

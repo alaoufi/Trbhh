@@ -15,8 +15,13 @@ const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
   const [variantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
-  // التسميات والخيارات مُترجمة مسبقاً من الخادم (الإجراء الموحّد)؛ وإلا احتياط القاموس المحلي.
-  const labelFor=(variant:Variant,index:number)=>labels?.[variant.vid]||cjVariantDisplayOptions(variant).map(o=>`${o.label}: ${o.value}`).join(' · ')||`الخيار ${index+1}`;
+  // التسميات مُترجمة مسبقاً من الخادم (الإجراء الموحّد). عند غياب خيار واضح (رقم مجرّد) نُلحق
+  // رمز السلعة SKU ليتمكّن المستخدم من التمييز بدل «الخيار N» غير المفيد.
+  const labelFor=(variant:Variant,index:number)=>{
+    const base=labels?.[variant.vid]||cjVariantDisplayOptions(variant).map(o=>`${o.label}: ${o.value}`).join(' · ');
+    if(base&&!/^الخيار \d+$/.test(base))return base;
+    return `الخيار ${index+1}${variant.variantSku?` · ${variant.variantSku}`:''}`;
+  };
   const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
   const options=useMemo(()=>selected?(optionsByVid?.[selected.vid]??cjVariantDisplayOptions(selected)):[],[selected,optionsByVid]);
   // نموذج اختيار بالسمات (لون/مقاس) عندما تحمل كل المتغيّرات نفس مجموعة الخيارات الواضحة؛
@@ -85,7 +90,23 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
           والمستودعات للإدارة فقط داخل قسم قابل للطيّ. */}
       <p className="text-slate-700">سعر المنتج: <b className="text-lg text-emerald-800" dir="ltr">{money(quote.salePriceMinor)} ر.س</b></p>
       {isStaff&&<details className="rounded-lg border border-slate-200 bg-white/60 px-3 text-xs"><summary className="cursor-pointer py-2 font-bold text-slate-600">تفاصيل الإدارة (التكلفة والمستودعات)</summary><div className="space-y-2 pb-2"><p>التكلفة (سعر CJ): <b dir="ltr">{money(quote.supplierPriceMinor)} ر.س</b> · الربح: <b dir="ltr">{money(quote.salePriceMinor-quote.supplierPriceMinor)} ر.س</b></p>{quote.warehouses.length>0&&<div><p className="mb-1 font-semibold text-slate-600">المخزون حسب المستودعات</p><ul className="flex flex-wrap gap-2">{quote.warehouses.map(warehouse=><li key={`${warehouse.id}-${warehouse.originCountry}`} className="rounded-full bg-white px-3 py-1">{warehouse.name||warehouse.originCountry}: {warehouse.quantity}</li>)}</ul></div>}</div></details>}
-      <div><label htmlFor={`${id}-shipping`} className="font-bold">شركة الشحن إلى السعودية</label><select id={`${id}-shipping`} value={shipping} onChange={event=>setShipping(Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2">{quote.shippingOptions.map((option,index)=><option key={`${option.name}-${option.originCountry}-${index}`} value={index}>{option.name} · {money(option.priceMinor+option.additionalMinor)} ر.س{option.deliveryDays?` · ${/[A-Za-z؀-ۿ]/.test(option.deliveryDays)?option.deliveryDays:`${option.deliveryDays} يوم`}`:''}</option>)}</select></div>
+      <div>
+        <p className="mb-1.5 font-bold">شركة الشحن إلى السعودية</p>
+        {/* قائمة اختيار منسّقة بدل القائمة المنسدلة: شركة · سعر · مدة، بخط صغير وفواصل وخلفية متبادلة. */}
+        <ul className="overflow-hidden rounded-xl border border-slate-200">
+          {quote.shippingOptions.map((option,index)=>{const shipMinor=option.priceMinor+option.additionalMinor;const days=option.deliveryDays?(/[A-Za-z؀-ۿ]/.test(option.deliveryDays)?option.deliveryDays:`${option.deliveryDays} يوم`):'';return (
+            <li key={`${option.name}-${option.originCountry}-${index}`} className={`border-b border-slate-100 last:border-0 ${index%2===0?'bg-slate-50':'bg-white'} ${shipping===index?'ring-1 ring-inset ring-primary':''}`}>
+              <label className="flex cursor-pointer items-center gap-2 px-3 py-2">
+                <input type="radio" name={`${id}-ship`} checked={shipping===index} onChange={()=>setShipping(index)} className="h-4 w-4 shrink-0 accent-primary" />
+                <span className="min-w-0 flex-1">
+                  <b className="block truncate text-[13px] text-slate-800" dir="auto">{option.name}</b>
+                  <span className="block text-[11px] text-slate-500"><b dir="ltr">{shipMinor===0?'مجاني':`${money(shipMinor)} ر.س`}</b>{days?` · ${days}`:''}</span>
+                </span>
+              </label>
+            </li>
+          );})}
+        </ul>
+      </div>
       {/* تفصيل شفّاف للإجمالي حتى يتّضح سبب الرقم: السلع (السعر×الكمية) + الشحن + الرسوم + الضريبة. */}
       <div className="space-y-1 rounded-lg bg-white/70 p-2">
         <p className="flex justify-between"><span>السلع (السعر × {verificationQuantity})</span><b dir="ltr">{money(quote.salePriceMinor*verificationQuantity)} ر.س</b></p>

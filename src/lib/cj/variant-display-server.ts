@@ -20,9 +20,12 @@ export async function translateVariantOptions<
   for (const r of raw) for (const o of r.options) { texts.add(o.label); texts.add(o.value); }
   const ar = await translateManyForDisplay([...texts], max).catch(() => new Map<string, string>());
   const tr = (t: string) => ar.get((t || '').trim()) || t;
+  // قيمة قابلة للعرض = تحوي حرفاً لاتينياً/عربياً أو رقماً؛ غير ذلك (رموز/محارف ناقصة الخط ⬚)
+  // تُستبعَد فلا تظهر مربّعات فارغة، ويتحوّل الخيار إلى «الخيار N».
+  const renderable = (v: string) => /[A-Za-z0-9؀-ۿ]/.test(v || '');
   const out: Record<string, TranslatedVariant> = {};
   raw.forEach((r, index) => {
-    const options = r.options.map((o) => ({ ...o, label: tr(o.label), value: tr(o.value) }));
+    const options = r.options.map((o) => ({ ...o, label: tr(o.label), value: tr(o.value) })).filter((o) => renderable(o.value));
     const label = options.map((o) => `${o.label}: ${o.value}`).join(' · ') || `الخيار ${index + 1}`;
     if (r.vid) out[r.vid] = { vid: r.vid, label, options };
   });

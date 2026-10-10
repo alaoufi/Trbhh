@@ -10,9 +10,9 @@ import { countApprovedCatalog, listApprovedCatalog, type ApprovedPreview } from 
 export const CJ_CATALOG_TABS = [
   { id: 'all', label: 'الكل' },
   { id: 'imported', label: 'السلع المستوردة' },
-  { id: 'members', label: 'اعلانات الاعضاء' },
-  { id: 'verified', label: 'اعلانات موثقة' },
-  { id: 'trbhh', label: 'اعلانات تربح' },
+  { id: 'members', label: 'إعلانات الأعضاء' },
+  { id: 'verified', label: 'إعلانات موثّقة' },
+  { id: 'trbhh', label: 'إعلانات تربح' },
 ] as const;
 export type CjCatalogTab = typeof CJ_CATALOG_TABS[number]['id'];
 export type CjCatalogQuery = Record<string, string | string[] | undefined>;

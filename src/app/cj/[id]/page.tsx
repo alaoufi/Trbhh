@@ -7,6 +7,7 @@ import { getAgent, agentContactLinks } from '@/lib/cj/agents';
 import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, cjArabicName, cjArabicDescription } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { CjProductGallery } from '@/components/cj/product-gallery';
 import { CjProductDescription } from '@/components/cj/product-description';
 import { CjProductCard } from '@/components/cj/product-card';
@@ -71,7 +72,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>شراء خاص بالإدارة</b> — تحقّق حيّ من السعر والمخزون والشحن، ثم السلة ← إنشاء الطلب ← الاعتماد والدفع من المحفظة ← التتبّع حتى التسليم.</p>{session && <CartLink accountId={session.uid} />}</div>}
     {sp.edited === '1' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">تم حفظ تعديل السلعة.</p>}
     {sp.err === 'has_activity' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر الحذف لوجود نشاط على السلعة. يمكنك إخفاؤها.</p>}
-    <nav aria-label="مسار التنقل" className="flex flex-wrap items-center gap-2 text-sm text-slate-500"><Link href="/cj" className="font-bold text-primary hover:underline">المتجر</Link><span aria-hidden="true">/</span><span>تفاصيل المنتج</span></nav>
+    <Breadcrumb items={[{ label: 'منتجات تربح', href: '/cj' }, { label: title }]} />
     <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
       <CjProductGallery key={id} images={gallery} title={title} />
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
@@ -100,8 +101,17 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
     </div>
-    {(p.trbhh_category||details?.weightMin)&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-3 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["القسم",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 py-3"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
-    {!!descriptionAr&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
+    {(p.trbhh_category||details?.weightMin)&&<section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-3 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["القسم",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 py-3"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
+    {!!descriptionAr&&<section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
+    {/* معلومات الشحن والاسترجاع — ثابتة وموحّدة بهوية تربح (لا تمسّ بيانات CJ). */}
+    <section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-shipping-return"><h2 id="cj-shipping-return" className="mb-3 text-lg font-extrabold text-primary">الشحن والاسترجاع</h2>
+      <ul className="space-y-2 text-sm leading-7 text-slate-700">
+        <li>• يُشحن إلى جميع مناطق المملكة؛ تُحتسب تكلفة الشحن ومدّته حسب الوجهة وتظهر عند الطلب.</li>
+        <li>• مدّة التجهيز تُضاف إلى مدّة التوصيل المذكورة في خيار الشحن.</li>
+        <li>• السعر المعروض بالريال السعودي شامل ربح تربح؛ يُضاف الشحن (والضريبة إن وُجدت) إلى الإجمالي عند الطلب.</li>
+        <li>• الاسترجاع والاستبدال وفق سياسة تربح المعلنة، ولا تُلزم المنصّة إلا بما ورد فيها.</li>
+      </ul>
+    </section>
     {canManage && <section aria-labelledby="cj-product-management" className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><h2 id="cj-product-management" className="text-sm font-bold text-primary">إدارة السلعة</h2><div className="mt-4">
       {canManage && (
         <div className="card-3d rounded-2xl p-3 space-y-2">
@@ -127,7 +137,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
                     {categoryOptions.map(option => <option key={option} value={option}>{option}</option>)}
                   </select>
                   {categoryOptions.length === 0
-                    ? <span className="mt-1 block text-xs text-amber-700">لا توجد تصنيفات بعد — أضِفها من لوحة الإدارة (إعدادات CJ ← التصنيفات).</span>
+                    ? <span className="mt-1 block text-xs text-amber-700">لا توجد تصنيفات بعد — أضِفها من لوحة الإدارة (إعدادات التوريد ← التصنيفات).</span>
                     : p.trbhh_category && !categoryOptions.includes(p.trbhh_category) && <span className="mt-1 block text-xs text-amber-700">التصنيف الحالي غير موحّد — اختر تصنيف تربح لتوحيد السلع المتشابهة.</span>}
                 </label>
                 <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>

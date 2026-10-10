@@ -19,7 +19,7 @@ vi.mock('@/lib/cj/mapping', () => {
 vi.mock('@/lib/cj/pricing', () => ({ setDefaultMarginBps: vi.fn() }));
 vi.mock('@/lib/cj/sync', () => ({ saveCjSyncSettings: vi.fn(), syncCjCatalog: vi.fn(), cjSyncSettings: async () => null }));
 vi.mock('@/lib/cj/import', () => ({ importCjProductByPid: vi.fn() }));
-vi.mock('@/lib/cj/translate', () => ({ translateToArabic: vi.fn(), translateManyCached: vi.fn(), learnTranslation: vi.fn() }));
+vi.mock('@/lib/cj/translate', () => ({ translateToArabic: vi.fn(), translateManyCached: vi.fn(), learnTranslation: vi.fn(), translateManyForDisplay: async () => new Map<string, string>() }));
 vi.mock('@/lib/cj/client', () => ({ getCategories: vi.fn(), getProduct: state.sourceFetch }));
 vi.mock('@/lib/cj/orders/store', () => ({ createOrder: vi.fn(), transitionOrder: vi.fn(), setOrderTracking: vi.fn() }));
 vi.mock('@/lib/cj/translate-warm', () => ({ warmCjTranslations: vi.fn(), refreshCjMedia: vi.fn() }));

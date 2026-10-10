@@ -4,7 +4,7 @@ import { Phone, MessageCircle } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
-import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, parseCjAvailability, cjShipEstimateFromAvailability, cjArabicName, cjArabicDescription } from '@/lib/cj/mapping';
+import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, cjArabicName, cjArabicDescription } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { CjProductGallery } from '@/components/cj/product-gallery';
@@ -16,7 +16,7 @@ import { SubmitButton } from '@/components/cj/submit-button';
 import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/variant-display';
 import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
-import { getSetting } from '@/lib/settings';
+import { translateManyForDisplay } from '@/lib/cj/translate';
 import { getCjCategoryOptions } from '@/lib/cj/categories';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
@@ -55,13 +55,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
     ? `${weightMin}${typeof weightMax === 'number' && Number.isFinite(weightMax) && weightMax > weightMin ? `–${weightMax}` : ''} غ` : 'غير محدد';
-  // معلومات التوفّر والشحن الحقيقية (المخزون + خيارات الشحن السعودية: الاسم/السعر/المدّة).
-  const availability = parseCjAvailability(p);
-  const sar = (m: number) => `${new Intl.NumberFormat('en-US').format(Math.round(m / 100))} ر.س`;
-  const shipOptions = availability
-    ? [...new Map(availability.shippingOptions.map(o => [o.name, o])).values()].sort((a, b) => a.priceMinor - b.priceMinor)
-    : [];
-  const shipCheapest = shipOptions[0] ?? null;
   // خيارات السلعة (اللون/المقاس/القابس...) مجمّعة بالعربية من المحلّل المُختبَر
   // cjVariantDisplayOptions (يقرأ سمات المتغيّر أو يستنتج اللون/المقاس من اسمه/مفتاحه،
   // ويتجاهل الضجيج). تُعرض من التفاصيل المخزّنة فتظهر حتى بلا توفّر حيّ محقّق.
@@ -73,20 +66,18 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       optionGroups.set(opt.label, values);
     }
   }
-  const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label, values: values.slice(0, 40) })).slice(0, 8);
-  // جدول الخيارات بتفاصيلها (كل خيار + وزنه) + شحن تقديري (سعر ثابت من الإدارة + مدّة نصّية).
-  const [shipMinorRaw, deliveryDaysText, categoryOptions] = await Promise.all([getSetting('cj_sync_shipping_minor', '0'), getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'), getCjCategoryOptions()]);
-  const flatShipMinor = Math.max(0, Math.round(Number(shipMinorRaw) || 0));
-  // قيمة شحن حقيقية واحدة (تربح هي البائع): تُؤخذ من المورد عبر الـAPI. أرخص شحن
-  // محقّق حيّ أولاً، وإلا تقدير الشحن المحفوظ من الـAPI (يبقى ظاهراً بعد نافذة النضارة
-  // ٦ ساعات لأن سعر الشحن مستقرّ)، وإلا تقدير الإدارة الاحتياطي. لا تُعرض «مجاني»
-  // لقيمة غير معروفة — تُعرض «يُحسب حسب الوجهة» ريثما يُحدَّث التوفّر من المورد.
-  const shipEstimate = cjShipEstimateFromAvailability(p);
-  const realShipMinor = shipCheapest?.priceMinor ?? shipEstimate?.minor ?? flatShipMinor;
-  const shipDeliveryText = shipCheapest?.deliveryDays || shipEstimate?.deliveryDays || (deliveryDaysText || '').trim() || '';
+  // ترجمة فورية عند التحميل لقيم الخيارات وتسمياتها (إنجليزية) عبر المترجم المحلي، فتظهر
+  // «الخيارات المتاحة» بالعربية للزائر. ما يتعذّر يبقى كما هو.
+  const optionTextSet = new Set<string>();
+  for (const [label, values] of optionGroups) { optionTextSet.add(label); for (const val of values) optionTextSet.add(val); }
+  const optionAr = await translateManyForDisplay([...optionTextSet], 120).catch(() => new Map<string, string>());
+  const tr = (t: string) => optionAr.get((t || '').trim()) || t;
+  const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label: tr(label), values: values.slice(0, 40).map(tr) })).slice(0, 8);
+  // الشحن والمخزون والمدّة الحقيقية تُعرض حيّاً من CJ عبر CjLiveNumbers في قسم الشحن.
+  const categoryOptions = await getCjCategoryOptions();
   const variantRows = displayVariants.map(v => {
-    const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${o.label}: ${o.value}`).join(' · ');
-    return { key: v.vid, label: opts || (v.name || v.optionKey || '').trim() || '—', weight: v.weight };
+    const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${tr(o.label)}: ${tr(o.value)}`).join(' · ');
+    return { key: v.vid, label: opts || tr((v.name || v.optionKey || '').trim()) || '—', weight: v.weight };
   }).slice(0, 60);
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
@@ -100,16 +91,17 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
-        {/* الأرقام الحيّة الحقيقية (السعر/المخزون/الشحن/المدة/الإجمالي) من CJ — في التفاصيل بتوزيع مرتّب. */}
-        <CjLiveNumbers pid={p.cj_product_id} priceMinor={p.sale_price_override_minor ?? p.sale_price_minor} />
         {view.isStaff && session && (verifiedVariants.length > 0
           ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من التوفّر قبل إتاحتها.</p>)}
         {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-bold text-slate-700">الخيارات المتاحة</h2>
+          <h2 className="text-base font-extrabold text-primary">الخيارات المتاحة</h2>
           {optionGroupList.map(group => <div key={group.label} className="min-w-0">
-            <h3 className="mb-1.5 text-xs font-bold text-slate-500">{group.label}</h3>
-            <div className="flex flex-wrap gap-1.5">{group.values.map((val, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2.5 py-1 text-xs font-semibold">{val}</span>)}</div>
+            <h3 className="mb-1.5 text-sm font-bold text-slate-600">{group.label}</h3>
+            {/* كل خيار في سطر مستقل بخلفية متبادلة (زيبرا) وخط أوضح لسهولة القراءة. */}
+            <ul className="overflow-hidden rounded-xl border border-slate-200">
+              {group.values.map((val, i) => <li key={i} dir="auto" className={`px-3 py-2.5 text-sm font-semibold text-slate-800 ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`}>{val}</li>)}
+            </ul>
           </div>)}
         </div>}
         {variantRows.length > 1 && <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
@@ -118,12 +110,10 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}</td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
-        <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm"><h2 className="mb-2 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2>
-          <ul className="space-y-1.5">
-            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">الشحن</span><b className="text-emerald-800">{realShipMinor > 0 ? sar(realShipMinor) : 'يُحسب حسب الوجهة عند الطلب'}</b></li>
-            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">مدّة التوصيل</span><b className="text-emerald-800" dir="auto">{shipDeliveryText}</b></li>
-            {availability && <li className="flex items-center justify-between gap-2"><span className="text-slate-700">المخزون المتوفّر</span><b className="text-emerald-800">{new Intl.NumberFormat('en-US').format(availability.stockQuantity)}</b></li>}
-          </ul>
+        {/* الأرقام الحيّة الحقيقية (السعر/المخزون/الشحن/المدة/الإجمالي) من CJ — في قسم الشحن بتوزيع مرتّب. */}
+        <div className="min-w-0 space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <h2 className="text-base font-extrabold text-emerald-900">الشحن إلى السعودية</h2>
+          <CjLiveNumbers pid={p.cj_product_id} priceMinor={p.sale_price_override_minor ?? p.sale_price_minor} />
         </div>
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>

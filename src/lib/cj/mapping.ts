@@ -373,6 +373,12 @@ export async function cjArabicDescription(row: Pick<CjProductRow, 'id' | 'displa
     if (persist && ar !== row.display_description_ar) await setCjProductDescriptionAr(Number(row.id), ar).catch(() => {});
     return ar;
   }
+  // احتياط متساهل (كالاسم): الأوصاف التسويقية المختلطة يرفضها الفحص الصارم، فتبقى إنجليزية.
+  const display = plain ? await translateToArabicForDisplay(plain).catch(() => null) : null;
+  if (display) {
+    if (persist && display !== row.display_description_ar) await setCjProductDescriptionAr(Number(row.id), display).catch(() => {});
+    return display;
+  }
   return current;
 }
 

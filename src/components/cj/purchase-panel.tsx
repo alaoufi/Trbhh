@@ -2,7 +2,7 @@
 
 import {useEffect,useId,useMemo,useState} from 'react';
 import {formatSar} from '@/lib/commerce/money';
-import {cjVariantDisplayOptions} from '@/lib/cj/variant-display';
+import {cjVariantDisplayOptions,type DisplayOption} from '@/lib/cj/variant-display';
 import {addTrialCartItem,type TrialCartSnapshot} from '@/lib/cj/trial-cart';
 import {CartLink,useTrialCart} from './cart-controls';
 import type {CjVariant} from '@/lib/cj/types';
@@ -12,10 +12,13 @@ type Check={status:'available';vid:string;sku:string;variantName:string|null;opt
 const failureMessage:Record<string,string>={checking:'جاري التحقق من المخزون والشحن...',out_of_stock:'غير متوفر حاليًا',quantity_exceeds_stock:'الكمية المطلوبة أكبر من المخزون المتاح',inventory_error:'تعذّر التحقق من المخزون، حاول مرة أخرى',variant_changed:'تغيّرت بيانات الخيار، حدّث الصفحة واختره مجدّداً',no_shipping:'لا يوجد شحن متاح للسعودية لهذا الخيار',freight_error:'تعذّر الحصول على سعر الشحن، حاول مرة أخرى',invalid_price:'تعذّر التحقق من السعر الحالي، لا يمكن الإضافة'};
 const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
-export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean}){
+export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
   const [variantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState('');
-  const selected=variants.find(item=>item.vid===variantId),options=useMemo(()=>selected?cjVariantDisplayOptions(selected):[],[selected]);
+  // التسميات والخيارات مُترجمة مسبقاً من الخادم (الإجراء الموحّد)؛ وإلا احتياط القاموس المحلي.
+  const labelFor=(variant:Variant,index:number)=>labels?.[variant.vid]||cjVariantDisplayOptions(variant).map(o=>`${o.label}: ${o.value}`).join(' · ')||`الخيار ${index+1}`;
+  const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
+  const options=useMemo(()=>selected?(optionsByVid?.[selected.vid]??cjVariantDisplayOptions(selected)):[],[selected,optionsByVid]);
   const alreadyInCart=items.find(item=>item.id===productId&&item.variantId===variantId)?.qty??0;
   const verificationQuantity=qty+alreadyInCart;
   useEffect(()=>{
@@ -38,14 +41,14 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     if(!quote||!ship||!selected||!ready)return;
     const previous=latest().find(item=>item.id===productId&&item.variantId===selected.vid)?.qty??0;
     const attributes=Object.fromEntries(Object.entries(selected.attributes??{}).filter((entry):entry is [string,string|number|boolean]=>['string','number','boolean'].includes(typeof entry[1])));
-    const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
+    const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
     try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
     <h2 className="font-extrabold text-primary">اختر المنتج</h2>
     <label htmlFor={`${id}-variant`} className="block text-sm font-bold">اللون والمقاس أو الخيار المتاح
       <select id={`${id}-variant`} value={variantId} onChange={event=>setVariantId(event.target.value)} className="mt-2 block min-h-12 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3" required>
-        <option value="">اختر الخيار</option>{variants.map((variant,index)=>{const parsed=cjVariantDisplayOptions(variant);const label=parsed.map(option=>`${option.label}: ${option.value}`).join(' · ')||`الخيار ${index+1}`;return <option key={variant.vid||index} value={variant.vid}>{label}</option>;})}
+        <option value="">اختر الخيار</option>{variants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)}</option>)}
       </select>
     </label>
     {selected&&<div className="grid grid-cols-2 gap-2 text-sm">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">{option.label}</span><b className="break-words" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">الوزن</span><b>{selected.variantWeight} غ</b></div>}</div>}

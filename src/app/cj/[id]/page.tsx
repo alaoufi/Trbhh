@@ -17,6 +17,7 @@ import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/var
 import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateManyForDisplay } from '@/lib/cj/translate';
+import { translateVariantOptions } from '@/lib/cj/variant-display-server';
 import { getCjCategoryOptions } from '@/lib/cj/categories';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
@@ -75,10 +76,12 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label: tr(label), values: values.slice(0, 40).map(tr) })).slice(0, 8);
   // الشحن والمخزون والمدّة الحقيقية تُعرض حيّاً من CJ عبر CjLiveNumbers في قسم الشحن.
   const categoryOptions = await getCjCategoryOptions();
-  const variantRows = displayVariants.map(v => {
-    const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${tr(o.label)}: ${tr(o.value)}`).join(' · ');
-    return { key: v.vid, label: opts || tr((v.name || v.optionKey || '').trim()) || '—', weight: v.weight };
-  }).slice(0, 60);
+  // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
+  // ولوحة الشراء (القائمة المنسدلة) معاً — فلا يبقى خيار غير مترجم في أي مكان.
+  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })));
+  const variantRows = displayVariants.map(v => ({ key: v.vid, label: translatedVariants[v.vid]?.label || '—', weight: v.weight })).slice(0, 60);
+  const panelLabels = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.label]));
+  const panelOptions = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.options]));
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
@@ -97,7 +100,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {view.isStaff && session && (displayVariants.length > 0
           ? <>
               {verifiedVariants.length === 0 && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">تجربة إدارية: لم يُحقَّق توفّر هذه السلعة للعرض العام بعد. يتم التحقّق حيّاً من المخزون والشحن عند اختيار الخيار، ولا يُنفَّذ أي دفع فعلي إلا بعد الاعتماد والتحقّق من الأرقام.</p>}
-              <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
+              <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} labels={panelLabels} optionsByVid={panelOptions} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
             </>
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات متاحة لهذه السلعة حالياً.</p>)}
         {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">

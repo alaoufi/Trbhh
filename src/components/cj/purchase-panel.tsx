@@ -58,7 +58,10 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     },200);
     return()=>{active=false;controller.abort();clearTimeout(timer);};
   },[productId,selected,qty,verificationQuantity]);
-  const quote=check?.status==='available'?check:null,ship=quote?.shippingOptions[shipping],total=ship?.totalMinor??null;
+  const quote=check?.status==='available'?check:null;
+  // ترتيب شركات الشحن حسب إجمالي الشحن (الأساسي + الإضافي) تصاعدياً — الأرخص أولاً وهو الافتراضي.
+  const shipSorted=useMemo(()=>quote?[...quote.shippingOptions].sort((a,b)=>(a.priceMinor+a.additionalMinor)-(b.priceMinor+b.additionalMinor)):[],[quote]);
+  const ship=shipSorted[shipping],total=ship?.totalMinor??null;
   // حدّ الكمية بالمخزون المتاح (ناقص ما في السلة) فلا يتجاوز الطلب المخزون الفعلي.
   const maxQty=quote?Math.max(1,quote.stockQuantity-alreadyInCart):99;
   useEffect(()=>{if(qty>maxQty)setQty(maxQty);},[maxQty,qty]);
@@ -94,7 +97,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
         <p className="mb-1.5 font-bold">شركة الشحن إلى السعودية</p>
         {/* قائمة اختيار منسّقة بدل القائمة المنسدلة: شركة · سعر · مدة، بخط صغير وفواصل وخلفية متبادلة. */}
         <ul className="overflow-hidden rounded-xl border border-slate-200">
-          {quote.shippingOptions.map((option,index)=>{const shipMinor=option.priceMinor+option.additionalMinor;const days=option.deliveryDays?(/[A-Za-z؀-ۿ]/.test(option.deliveryDays)?option.deliveryDays:`${option.deliveryDays} يوم`):'';return (
+          {shipSorted.map((option,index)=>{const shipMinor=option.priceMinor+option.additionalMinor;const days=option.deliveryDays?(/[A-Za-z؀-ۿ]/.test(option.deliveryDays)?option.deliveryDays:`${option.deliveryDays} يوم`):'';return (
             <li key={`${option.name}-${option.originCountry}-${index}`} className={`border-b border-slate-100 last:border-0 ${index%2===0?'bg-slate-50':'bg-white'} ${shipping===index?'ring-1 ring-inset ring-primary':''}`}>
               <label className="flex cursor-pointer items-center gap-2 px-3 py-2">
                 <input type="radio" name={`${id}-ship`} checked={shipping===index} onChange={()=>setShipping(index)} className="h-4 w-4 shrink-0 accent-primary" />

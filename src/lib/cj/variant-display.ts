@@ -15,7 +15,12 @@ export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'var
   const options:DisplayOption[]=[];
   const attrs=variant.attributes??{};
   for(const [key,value] of Object.entries(attrs)){
-    const clean=safeText(value);if(!clean||/^(?:vid|pid|sku|id|price|weight)$/i.test(key)||/^variant(?:id|sku|name|image|price|weight|key)/i.test(key))continue;
+    // استبعاد الحقول التقنية الخام القادمة من CJ (باركود/أبعاد/أسعار/وقت/معايير) فلا تظهر
+    // كخيارات للمشتري؛ نُبقي الخيارات الحقيقية (لون/مقاس/فولت/قابس/سعة/موديل/خامة/مخصّص).
+    const clean=safeText(value);
+    if(!clean
+      ||/^(?:vid|pid|sku|id|price|weight|barcode|createtime|updatetime|addtime)$/i.test(key)
+      ||/^variant(?:id|sku|name|image|price|weight|key|unit|length|width|height|standard|sellprice|sugsellprice|volume)/i.test(key))continue;
     options.push({label:labelFor(key),value:translateKnownValue(clean),source:'attribute'});
   }
   if(options.length)return options;

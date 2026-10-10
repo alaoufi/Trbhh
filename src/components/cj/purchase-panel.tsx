@@ -31,6 +31,9 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     return()=>{active=false;controller.abort();clearTimeout(timer);};
   },[productId,selected,qty,verificationQuantity]);
   const quote=check?.status==='available'?check:null,ship=quote?.shippingOptions[shipping],total=ship?.totalMinor??null;
+  // حدّ الكمية بالمخزون المتاح (ناقص ما في السلة) فلا يتجاوز الطلب المخزون الفعلي.
+  const maxQty=quote?Math.max(1,quote.stockQuantity-alreadyInCart):99;
+  useEffect(()=>{if(qty>maxQty)setQty(maxQty);},[maxQty,qty]);
   function add(){
     if(!quote||!ship||!selected||!ready)return;
     const previous=latest().find(item=>item.id===productId&&item.variantId===selected.vid)?.qty??0;
@@ -58,7 +61,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
       <p className="flex justify-between border-t border-emerald-200 pt-2 text-base"><span>الإجمالي بعد الرسوم والضريبة</span><b className="text-xl text-emerald-800">{total==null?'—':money(total)}</b></p>
       <p className="text-xs text-slate-600">السعر والشحن محسوبان لكمية {verificationQuantity} بعد التحقق الحيّ من CJ. يُعاد التحقق مرة أخرى قبل الدفع.</p>
     </div>}
-    <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية<input id={`${id}-qty`} type="number" min={1} max={quote?.stockQuantity??99} value={qty} onChange={event=>setQty(Math.max(1,Math.min(99,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">أضف إلى السلة</button><CartLink accountId={accountId}/></div>
+    <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية{quote&&<span className="ms-1 text-xs font-normal text-slate-500">(المتاح: {maxQty})</span>}<input id={`${id}-qty`} type="number" min={1} max={maxQty} value={qty} onChange={event=>setQty(Math.max(1,Math.min(maxQty,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">أضف إلى السلة</button><CartLink accountId={accountId}/></div>
     {notice&&<p role="alert" className="text-sm text-red-700">{notice}</p>}
     <p className="text-xs leading-6 text-slate-600">شراء خاص بالإدارة: أضِف الخيار المتحقّق إلى السلة، ثم من السلة يُنشأ الطلب ويُعتمد ويُدفع من المحفظة ويُتابع حتى التسليم.</p>
   </section>;

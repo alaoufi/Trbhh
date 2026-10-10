@@ -81,11 +81,12 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
-        {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) + عدد عمليات الشراء الحقيقية إن وُجد. */}
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) — يُخفى إن لم تُسعّر السلعة بعد. */}
+        {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <PriceText size="detail">{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText>
           <span className="text-xs text-slate-500">شامل الضريبة عند تطبيقها · يُضاف الشحن حسب الوجهة</span>
-        </div>
+        </div>}
+        {/* عدد عمليات الشراء الحقيقية — يظهر فقط من أول عملية فعلية (بلا تزييف). */}
         {soldCount > 0 && <p className="text-xs text-slate-500">عمليات شراء مؤكّدة: <b className="text-slate-700">{soldCount.toLocaleString('en')}</b></p>}
         {/* السلة والشراء مُفعّلان للإدارة (تجربة): يُعرض محرّك الشراء لكل السلع ذات الخيارات،
             ويتحقّق حيّاً من المخزون والشحن عند الاختيار قبل الإضافة للسلة. لا دفع فعلي إلا بعد
@@ -167,7 +168,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     {/* شريط شراء ثابت (نمط المتاجر) فوق القائمة السفلية؛ ينتقل لمحرّك الاختيار والإضافة. للإدارة. */}
     {view.isStaff && session && displayVariants.length > 0 && <div className="fixed inset-x-0 bottom-[4.5rem] z-30 border-t border-slate-200 bg-white/95 px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-        <div className="min-w-0"><span className="block text-[10px] text-slate-500">السعر (شامل ربح تربح)</span><PriceText>{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText></div>
+        {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="min-w-0"><span className="block text-[10px] text-slate-500">السعر (شامل ربح تربح)</span><PriceText>{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText></div>}
         <a href="#cj-buy" className="inline-flex min-h-12 w-1/2 max-w-xs items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-white">اختر وأضف إلى السلة</a>
       </div>
     </div>}

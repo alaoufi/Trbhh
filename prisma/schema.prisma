@@ -2324,6 +2324,7 @@ model cj_products {
   availability_checked_at DateTime? @db.DateTime(3)
   agent_user_id       BigInt?   @db.UnsignedBigInt
   agent_claimed_at    DateTime? @db.DateTime(3)
+  highlight_label     String    @default("") @db.VarChar(40)
   hidden              Int       @default(0) @db.TinyInt
   sale_price_override_minor Int?
   image               String    @default("") @db.VarChar(1024)

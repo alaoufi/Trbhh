@@ -21,9 +21,10 @@ export function CjProductCard({ product }: { product: CjProductRow }) {
     <Link href={`/cj/${product.id}`} className="flex min-w-0 flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
         <CjProductImage src={source ? cjImg(source) : null} alt={compactAdTitle(title)} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-        <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
-          <span className="rounded-full bg-[#16294a]/95 px-2.5 py-1 text-[10px] font-bold text-white">معروض</span>
-        </div>
+        {/* وسم تمييز تسويقي (مثل «متميز») باللون الأحمر — يظهر فقط إذا حدّده الأدمن (بلا شارة ثابتة). */}
+        {product.highlight_label?.trim() && <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
+          <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-sm">{product.highlight_label.trim()}</span>
+        </div>}
       </div>
       <div className="flex min-w-0 flex-col gap-1 p-2.5 pb-1.5 sm:p-3 sm:pb-1.5">
         <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={finalMinor <= 0}>{cjPriceLabel(finalMinor, product.currency)}</PriceText></div>

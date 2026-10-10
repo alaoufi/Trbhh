@@ -247,7 +247,7 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
         table==='finance_change_requests'?[]:table==='finance_tax_policies'?['finance_tax_policies.calculation_policy']:names.map((name) => `${table}.${name}`)),
       'commerce_customer_addresses.id','commerce_customer_addresses.member_id','commerce_customer_addresses.label','commerce_customer_addresses.snapshot','commerce_customer_addresses.is_default','commerce_customer_addresses.created_at','commerce_customer_addresses.updated_at',
       'commerce_customer_carts.member_id','commerce_customer_carts.items','commerce_customer_carts.updated_at',
-      'cj_products.availability_json','cj_products.availability_checked_at','cj_products.source_category',
+      'cj_products.availability_json','cj_products.availability_checked_at','cj_products.source_category','cj_products.highlight_label',
       // أعمدة الطبقة المالية لـCJ (الدفع/الموافقة/التحقق) المضافة على cj_orders.
       'cj_orders.cj_shipment_order_id','cj_orders.cj_pay_id','cj_orders.approved_cap_usd_minor','cj_orders.actual_payment_usd_minor','cj_orders.approved_at','cj_orders.approved_by','cj_orders.paid_at','cj_orders.verified_at','cj_orders.verified_source','cj_orders.is_test','cj_orders.last_polled_at','cj_orders.pay_started_at',
       // أعمدة معالجة أحداث webhook من CJ.

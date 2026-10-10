@@ -27,6 +27,7 @@ export type CjProductRow = {
   availability_checked_at: Date | null;
   agent_user_id: bigint | null;
   agent_claimed_at: Date | null;
+  highlight_label: string;
   hidden: number;
   sale_price_override_minor: number | null;
   image: string;
@@ -263,6 +264,13 @@ export async function setCjProductNameAr(id: number, nameAr: string): Promise<vo
 export async function setCjProductHidden(id: number, hidden: boolean): Promise<void> {
   if (!Number.isInteger(id) || id <= 0) return;
   await prisma.$executeRaw`UPDATE cj_products SET hidden=${hidden ? 1 : 0} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/** وسم تمييز تسويقي للسلعة (مثل «متميز») يظهر على صورة البطاقة؛ فارغ = بلا تمييز. */
+export async function setCjProductHighlight(id: number, label: string): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  const clean = (label || '').trim().slice(0, 40);
+  await prisma.$executeRaw`UPDATE cj_products SET highlight_label=${clean} WHERE id=${BigInt(id)}`.catch(() => {});
 }
 
 /** تعديل سعر البيع النهائي يدوياً (بالهللة) أو إلغاؤه (null → العودة للسعر المحسوب). */

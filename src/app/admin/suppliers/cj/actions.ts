@@ -50,6 +50,18 @@ export async function saveCjMargin(form: FormData) {
   redirect('/admin/suppliers/cj?saved=margin');
 }
 
+/** حفظ قائمة أوسمة التمييز التسويقية المتاحة (مثل «متميز») — قابلة للإضافة من لوحة الإدارة. */
+export async function saveCjHighlightSettings(form: FormData) {
+  const s = await requireCjAccess('products', 'manage_settings');
+  const raw = String(form.get('labels') || '');
+  const { cjHighlightLabels, saveCjHighlightLabels } = await import('@/lib/cj/highlight');
+  const before = await cjHighlightLabels();
+  await saveCjHighlightLabels(raw);
+  await auditCjChange(s.uid, 'products', 'highlight_labels', { labels: before.join('، ') }, { labels: (await cjHighlightLabels()).join('، ') });
+  revalidatePath('/admin/suppliers/cj');
+  redirect('/admin/suppliers/cj?saved=highlight');
+}
+
 const numField = (form: FormData, name: string): number | undefined => {
   const raw = String(form.get(name) ?? '').trim();
   if (raw === '') return undefined;
@@ -554,6 +566,12 @@ export async function saveCjStorefrontEdit(form: FormData) {
   const descAr = String(form.get('descriptionAr') || '').trim();
   const cat = String(form.get('trbhhCategory') || '').trim();
   const priceRaw = String(form.get('priceSar') || '').trim();
+  // وسم التمييز: لا يُحفظ إلا من القائمة المعتمدة (أو تفريغه = بلا تمييز).
+  const highlightRaw = String(form.get('highlightLabel') || '').trim();
+  const { cjHighlightLabels } = await import('@/lib/cj/highlight');
+  const { setCjProductHighlight } = await import('@/lib/cj/mapping');
+  const allowedHighlights = await cjHighlightLabels();
+  await setCjProductHighlight(id, highlightRaw && allowedHighlights.includes(highlightRaw) ? highlightRaw : '');
   if (nameAr) { await setCjProductNameAr(id, nameAr); if (row?.name) await learnTranslation(row.name, nameAr); }
   await setCjProductDescriptionAr(id, descAr);
   if (row?.source_description && descAr) await learnTranslation(row.source_description, descAr);

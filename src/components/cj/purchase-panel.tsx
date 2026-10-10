@@ -14,7 +14,7 @@ const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
 export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
-  const [variantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState('');
+  const [variantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
   // التسميات والخيارات مُترجمة مسبقاً من الخادم (الإجراء الموحّد)؛ وإلا احتياط القاموس المحلي.
   const labelFor=(variant:Variant,index:number)=>labels?.[variant.vid]||cjVariantDisplayOptions(variant).map(o=>`${o.label}: ${o.value}`).join(' · ')||`الخيار ${index+1}`;
   const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
@@ -43,7 +43,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   const verificationQuantity=qty+alreadyInCart;
   useEffect(()=>{
     if(!selected){setStatus('');setCheck(null);return;}
-    let active=true;const controller=new AbortController();setStatus('checking');setCheck(null);setNotice('');
+    let active=true;const controller=new AbortController();setStatus('checking');setCheck(null);setNotice('');setAdded(false);
     const timer=setTimeout(async()=>{
       try{
         const response=await fetch(`/api/cj/products/${productId}/verify-variant`,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({variantId:selected.vid,quantity:verificationQuantity}),signal:controller.signal});
@@ -62,7 +62,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     const previous=latest().find(item=>item.id===productId&&item.variantId===selected.vid)?.qty??0;
     const attributes=Object.fromEntries(Object.entries(selected.attributes??{}).filter((entry):entry is [string,string|number|boolean]=>['string','number','boolean'].includes(typeof entry[1])));
     const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
-    try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
+    try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');setAdded(true);}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
     <h2 className="font-extrabold text-primary">اختر المنتج</h2>
@@ -84,15 +84,20 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
       {isStaff&&<p>التكلفة: <b>{money(quote.supplierPriceMinor)}</b></p>}
       <p>سعر المنتج: <b className="text-lg text-emerald-800">{money(quote.salePriceMinor)}</b></p>
       {isStaff&&quote.warehouses.length>0&&<div><p className="mb-1 text-xs font-semibold text-slate-600">المخزون حسب المستودعات (للإدارة)</p><ul className="flex flex-wrap gap-2">{quote.warehouses.map(warehouse=><li key={`${warehouse.id}-${warehouse.originCountry}`} className="rounded-full bg-white px-3 py-1 text-xs">{warehouse.name||warehouse.originCountry}: {warehouse.quantity}</li>)}</ul></div>}
-      <div><label htmlFor={`${id}-shipping`} className="font-bold">الشحن إلى السعودية</label><select id={`${id}-shipping`} value={shipping} onChange={event=>setShipping(Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2">{quote.shippingOptions.map((option,index)=><option key={`${option.name}-${option.originCountry}-${index}`} value={index}>{option.name} · مستودع {option.originCountry} · {money(option.priceMinor+option.additionalMinor)}{option.deliveryDays?` · ${option.deliveryDays}`:''}</option>)}</select></div>
-      {ship?.deliveryDays&&<p>مدّة الشحن: <b dir="auto">{ship.deliveryDays}</b></p>}
-      {ship&&ship.additionalMinor>0&&<p className="flex justify-between"><span>رسوم إضافية</span><b>{money(ship.additionalMinor)}</b></p>}
-      {ship?.vatEnabled&&<p className="flex justify-between"><span>ضريبة القيمة المضافة</span><b>{money(ship.vatMinor)}</b></p>}
-      <p className="flex justify-between border-t border-emerald-200 pt-2 text-base"><span>الإجمالي بعد الرسوم والضريبة</span><b className="text-xl text-emerald-800">{total==null?'—':money(total)}</b></p>
-      <p className="text-xs text-slate-600">السعر والشحن محسوبان لكمية {verificationQuantity} بعد التحقق الحيّ من CJ. يُعاد التحقق مرة أخرى قبل الدفع.</p>
+      <div><label htmlFor={`${id}-shipping`} className="font-bold">شركة الشحن إلى السعودية</label><select id={`${id}-shipping`} value={shipping} onChange={event=>setShipping(Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-lg border bg-white px-2">{quote.shippingOptions.map((option,index)=><option key={`${option.name}-${option.originCountry}-${index}`} value={index}>{option.name} · {money(option.priceMinor+option.additionalMinor)} ر.س{option.deliveryDays?` · ${/[A-Za-z؀-ۿ]/.test(option.deliveryDays)?option.deliveryDays:`${option.deliveryDays} يوم`}`:''}</option>)}</select></div>
+      {/* تفصيل شفّاف للإجمالي حتى يتّضح سبب الرقم: السلع (السعر×الكمية) + الشحن + الرسوم + الضريبة. */}
+      <div className="space-y-1 rounded-lg bg-white/70 p-2">
+        <p className="flex justify-between"><span>السلع (السعر × {verificationQuantity})</span><b dir="ltr">{money(quote.salePriceMinor*verificationQuantity)} ر.س</b></p>
+        <p className="flex justify-between"><span>الشحن</span><b dir="ltr">{ship?(ship.priceMinor+ship.additionalMinor===0?'مجاني':`${money(ship.priceMinor+ship.additionalMinor)} ر.س`):'—'}</b></p>
+        {ship?.vatEnabled&&<p className="flex justify-between"><span>ضريبة القيمة المضافة</span><b dir="ltr">{money(ship.vatMinor)} ر.س</b></p>}
+        {ship?.deliveryDays&&<p className="flex justify-between"><span>مدّة الشحن</span><b dir="auto">{/[A-Za-z؀-ۿ]/.test(ship.deliveryDays)?ship.deliveryDays:`${ship.deliveryDays} يوم`}</b></p>}
+        <p className="flex justify-between border-t border-emerald-200 pt-1.5 text-base"><span className="font-bold">الإجمالي</span><b className="text-xl text-emerald-800" dir="ltr">{total==null?'—':`${money(total)} ر.س`}</b></p>
+      </div>
+      <p className="text-xs text-slate-600">محسوب لكمية {verificationQuantity} بعد التحقق الحيّ من CJ. يُعاد التحقق قبل الدفع. (التكلفة = سعر CJ؛ سعر المنتج = التكلفة + هامش تربح؛ الإجمالي = السلع + الشحن{ship?.vatEnabled?' + الضريبة':''}).</p>
     </div>}
     <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية{quote&&<span className="ms-1 text-xs font-normal text-slate-500">(المتاح: {maxQty})</span>}<input id={`${id}-qty`} type="number" min={1} max={maxQty} value={qty} onChange={event=>setQty(Math.max(1,Math.min(maxQty,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">أضف إلى السلة</button><CartLink accountId={accountId}/></div>
     {notice&&<p role="alert" className="text-sm text-red-700">{notice}</p>}
+    {added&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3"><span className="text-sm font-bold text-emerald-800">✓ أُضيف إلى السلة</span><a href="/cj/cart" className="min-h-11 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white">اذهب إلى السلة والدفع ←</a></div>}
     <p className="text-xs leading-6 text-slate-600">شراء خاص بالإدارة: أضِف الخيار المتحقّق إلى السلة، ثم من السلة يُنشأ الطلب ويُعتمد ويُدفع من المحفظة ويُتابع حتى التسليم.</p>
   </section>;
 }

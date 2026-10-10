@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Phone, MessageCircle } from 'lucide-react';
+import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
@@ -15,7 +15,8 @@ import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { cleanCjDisplayDescription } from '@/lib/cj/variant-display';
-import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
+import { cjProductDisplayTitle, cjDescriptionText, cjPriceLabel } from '@/lib/cj/presentation';
+import { PriceText } from '@/components/price-text';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
 import { getCjCategoryOptions } from '@/lib/cj/categories';
@@ -38,7 +39,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // (يختارها/يعدّلها/يتابع شحنها/تصله رسائل الشراء) حتى لو لم يكن موظّفاً. غيرهما ممنوع.
   if (!view.isStaff && !capabilities.agent) notFound();
   const canManage = capabilities.edit || capabilities.suspend || capabilities.delete;
-  const hasActivity = capabilities.delete ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
+  // عدد عمليات الشراء الحقيقية من طلبات CJ — بيانات تتراكم من النشاط الفعلي (تبدأ من صفر، بلا تزييف).
+  const soldCount = await cjProductOrderCount(p.cj_product_id).catch(() => 0);
+  const hasActivity = capabilities.delete ? soldCount > 0 : false;
   const productAgent = p.agent_user_id != null ? await getAgent(p.agent_user_id) : null;
   const agentContact = productAgent?.active === 1 ? agentContactLinks(productAgent) : null;
   // ترجمة فورية عند التحميل بلا أزرار: العنوان والوصف يُعرضان بالعربية متى كان المترجم شغّالاً
@@ -78,9 +81,16 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
+        {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) + عدد عمليات الشراء الحقيقية إن وُجد. */}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <PriceText size="detail">{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText>
+          <span className="text-xs text-slate-500">شامل الضريبة عند تطبيقها · يُضاف الشحن حسب الوجهة</span>
+        </div>
+        {soldCount > 0 && <p className="text-xs text-slate-500">عمليات شراء مؤكّدة: <b className="text-slate-700">{soldCount.toLocaleString('en')}</b></p>}
         {/* السلة والشراء مُفعّلان للإدارة (تجربة): يُعرض محرّك الشراء لكل السلع ذات الخيارات،
             ويتحقّق حيّاً من المخزون والشحن عند الاختيار قبل الإضافة للسلة. لا دفع فعلي إلا بعد
             الاعتماد وتفعيل الطلبات الحيّة. الخيارات هنا من بيانات السلعة (محقّقة أو تفصيلية). */}
+        <div id="cj-buy" className="scroll-mt-24" />
         {view.isStaff && session && (displayVariants.length > 0
           ? <>
               {verifiedVariants.length === 0 && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">تجربة إدارية: لم يُحقَّق توفّر هذه السلعة للعرض العام بعد. يتم التحقّق حيّاً من المخزون والشحن عند اختيار الخيار، ولا يُنفَّذ أي دفع فعلي إلا بعد الاعتماد والتحقّق من الأرقام.</p>}
@@ -103,13 +113,12 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     </div>
     {(p.trbhh_category||details?.weightMin)&&<section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-3 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["القسم",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 py-3"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
     {!!descriptionAr&&<section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
-    {/* معلومات الشحن والاسترجاع — ثابتة وموحّدة بهوية تربح (لا تمسّ بيانات CJ). */}
-    <section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-shipping-return"><h2 id="cj-shipping-return" className="mb-3 text-lg font-extrabold text-primary">الشحن والاسترجاع</h2>
-      <ul className="space-y-2 text-sm leading-7 text-slate-700">
-        <li>• يُشحن إلى جميع مناطق المملكة؛ تُحتسب تكلفة الشحن ومدّته حسب الوجهة وتظهر عند الطلب.</li>
-        <li>• مدّة التجهيز تُضاف إلى مدّة التوصيل المذكورة في خيار الشحن.</li>
-        <li>• السعر المعروض بالريال السعودي شامل ربح تربح؛ يُضاف الشحن (والضريبة إن وُجدت) إلى الإجمالي عند الطلب.</li>
-        <li>• الاسترجاع والاستبدال وفق سياسة تربح المعلنة، ولا تُلزم المنصّة إلا بما ورد فيها.</li>
+    {/* ضمانات الشحن والاسترجاع — بهوية تربح وأيقونات واضحة (لا تمسّ بيانات CJ). */}
+    <section className="card-3d min-w-0 rounded-2xl p-4 sm:p-5" aria-labelledby="cj-guarantees"><h2 id="cj-guarantees" className="mb-3 text-lg font-extrabold text-primary">الشحن والضمانات</h2>
+      <ul className="divide-y divide-slate-100 text-sm leading-7 text-slate-700">
+        <li className="flex items-start gap-3 py-2.5"><Truck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>توصيل لكل مناطق المملكة</b> — تُحتسب تكلفة الشحن ومدّته حسب الوجهة وتظهر عند الطلب (مدّة التجهيز تُضاف للتوصيل).</span></li>
+        <li className="flex items-start gap-3 py-2.5"><RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>استرجاع واستبدال</b> وفق سياسة تربح المعلنة.</span></li>
+        <li className="flex items-start gap-3 py-2.5"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>دفع آمن وخصوصية</b> — بياناتك محمية، والسعر بالريال شامل ربح تربح (يُضاف الشحن والضريبة إن وُجدت عند الطلب).</span></li>
       </ul>
     </section>
     {canManage && <section aria-labelledby="cj-product-management" className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><h2 id="cj-product-management" className="text-sm font-bold text-primary">إدارة السلعة</h2><div className="mt-4">
@@ -155,5 +164,12 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     </div></section>}
     {view.isStaff && !canManage && <p role="note" className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة. يمكن لمسؤول الصلاحيات مراجعتها من <Link className="font-bold text-primary underline" href="/admin/access-control">إدارة الصلاحيات</Link>.</p>}
     {others.length > 0 && <section className="min-w-0 space-y-3"><h2 className="text-lg font-extrabold text-primary">منتجات مشابهة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
+    {/* شريط شراء ثابت (نمط المتاجر) فوق القائمة السفلية؛ ينتقل لمحرّك الاختيار والإضافة. للإدارة. */}
+    {view.isStaff && session && displayVariants.length > 0 && <div className="fixed inset-x-0 bottom-[4.5rem] z-30 border-t border-slate-200 bg-white/95 px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+        <div className="min-w-0"><span className="block text-[10px] text-slate-500">السعر (شامل ربح تربح)</span><PriceText>{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText></div>
+        <a href="#cj-buy" className="inline-flex min-h-12 w-1/2 max-w-xs items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-white">اختر وأضف إلى السلة</a>
+      </div>
+    </div>}
   </div>;
 }

@@ -58,7 +58,6 @@ export function CjLiveNumbers({ pid, priceMinor }: { pid: string; priceMinor?: n
           <div><span className="text-emerald-800">الشحن: </span><b dir="ltr">{available.shipMinor === 0 ? 'مجاني' : sar(available.shipMinor)}</b></div>
           <div><span className="text-emerald-800">مدة الشحن: </span><b dir="ltr">{available.deliveryDays ? (/[A-Za-z؀-ۿ]/.test(available.deliveryDays) ? available.deliveryDays : `${available.deliveryDays} يوم`) : '—'}</b></div>
           <div className="col-span-2 border-t border-emerald-200 pt-1"><span className="text-emerald-800">الإجمالي: </span><b className="text-emerald-900" dir="ltr">{sar(price + available.shipMinor)}</b></div>
-          <div className="col-span-2 text-[10px] font-normal text-emerald-700">قيم حقيقية حيّة من CJ = سعر الشراء الفعلي للعميل</div>
         </div>
       ) : loading || !data ? (
         <div className="rounded-lg bg-primary/5 p-1.5 text-[11px] text-muted-foreground">جارٍ تحميل البيانات…</div>

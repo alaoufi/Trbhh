@@ -81,7 +81,10 @@ describe('CJ storefront precise capabilities', () => {
     const result = await html();
     expect(result).not.toContain('خيارات المنتج قبل الإضافة');
     expect(result).not.toContain('التوفر غير متحقق');
-    expect(result).toContain('لا يوجد خيار ثبت مخزونه وشحنه');
+    // السلة والشراء مُفعّلان للإدارة حتى بلا تحقّق مخزَّن: يظهر محرّك الشراء + تنبيه التجربة،
+    // والتحقّق يتم حيّاً عند الاختيار قبل الإضافة للسلة.
+    expect(result).toContain('تجربة إدارية');
+    expect(result).toContain('اختر الخيار');
   });
   it('keeps the new trial private even if the legacy public switch is enabled', async () => {
     state.public = true; state.keys.clear();

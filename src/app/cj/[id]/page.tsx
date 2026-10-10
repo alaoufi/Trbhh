@@ -91,9 +91,15 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
-        {view.isStaff && session && (verifiedVariants.length > 0
-          ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
-          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من التوفّر قبل إتاحتها.</p>)}
+        {/* السلة والشراء مُفعّلان للإدارة (تجربة): يُعرض محرّك الشراء لكل السلع ذات الخيارات،
+            ويتحقّق حيّاً من المخزون والشحن عند الاختيار قبل الإضافة للسلة. لا دفع فعلي إلا بعد
+            الاعتماد وتفعيل الطلبات الحيّة. الخيارات هنا من بيانات السلعة (محقّقة أو تفصيلية). */}
+        {view.isStaff && session && (displayVariants.length > 0
+          ? <>
+              {verifiedVariants.length === 0 && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">تجربة إدارية: لم يُحقَّق توفّر هذه السلعة للعرض العام بعد. يتم التحقّق حيّاً من المخزون والشحن عند اختيار الخيار، ولا يُنفَّذ أي دفع فعلي إلا بعد الاعتماد والتحقّق من الأرقام.</p>}
+              <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
+            </>
+          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات متاحة لهذه السلعة حالياً.</p>)}
         {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
           <h2 className="text-base font-extrabold text-primary">الخيارات المتاحة</h2>
           {optionGroupList.map(group => <div key={group.label} className="min-w-0">

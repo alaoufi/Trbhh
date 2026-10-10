@@ -1,6 +1,7 @@
 'use client';
 
 import {useEffect,useId,useMemo,useState} from 'react';
+import Link from 'next/link';
 import {formatSar} from '@/lib/commerce/money';
 import {cjVariantDisplayOptions,type DisplayOption} from '@/lib/cj/variant-display';
 import {addTrialCartItem,type TrialCartSnapshot} from '@/lib/cj/trial-cart';
@@ -120,7 +121,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     </div>}
     <div className="flex flex-wrap items-end gap-2"><label htmlFor={`${id}-qty`} className="text-sm font-bold">الكمية{quote&&<span className="ms-1 text-xs font-normal text-slate-500">(المتاح: {maxQty})</span>}<input id={`${id}-qty`} type="number" min={1} max={maxQty} value={qty} onChange={event=>setQty(Math.max(1,Math.min(maxQty,Number(event.target.value)||1)))} className="mt-1 block min-h-11 w-24 rounded-lg border px-3" /></label><button type="button" disabled={!ready||!quote||!ship||!isStaff} onClick={add} className="min-h-11 flex-1 rounded-xl bg-primary px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{!isStaff?'للإدارة فقط':(selector?!comboComplete:!variantId)?'اختر الخيار أولاً':status==='checking'?'جارٍ التحقق…':!quote?'غير متاح حالياً':!ship?'لا شحن متاح':'أضف إلى السلة'}</button><CartLink accountId={accountId}/></div>
     {notice&&<p role="alert" className="text-sm text-red-700">{notice}</p>}
-    {added&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3"><span className="text-sm font-bold text-emerald-800">✓ أُضيف إلى السلة</span><a href="/cj/cart" className="min-h-11 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white">اذهب إلى السلة والدفع ←</a></div>}
+    {added&&<div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3"><span className="text-sm font-bold text-emerald-800">✓ أُضيف إلى السلة</span><Link href="/cj/cart" className="min-h-11 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white">اذهب إلى السلة والدفع ←</Link></div>}
     <p className="text-xs leading-6 text-slate-600">شراء خاص بالإدارة: أضِف الخيار المتحقّق إلى السلة، ثم من السلة يُنشأ الطلب ويُعتمد ويُدفع من المحفظة ويُتابع حتى التسليم.</p>
   </section>;
 }

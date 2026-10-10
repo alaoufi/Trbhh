@@ -54,7 +54,8 @@ export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'var
     const colorHit=new RegExp(`(?:^|[\\s_-])(${colorPattern})(?:[\\s_-]|$)`,'i').exec(source);
     return [...(colorHit?[{label:'اللون',value:translateKnownValue(colorHit[1]),source:'parsed' as const}]:[]),{label:'المقاس',value:size,source:'parsed'}];
   }
-  if(source.length>60)return [];
+  // لا نعرض مصدراً طويلاً أو خالياً من أي حرف/رقم (رموز فقط تظهر مربعات فارغة ⬚) كخيار.
+  if(source.length>60||!/[\p{L}\p{N}]/u.test(source))return [];
   return [{label:'الخيار',value:source,source:'parsed'}];
 }
 

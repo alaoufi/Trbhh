@@ -84,7 +84,8 @@ describe('CJ storefront precise capabilities', () => {
     // السلة والشراء مُفعّلان للإدارة حتى بلا تحقّق مخزَّن: يظهر محرّك الشراء + تنبيه التجربة،
     // والتحقّق يتم حيّاً عند الاختيار قبل الإضافة للسلة.
     expect(result).toContain('تجربة إدارية');
-    expect(result).toContain('اختر الخيار');
+    // محرّك الشراء يظهر للإدارة (اختيار بالسمات ثم إضافة للسلة بعد التحقّق الحيّ).
+    expect(result).toContain('أضف إلى السلة');
   });
   it('keeps the new trial private even if the legacy public switch is enabled', async () => {
     state.public = true; state.keys.clear();

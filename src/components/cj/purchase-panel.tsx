@@ -19,6 +19,26 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   const labelFor=(variant:Variant,index:number)=>labels?.[variant.vid]||cjVariantDisplayOptions(variant).map(o=>`${o.label}: ${o.value}`).join(' · ')||`الخيار ${index+1}`;
   const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
   const options=useMemo(()=>selected?(optionsByVid?.[selected.vid]??cjVariantDisplayOptions(selected)):[],[selected,optionsByVid]);
+  // نموذج اختيار بالسمات (لون/مقاس) عندما تحمل كل المتغيّرات نفس مجموعة الخيارات الواضحة؛
+  // فيختار المستخدم كل سمة على حدة وتُحلّ إلى متغيّر. وإلا نعود للقائمة المنسدلة الكاملة.
+  const selector=useMemo(()=>{
+    const per=variants.map(v=>({vid:v.vid,opts:(optionsByVid?.[v.vid]??cjVariantDisplayOptions(v))}));
+    if(per.length<2||per.some(p=>!p.opts.length))return null;
+    const groupLabels=per[0].opts.map(o=>o.label);
+    if(!groupLabels.length||groupLabels.length>3||groupLabels.includes('الخيار'))return null;
+    const consistent=per.every(p=>p.opts.length===groupLabels.length&&groupLabels.every(l=>p.opts.some(o=>o.label===l)));
+    if(!consistent)return null;
+    const groups=groupLabels.map(label=>({label,values:[...new Set(per.flatMap(p=>p.opts.filter(o=>o.label===label).map(o=>o.value)))]}));
+    const combo=new Map<string,string>();
+    for(const p of per)combo.set(groupLabels.map(l=>p.opts.find(o=>o.label===l)?.value??'').join('\u0000'),p.vid);
+    return {groups,groupLabels,combo};
+  },[variants,optionsByVid]);
+  const [chosen,setChosen]=useState<Record<string,string>>({});
+  const comboComplete=!!selector&&selector.groupLabels.every(l=>chosen[l]);
+  useEffect(()=>{
+    if(!selector)return;
+    setVariantId(comboComplete?(selector.combo.get(selector.groupLabels.map(l=>chosen[l]).join('\u0000'))??''):'');
+  },[chosen,selector,comboComplete]);
   const alreadyInCart=items.find(item=>item.id===productId&&item.variantId===variantId)?.qty??0;
   const verificationQuantity=qty+alreadyInCart;
   useEffect(()=>{
@@ -46,11 +66,18 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
     <h2 className="font-extrabold text-primary">اختر المنتج</h2>
-    <label htmlFor={`${id}-variant`} className="block text-sm font-bold">اللون والمقاس أو الخيار المتاح
-      <select id={`${id}-variant`} value={variantId} onChange={event=>setVariantId(event.target.value)} className="mt-2 block min-h-12 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3" required>
-        <option value="">اختر الخيار</option>{variants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)}</option>)}
-      </select>
-    </label>
+    {selector
+      ? <div className="space-y-3">{selector.groups.map(group=><div key={group.label}>
+          <p className="mb-1.5 text-sm font-bold text-slate-700">{group.label}</p>
+          <div className="flex flex-wrap gap-2">{group.values.map(val=><button key={val} type="button" onClick={()=>setChosen(c=>({...c,[group.label]:val}))} aria-pressed={chosen[group.label]===val} dir="auto" className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${chosen[group.label]===val?'border-primary bg-primary text-white shadow-sm':'border-slate-300 bg-white text-slate-700 hover:border-primary/50'}`}>{val}</button>)}</div>
+        </div>)}
+        {comboComplete&&!selected&&<p role="status" className="text-sm font-bold text-amber-800">هذا التركيب غير متوفّر — اختر تركيباً آخر.</p>}
+      </div>
+      : <label htmlFor={`${id}-variant`} className="block text-sm font-bold">الخيار المتاح
+          <select id={`${id}-variant`} value={variantId} onChange={event=>setVariantId(event.target.value)} className="mt-2 block min-h-12 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3" required>
+            <option value="">اختر الخيار</option>{variants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)}</option>)}
+          </select>
+        </label>}
     {selected&&<div className="grid grid-cols-2 gap-2 text-sm">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">{option.label}</span><b className="break-words" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">الوزن</span><b>{selected.variantWeight} غ</b></div>}</div>}
     <p role="status" aria-live="polite" className={`text-sm font-bold ${quote?'text-emerald-700':'text-amber-800'}`}>{quote?`${quote.priceChanged?'تم تحديث السعر · ':''}متوفر · الكمية المتاحة: ${quote.stockQuantity}`:failureMessage[status]|| (status==='verification_failed'?'تعذّر التحقق، حاول مرة أخرى':status?`تعذّر التحقق من الخيار (${status})`:'اختر اللون أو المقاس لبدء التحقق')}</p>
     {quote&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm">

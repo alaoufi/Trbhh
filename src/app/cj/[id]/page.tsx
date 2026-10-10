@@ -13,10 +13,9 @@ import { CjProductCard } from '@/components/cj/product-card';
 import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
 import { SubmitButton } from '@/components/cj/submit-button';
-import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/variant-display';
+import { cleanCjDisplayDescription } from '@/lib/cj/variant-display';
 import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
-import { translateManyForDisplay } from '@/lib/cj/translate';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
 import { getCjCategoryOptions } from '@/lib/cj/categories';
 
@@ -57,27 +56,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
     ? `${weightMin}${typeof weightMax === 'number' && Number.isFinite(weightMax) && weightMax > weightMin ? `–${weightMax}` : ''} غ` : 'غير محدد';
   // خيارات السلعة (اللون/المقاس/القابس...) مجمّعة بالعربية من المحلّل المُختبَر
-  // cjVariantDisplayOptions (يقرأ سمات المتغيّر أو يستنتج اللون/المقاس من اسمه/مفتاحه،
-  // ويتجاهل الضجيج). تُعرض من التفاصيل المخزّنة فتظهر حتى بلا توفّر حيّ محقّق.
-  const optionGroups = new Map<string, string[]>();
-  for (const v of displayVariants) {
-    for (const opt of cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name })) {
-      const values = optionGroups.get(opt.label) ?? [];
-      if (!values.includes(opt.value)) values.push(opt.value);
-      optionGroups.set(opt.label, values);
-    }
-  }
-  // ترجمة فورية عند التحميل لقيم الخيارات وتسمياتها (إنجليزية) عبر المترجم المحلي، فتظهر
-  // «الخيارات المتاحة» بالعربية للزائر. ما يتعذّر يبقى كما هو.
-  const optionTextSet = new Set<string>();
-  for (const [label, values] of optionGroups) { optionTextSet.add(label); for (const val of values) optionTextSet.add(val); }
-  const optionAr = await translateManyForDisplay([...optionTextSet], 120).catch(() => new Map<string, string>());
-  const tr = (t: string) => optionAr.get((t || '').trim()) || t;
-  const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label: tr(label), values: values.slice(0, 40).map(tr) })).slice(0, 8);
   // الشحن والمخزون والمدّة الحقيقية تُعرض حيّاً من CJ عبر CjLiveNumbers في قسم الشحن.
   const categoryOptions = await getCjCategoryOptions();
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
-  // ولوحة الشراء (القائمة المنسدلة) معاً — فلا يبقى خيار غير مترجم في أي مكان.
+  // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
+  // (لون/مقاس) داخل لوحة الشراء ويُحفظ مع الطلب؛ لا قائمة عرض منفصلة غير قابلة للاختيار.
   const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })));
   const variantRows = displayVariants.map(v => ({ key: v.vid, label: translatedVariants[v.vid]?.label || '—', weight: v.weight })).slice(0, 60);
   const panelLabels = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.label]));
@@ -103,16 +86,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
               <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} labels={panelLabels} optionsByVid={panelOptions} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
             </>
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات متاحة لهذه السلعة حالياً.</p>)}
-        {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-base font-extrabold text-primary">الخيارات المتاحة</h2>
-          {optionGroupList.map(group => <div key={group.label} className="min-w-0">
-            <h3 className="mb-1.5 text-sm font-bold text-slate-600">{group.label}</h3>
-            {/* كل خيار في سطر مستقل بخلفية متبادلة (زيبرا) وخط أوضح لسهولة القراءة. */}
-            <ul className="overflow-hidden rounded-xl border border-slate-200">
-              {group.values.map((val, i) => <li key={i} dir="auto" className={`px-3 py-2.5 text-sm font-semibold text-slate-800 ${i % 2 === 0 ? 'bg-slate-50' : 'bg-white'}`}>{val}</li>)}
-            </ul>
-          </div>)}
-        </div>}
         {variantRows.length > 1 && <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           <summary className="cursor-pointer font-bold text-slate-700">تفاصيل الخيارات ({variantRows.length})</summary>
           <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[280px] text-right text-xs"><thead className="bg-slate-50"><tr>{['الخيار', 'الوزن'].map(h => <th key={h} className="p-2 font-bold text-slate-600">{h}</th>)}</tr></thead><tbody>

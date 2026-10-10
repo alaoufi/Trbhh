@@ -61,7 +61,7 @@ export function CjLiveNumbers({ pid, priceMinor }: { pid: string; priceMinor?: n
           <div className="col-span-2 text-[10px] font-normal text-emerald-700">قيم حقيقية حيّة من CJ = سعر الشراء الفعلي للعميل</div>
         </div>
       ) : loading || !data ? (
-        <div className="rounded-lg bg-primary/5 p-1.5 text-[11px] text-muted-foreground">{loading ? 'جارٍ جلب الأرقام الحيّة من CJ…' : 'بانتظار الظهور لجلب الأرقام الحيّة…'}</div>
+        <div className="rounded-lg bg-primary/5 p-1.5 text-[11px] text-muted-foreground">جارٍ تحميل البيانات…</div>
       ) : (
         <button type="button" onClick={fetchLive} className="w-full rounded-lg border border-amber-300 bg-amber-50 p-1.5 text-start text-[11px] font-bold text-amber-800">
           تعذّر جلب الأرقام الحيّة الآن{data?.status ? ` (${data.status})` : ''} — اضغط لإعادة المحاولة.

@@ -54,10 +54,10 @@ export async function saveCjMargin(form: FormData) {
 export async function saveCjHighlightSettings(form: FormData) {
   const s = await requireCjAccess('products', 'manage_settings');
   const raw = String(form.get('labels') || '');
-  const { cjHighlightLabels, saveCjHighlightLabels } = await import('@/lib/cj/highlight');
-  const before = await cjHighlightLabels();
-  await saveCjHighlightLabels(raw);
-  await auditCjChange(s.uid, 'products', 'highlight_labels', { labels: before.join('، ') }, { labels: (await cjHighlightLabels()).join('، ') });
+  const { cjHighlightsText, saveCjHighlights } = await import('@/lib/cj/highlight');
+  const before = await cjHighlightsText();
+  await saveCjHighlights(raw);
+  await auditCjChange(s.uid, 'products', 'highlight_labels', { labels: before }, { labels: await cjHighlightsText() });
   revalidatePath('/admin/suppliers/cj');
   redirect('/admin/suppliers/cj?saved=highlight');
 }
@@ -568,9 +568,9 @@ export async function saveCjStorefrontEdit(form: FormData) {
   const priceRaw = String(form.get('priceSar') || '').trim();
   // وسم التمييز: لا يُحفظ إلا من القائمة المعتمدة (أو تفريغه = بلا تمييز).
   const highlightRaw = String(form.get('highlightLabel') || '').trim();
-  const { cjHighlightLabels } = await import('@/lib/cj/highlight');
+  const { allowedHighlightValues } = await import('@/lib/cj/highlight');
   const { setCjProductHighlight } = await import('@/lib/cj/mapping');
-  const allowedHighlights = await cjHighlightLabels();
+  const allowedHighlights = await allowedHighlightValues();
   await setCjProductHighlight(id, highlightRaw && allowedHighlights.includes(highlightRaw) ? highlightRaw : '');
   if (nameAr) { await setCjProductNameAr(id, nameAr); if (row?.name) await learnTranslation(row.name, nameAr); }
   await setCjProductDescriptionAr(id, descAr);

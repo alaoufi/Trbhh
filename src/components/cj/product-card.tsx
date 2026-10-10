@@ -6,6 +6,7 @@ import { cjPriceLabel } from '@/lib/cj/presentation';
 import { compactAdTitle } from '@/lib/ad-presentation';
 import { CjProductImage } from './product-image';
 import { PriceText } from '@/components/price-text';
+import { parseHighlightValue } from '@/lib/cj/highlight';
 
 /**
  * بطاقة سلعة CJ بنفس تصميم بطاقة إعلانات السوق (AdCardMarketplace) في الرئيسية —
@@ -17,13 +18,14 @@ export function CjProductCard({ product }: { product: CjProductRow }) {
   const title = product.name_ar || 'منتج بانتظار ترجمة الاسم';
   const source = cjProductImages(product)[0];
   const finalMinor = product.sale_price_override_minor ?? product.sale_price_minor;
+  const highlight = parseHighlightValue(product.highlight_label);
   return <div className="marketplace-card group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
     <Link href={`/cj/${product.id}`} className="flex min-w-0 flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
         <CjProductImage src={source ? cjImg(source) : null} alt={compactAdTitle(title)} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-        {/* وسم تمييز تسويقي (مثل «متميز») باللون الأحمر — يظهر فقط إذا حدّده الأدمن (بلا شارة ثابتة). */}
-        {product.highlight_label?.trim() && <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
-          <span className="rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-extrabold text-white shadow-sm">{product.highlight_label.trim()}</span>
+        {/* وسم تمييز تسويقي (مثل «متميز») بلونه المحدَّد — يظهر فقط إذا حدّده الأدمن (بلا شارة ثابتة). */}
+        {highlight && <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
+          <span className="rounded-full px-2.5 py-1 text-[10px] font-extrabold text-white shadow-sm" style={{ backgroundColor: highlight.color }}>{highlight.label}</span>
         </div>}
       </div>
       <div className="flex min-w-0 flex-col gap-1 p-2.5 pb-1.5 sm:p-3 sm:pb-1.5">

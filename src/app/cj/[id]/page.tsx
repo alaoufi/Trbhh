@@ -62,7 +62,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // خيارات السلعة (اللون/المقاس/القابس...) مجمّعة بالعربية من المحلّل المُختبَر
   // الشحن والمخزون والمدّة الحقيقية تُعرض حيّاً من CJ عبر CjLiveNumbers في قسم الشحن.
   const categoryOptions = await getCjCategoryOptions();
-  const highlightOptions = canManage ? await (await import('@/lib/cj/highlight')).cjHighlightLabels() : [];
+  const highlightOptions = canManage ? (await (await import('@/lib/cj/highlight')).cjHighlights()).map(h => ({ value: `${h.label}|${h.color}`, label: h.label, color: h.color })) : [];
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
   // (لون/مقاس) داخل لوحة الشراء ويُحفظ مع الطلب؛ لا قائمة عرض منفصلة غير قابلة للاختيار.
@@ -156,11 +156,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
                 </label>
                 <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
                 <label className="block">التمييز (يظهر على الصورة)
-                  <select name="highlightLabel" defaultValue={p.highlight_label || ''} className={editInput}>
+                  <select name="highlightLabel" defaultValue={highlightOptions.some(o => o.value === (p.highlight_label || '')) ? (p.highlight_label || '') : ''} className={editInput}>
                     <option value="">— بلا تمييز —</option>
-                    {highlightOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                    {highlightOptions.map(o => <option key={o.value} value={o.value}>{o.label} ({o.color})</option>)}
                   </select>
-                  <span className="mt-1 block text-xs text-muted-foreground">تُدار الأوسمة من إعدادات التوريد (cj_highlight_labels).</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">الكلمة ولونها تُداران من «أوسمة التمييز» في إعدادات التوريد.</span>
                 </label>
               </div>
               <div className="flex items-center gap-2">

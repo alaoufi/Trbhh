@@ -12,7 +12,7 @@ import { sampleCjProducts } from '@/lib/cj/sample';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { getSetting } from '@/lib/settings';
 import { getCjCategoryText } from '@/lib/cj/categories';
-import { cjHighlightLabels } from '@/lib/cj/highlight';
+import { cjHighlightsText } from '@/lib/cj/highlight';
 import { saveCjMargin, saveCjSync, runCjSync, saveCjHighlightSettings } from './actions';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { CjAdminNav } from '@/components/cj/admin-nav';
@@ -33,14 +33,14 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   await requireAdminPage('/admin/suppliers/cj');
   const sp = await searchParams;
   const cfg = cjConfig();
-  const [commerce, marginBps, mapped, sync, deliveryDays, categoryTree, highlightLabels] = await Promise.all([
+  const [commerce, marginBps, mapped, sync, deliveryDays, categoryTree, highlightLabelsText] = await Promise.all([
     getCommerceConfig().catch(() => null),
     defaultMarginBps(),
     countCjProducts(),
     cjSyncSettings(),
     getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'),
     getCjCategoryText(),
-    cjHighlightLabels(),
+    cjHighlightsText(),
   ]);
   const liveAllowed = process.env.SUPPLIER_ALLOW_LIVE_ORDERS === 'true';
   const run = typeof sp.run === 'string' ? sp.run : '';
@@ -103,12 +103,13 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
       <div className={card}>
         <h2 className="font-bold">أوسمة التمييز على البطاقة</h2>
         <p className="text-xs text-muted-foreground">
-          قائمة كلمات تسويقية (مثل «متميز») تظهر على صورة السلعة في الرئيسية باللون الأحمر عند اختيار الأدمن لها في تحرير السلعة.
-          اكتب كلمة في كل سطر (أو افصل بفواصل). الحقل فارغ على السلعة = لا وسم. حتى ٢٠ وسماً، كل وسم حتى ٤٠ حرفاً.
+          كلمات تسويقية (مثل «متميز») تظهر على صورة السلعة في الرئيسية بلونها المحدَّد عند اختيار الأدمن لها في تحرير السلعة.
+          سطر لكل وسم بصيغة: <code>الكلمة | #اللون</code> (اللون بصيغة hex مثل <code>#dc2626</code>؛ إن غاب فالأحمر).
+          الحقل فارغ على السلعة = لا وسم. حتى ٢٠ وسماً، كل كلمة حتى ٤٠ حرفاً.
         </p>
         {sp.saved === 'highlight' && <p className="text-sm text-emerald-700">تم حفظ أوسمة التمييز.</p>}
         <AccessBoundary module="products" action="manage_settings"><form action={saveCjHighlightSettings} className="space-y-2">
-          <textarea className="w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm" name="labels" rows={4} defaultValue={highlightLabels.join('\n')} placeholder={"متميز\nجديد\nالأكثر مبيعاً"} dir="rtl" />
+          <textarea className="w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm" name="labels" rows={5} defaultValue={highlightLabelsText} placeholder={"متميز | #dc2626\nجديد | #16a34a\nالأكثر مبيعاً | #f0b429"} dir="rtl" />
           <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ الأوسمة</SubmitButton>
         </form></AccessBoundary>
       </div>

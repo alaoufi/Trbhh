@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { AccessBoundary } from '@/components/access-boundary';
 import { hasAccess, requireAccess } from '@/lib/access-control/guards';
 import { getOrderById, listOrderEvents } from '@/lib/cj/orders/store';
-import { nextStatuses, statusLabel, isException, isStatus } from '@/lib/cj/orders/state';
+import { nextStatuses, statusLabel, customerStatusLabel, isException, isStatus } from '@/lib/cj/orders/state';
 import { parseOrderLines } from '@/lib/cj/orders/store';
 import { canDispatch } from '@/lib/cj/orders/dispatch';
 import { listOrderLedger } from '@/lib/cj/orders/ledger';
@@ -45,6 +45,46 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
         <h1 className="text-xl font-extrabold text-primary">طلب #{String(order.id)}</h1>
         <Link href="/admin/suppliers/cj/orders" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">لوحة المراقبة ←</Link>
       </div>
+      {/* ===== معاينة العميل: نسخة طبق الأصل مما يراه العميل — أسعار ودفع تربح فقط، بلا أي ذكر لمورّد ===== */}
+      <section className="card-3d space-y-3 rounded-xl p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-bold text-primary">معاينة العميل</h2>
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">هكذا يراها العميل تماماً</span>
+        </div>
+        <p className="text-xs text-muted-foreground">نسخة مطابقة لِما يظهر للعميل في «طلباتي»: الأسعار والدفع عبر بوابة تربح (الراجحي) فقط، بلا أي ذكر للمورّد. العميل لا يدخل هذه الصفحة — هي للتجربة والمطابقة قبل التفعيل.</p>
+        <div className="rounded-xl border border-primary/15 bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-bold text-primary">طلب #{String(order.id)}</h3>
+            <span className="rounded bg-emerald-100 px-2 py-0.5 text-sm font-bold text-emerald-800">{customerStatusLabel(order.status)}</span>
+          </div>
+          {order.status === 'cancelled'
+            ? <p className="rounded-lg bg-slate-50 p-3 text-sm">تم إلغاء الطلب.</p>
+            : (order.status === 'delivered' || order.status === 'completed')
+              ? <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">تم تسليم طلبك بنجاح.</p>
+              : <p className="rounded-lg bg-amber-50 p-3 text-sm">طلبك قيد المعالجة، وسيتم تحديث حالته تباعاً.</p>}
+          <div className="flex justify-between gap-4 border-b pb-2 text-sm">
+            <span className="min-w-0">{order.product_name || 'منتج'}{orderLines.length > 0 ? ` × ${orderLines.reduce((n, l) => n + l.quantity, 0)}` : ''}</span>
+            <span className="shrink-0">{sar(order.items_total_minor)}</span>
+          </div>
+          <p className="text-sm">التوصيل: {sar(order.shipping_total_minor)}</p>
+          {order.tax_total_minor > 0 && <p className="text-sm">الضريبة: {sar(order.tax_total_minor)}</p>}
+          <p className="text-lg font-bold">الإجمالي النهائي: {sar(order.grand_total_minor)}</p>
+          {(order.carrier || order.tracking_number) && <div className="border-t pt-2 text-sm">
+            <div className="font-bold">تتبع الشحن</div>
+            <div>شركة الشحن: {order.carrier || '—'} · رقم التتبع: <span dir="ltr">{order.tracking_number || '—'}</span></div>
+          </div>}
+          <button type="button" disabled className="w-full cursor-not-allowed rounded-lg bg-primary px-5 py-2 font-bold text-white opacity-60">الدفع بالبطاقة عبر بوابة البنك</button>
+          <p className="text-center text-[11px] text-muted-foreground">زر الدفع الفعلي للعميل عبر بوابة الراجحي — معطّل في المعاينة فقط.</p>
+        </div>
+      </section>
+
+      {/* ===== الإجراءات الداخلية (إدارة فقط) — لا يراها العميل إطلاقاً ===== */}
+      <details open className="group/i card-3d rounded-xl p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+          <span className="font-bold text-primary">الإجراءات الداخلية (إدارة فقط — لا يراها العميل)</span>
+          <span className="text-xs text-muted-foreground">▾</span>
+        </summary>
+        <div className="mt-3 space-y-4">
       {sp.moved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تغيير الحالة.</p>}
       {sp.tracked === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث التتبّع.</p>}
       {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ الطلب بعد تحقّق حيّ. الخطوة التالية: «اعتماد ودفع» من لوحة الدفع أدناه (ضمن السقف)، ثم يُتابَع حتى التسليم.</p>}
@@ -181,6 +221,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
           </ol>
         )}
       </div>
+        </div>
+      </details>
     </div>
   );
 }

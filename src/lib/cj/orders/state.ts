@@ -77,6 +77,24 @@ export function statusLabel(s: string): string {
 }
 
 /**
+ * تسمية حالة الطلب كما يراها العميل — بلا أي ذكر للمورّد أو لمراحل داخلية.
+ * تُستخدم في معاينة العميل داخل لوحة الإدارة (وفي أي عرض مستقبلي للعميل).
+ */
+export function customerStatusLabel(s: string): string {
+  switch (s) {
+    case 'shipped': return 'تم الشحن';
+    case 'in_transit': return 'في الطريق';
+    case 'out_for_delivery': return 'خرج للتسليم';
+    case 'delivered': return 'تم التسليم';
+    case 'completed': return 'مكتمل';
+    case 'cancelled': return 'ملغى';
+    case 'refunded': return 'مسترد';
+    case 'return_requested': return 'طلب إرجاع قيد المراجعة';
+    default: return 'قيد المعالجة';
+  }
+}
+
+/**
  * هل الانتقال مسموح؟ القاعدة:
  * - داخل المسار: للأمام فقط (خطوة أو أكثر)، لا للخلف.
  * - من أي حالة غير نهائية يمكن الدخول لحالة استثنائية (تعثّر/إلغاء/إرجاع…).

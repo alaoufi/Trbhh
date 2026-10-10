@@ -10,8 +10,24 @@ import { getSetting, setSetting } from '@/lib/settings';
  */
 export const CJ_CATEGORY_TREE_KEY = 'cj_category_tree';
 
+/**
+ * شجرة تصنيفات افتراضية للسوق السعودي — تظهر جاهزة كي لا تكون القائمة فارغة،
+ * وهي قابلة للتعديل/الحذف بالكامل من لوحة الإدارة (إعدادات التوريد ← التصنيفات).
+ */
+export const DEFAULT_CJ_CATEGORY_TREE = [
+  'المنزل والمطبخ: أدوات مطبخ، تنظيم وترتيب، إضاءة، ديكور، مفروشات',
+  'الإلكترونيات والإكسسوارات: سماعات، شواحن وكوابل، كفرات وحمايات، ساعات ذكية، إضاءة LED',
+  'الموضة والأزياء: ملابس رجالية، ملابس نسائية، أحذية، حقائب، إكسسوارات',
+  'الجمال والعناية: مكياج، عناية بالبشرة، عناية بالشعر، عطور، أدوات تجميل',
+  'الرياضة واللياقة: أدوات رياضية، ملابس رياضية، تخييم ورحلات، دراجات هوائية',
+  'السيارات والدراجات: إكسسوارات سيارات، خوذ ودراجات نارية، عدّة وصيانة',
+  'الأطفال والألعاب: ألعاب أطفال، مستلزمات أطفال، قرطاسية',
+  'الأدوات والمعدات: عدّة يدوية، أدوات كهربائية، تنظيم ورشة',
+  'الحيوانات الأليفة: مستلزمات قطط، مستلزمات كلاب',
+].join('\n');
+
 export async function getCjCategoryText(): Promise<string> {
-  return getSetting(CJ_CATEGORY_TREE_KEY, '').catch(() => '');
+  return getSetting(CJ_CATEGORY_TREE_KEY, DEFAULT_CJ_CATEGORY_TREE).catch(() => DEFAULT_CJ_CATEGORY_TREE);
 }
 export async function setCjCategoryText(value: string): Promise<void> {
   await setSetting(CJ_CATEGORY_TREE_KEY, (value || '').slice(0, 20000));

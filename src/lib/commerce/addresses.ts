@@ -44,9 +44,17 @@ export function normalizeSaudiAddress(input:SaudiAddressInput):SaudiAddressSnaps
     alternatePhone:alternate?`+${alternate}`:null,email,country:'SA',region:text(input.region,'region'),city:text(input.city,'city'),
     district:text(input.district,'district'),street:text(input.street,'street'),buildingNumber:text(input.buildingNumber,'buildingNumber'),
     secondaryNumber:text(input.secondaryNumber,'secondaryNumber',true),postalCode:text(input.postalCode,'postalCode'),
-    shortAddress:text(input.shortAddress,'shortAddress',true),deliveryNotes:text(input.deliveryNotes,'deliveryNotes',true),
+    shortAddress:shortAddress(input.shortAddress),deliveryNotes:text(input.deliveryNotes,'deliveryNotes',true),
     lat:coord(input.lat,'lat'),lng:coord(input.lng,'lng'),
   };
+}
+
+/** العنوان الوطني المختصر: ٤ أحرف + ٤ أرقام (مثل QDMA9340). اختياري؛ فارغ = لا شيء. */
+function shortAddress(value:unknown):string{
+  const raw=(typeof value==='string'?value:'').trim().toUpperCase();
+  if(!raw)return '';
+  if(!/^[A-Z]{4}\d{4}$/.test(raw))throw new Error('address_short_invalid');
+  return raw;
 }
 
 export function formatAddressLine(address:SaudiAddressSnapshot):string{

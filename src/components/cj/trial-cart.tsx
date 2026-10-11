@@ -4,7 +4,7 @@ import {useEffect,useRef,useState} from 'react';
 import {useTrialCart} from './cart-controls';
 import {CjProductImage} from './product-image';
 import {formatSar} from '@/lib/commerce/money';
-import {setTrialCartQuantity,MAX_TRIAL_QTY,type TrialCartItem,type TrialCartQuote} from '@/lib/cj/trial-cart';
+import {setTrialCartQuantity,validateTrialCart,MAX_TRIAL_QTY,type TrialCartItem,type TrialCartQuote} from '@/lib/cj/trial-cart';
 import {cjVariantDisplayOptions} from '@/lib/cj/variant-display';
 import {placeCjTrialOrder} from '@/app/cj/cart/actions';
 
@@ -43,9 +43,25 @@ export function TrialCart({accountId,ship}:{accountId:number;ship:ShipDefault|nu
       finally{window.clearTimeout(timeout);if(!controller.signal.aborted&&generation.current===current)setBusy(false);}
     })();return()=>{window.clearTimeout(timeout);controller.abort();};
   },[accountId,items,ready]);
-  function quantity(item:TrialCartItem,value:string){
-    try{if(!/^[1-9]\d?$/.test(value))throw Error('invalid_quantity');save(setTrialCartQuantity(items,item.id,Number(value),item.variantId));setFeedback('تُحدّث الكمية والسعر التقديري.');}
-    catch{setFeedback('اختر كمية صحيحة بين ١ و٩٩. هذا حد للتجربة وليس إثباتًا للمخزون.');}
+  // تغيير الكمية داخل السلة = إعادة تحقّق حيّ من CJ لتلك الكمية (السعر والمخزون
+  // والشحن والضريبة تُؤخذ من API لحظياً، لا تُحسب يدوياً)، ثم تُحدَّث اللقطة. الشحن
+  // ليس ضرب الكمية — CJ يعيد رسم الشحن للكمية كاملة عبر freightCalculate.
+  async function quantity(item:TrialCartItem,value:string){
+    if(!/^[1-9]\d?$/.test(value)){setFeedback('اختر كمية بين ١ و٩٩.');return;}
+    const newQty=Number(value);
+    if(!item.variantId||!item.snapshot){save(setTrialCartQuantity(items,item.id,newQty,item.variantId));return;}
+    setBusy(true);setFeedback('جارٍ تحديث السعر والشحن من المورد…');
+    try{
+      const res=await fetch(`/api/cj/products/${item.id}/verify-variant`,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({variantId:item.variantId,quantity:newQty})});
+      if(!res.ok)throw Error('verify');
+      const data=await res.json() as {salePriceMinor?:number;stockQuantity?:number;sku?:string;checkedAt?:string;shippingOptions?:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;deliveryDays:string|null;originCountry:string}[]};
+      if(typeof data.salePriceMinor!=='number'||!data.shippingOptions?.length){setFeedback('تعذّر تحديث الكمية — راجع التوفّر من صفحة المنتج.');return;}
+      const prev=item.snapshot;
+      const ship=data.shippingOptions.find(o=>o.name===prev.shippingName&&o.originCountry===prev.originCountry)??data.shippingOptions[0];
+      const snapshot={...prev,verifiedQuantity:newQty,unitMinor:data.salePriceMinor,stockQuantity:data.stockQuantity??prev.stockQuantity,sku:data.sku||prev.sku,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:data.checkedAt||prev.checkedAt};
+      save(validateTrialCart(items.map(row=>row.id===item.id&&row.variantId===item.variantId?{id:item.id,qty:newQty,variantId:item.variantId,snapshot}:row)),'');
+    }catch{setFeedback('تعذّر تحديث الكمية الآن — حاول مجدداً.');}
+    finally{setBusy(false);}
   }
   // Never show a previous quantity's amount during the render before the refresh effect.
   const currentQuote=quote&&quoteKey===JSON.stringify(items)?quote:null;

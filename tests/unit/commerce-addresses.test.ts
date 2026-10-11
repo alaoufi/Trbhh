@@ -9,7 +9,7 @@ const valid:SaudiAddressInput={
 
 describe('Saudi commerce address validation',()=>{
   it('normalizes a complete Saudi shipping address for an immutable order snapshot',()=>{
-    expect(normalizeSaudiAddress(valid)).toEqual({...valid,phone:'+966501234567',alternatePhone:null,country:'SA'});
+    expect(normalizeSaudiAddress(valid)).toEqual({...valid,phone:'+966501234567',alternatePhone:null,country:'SA',lat:'',lng:''});
   });
   it.each(['fullName','phone','region','city','district','street','buildingNumber','postalCode'] as const)(
     'rejects missing required field %s',field=>{

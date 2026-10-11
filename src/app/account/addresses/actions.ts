@@ -8,7 +8,7 @@ import type {SaudiAddressInput} from '@/lib/commerce/addresses';
 function id(form:FormData):bigint|null{const value=String(form.get('addressId')||'');return /^[1-9]\d{0,19}$/.test(value)?BigInt(value):null;}
 export async function saveAddressAction(form:FormData):Promise<void>{
   const session=await requireUser();
-  const input=Object.fromEntries(['label','fullName','phone','alternatePhone','email','country','region','city','district','street','buildingNumber','secondaryNumber','postalCode','shortAddress','deliveryNotes'].map(key=>[key,String(form.get(key)||'')])) as unknown as SaudiAddressInput;
+  const input=Object.fromEntries(['label','fullName','phone','alternatePhone','email','country','region','city','district','street','buildingNumber','secondaryNumber','postalCode','shortAddress','deliveryNotes','lat','lng'].map(key=>[key,String(form.get(key)||'')])) as unknown as SaudiAddressInput;
   try{await saveMemberAddress(BigInt(session.uid),input,form.get('isDefault')==='1');}
   catch(error){const code=error instanceof Error?error.message:'address_invalid';redirect(`/account/addresses?error=${encodeURIComponent(code)}`);}
   revalidatePath('/account/addresses');

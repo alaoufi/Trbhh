@@ -7,7 +7,11 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { ensureSchema } = await import('@/data/schema-sync');
-    await ensureSchema().catch((e) => console.error('[schema-sync] failed at boot:', e));
+    // حماية حرجة: لا يجوز أن يُعطّل schema-sync تقديم الطلبات مهما تأخّر/تعلّق.
+    // ننتظره بحدٍّ أقصى ثم نبدأ الخدمة؛ وهو يُكمل في الخلفية. (قاعدة الإنتاج قائمة
+    // أصلاً، فالأعمدة موجودة؛ الانتظار قبل الخدمة يهمّ قاعدة مُستعادة فارغة فقط.)
+    const running = ensureSchema().catch((e) => console.error('[schema-sync] failed at boot:', e));
+    await Promise.race([running, new Promise((resolve) => setTimeout(resolve, 20000))]);
     // تعبئة حقول الأقسام الفرعية الفارغة من القوالب المطابقة — تلقائياً مرّة واحدة
     // (بعلامة دائمة)، غير متلفة. لا يكسر الإقلاع إن فشل.
     try {

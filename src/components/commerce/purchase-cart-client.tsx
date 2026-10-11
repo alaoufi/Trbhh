@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; cart images use native lazy loading. */
 import Link from 'next/link';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
-import {ShoppingCart} from 'lucide-react';
+import {ShoppingCart,CreditCard,MapPin,Truck} from 'lucide-react';
 import {formatSar} from '@/lib/commerce/money';
 import {COMMERCE_CART_EVENT,COMMERCE_CART_STORAGE_KEY,addCartLine,countCartUnits,mergeCartLines,normalizeCart,readStoredCart,removeCartLine,setCartQuantity,writeStoredCart,type CartLine} from '@/lib/commerce/cart';
 import type {SaudiAddressSnapshot} from '@/lib/commerce/addresses';
@@ -59,6 +59,7 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
  const[items,setItems]=useState<CartLine[]>([]),[quote,setQuote]=useState<Quote|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  const persistQueue=useRef<Promise<void>>(Promise.resolve());
  const[selectedAddress,setSelectedAddress]=useState(addresses.find(address=>address.isDefault)?.id||addresses[0]?.id||'');
+ const[addrConfirmed,setAddrConfirmed]=useState(false);
  async function refresh(lines:CartLine[]){
   if(!lines.length){setQuote(null);setLoading(false);return;}
   setLoading(true);setError('');
@@ -72,37 +73,78 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
    if(cancelled)return;setItems(local);void refresh(local);
   }void load();return()=>{cancelled=true;};},[signedIn]);
  const totalQuantity=items.reduce((sum,item)=>sum+item.quantity,0),invalid=!!quote?.lines.some(line=>!line.available);
- return <div className="mx-auto grid max-w-6xl gap-5 pb-28 lg:grid-cols-[1fr_340px] lg:pb-0">
-  <section className="min-w-0 space-y-4"><header><p className="text-sm font-bold text-[#ff6a1a]">متجر تربح</p><h1 className="mt-1 text-2xl font-extrabold text-[#16294a] sm:text-3xl">سلة مشترياتك</h1><p className="mt-1 text-sm text-slate-500">نراجع السعر والتوفر من بيانات تربح الحالية في كل مرة تفتح فيها السلة.</p></header>
-   <ol aria-label="خطوات مراجعة الشراء" className="grid grid-cols-5 gap-1 rounded-2xl border border-slate-200 bg-white p-2 text-center text-[10px] font-bold text-slate-600 sm:gap-2 sm:p-3 sm:text-xs"><li className={selectedAddress?'text-emerald-700':'text-[#ff6a1a]'}>١ · العنوان</li><li>٢ · المنتجات</li><li>٣ · الشحن والسعر</li><li className="text-slate-400">٤ · الدفع</li><li className="text-slate-400">٥ · المراجعة</li></ol>
-   <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 className="font-extrabold text-[#16294a]">عنوان الشحن</h2><p className="mt-1 text-xs text-slate-500">سنستخدم العنوان المحدد ونحفظ نسخة ثابتة منه داخل الطلب عند تفعيل الشراء.</p></div><Link href={signedIn?'/account/addresses':'/login'} className="shrink-0 text-xs font-bold text-[#16294a] underline">{addresses.length?'إدارة العناوين':'إضافة عنوان'}</Link></div>
-    {!signedIn?<p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-900">سجّل الدخول واحفظ عنوان الشحن قبل متابعة المراجعة.</p>:addresses.length===0?<p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-900">أضف عنوانًا سعوديًا كاملًا إلى حسابك قبل الشراء.</p>:<><label className="sr-only" htmlFor="commerce-address">اختر عنوان الشحن</label><select id="commerce-address" value={selectedAddress} onChange={event=>setSelectedAddress(event.target.value)} className="mt-3 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold">{addresses.map(address=><option key={address.id} value={address.id}>{address.label}{address.isDefault?' · افتراضي':''} — {address.snapshot.city}</option>)}</select>{(()=>{const address=addresses.find(item=>item.id===selectedAddress);return address?<p className="mt-2 text-xs leading-5 text-slate-600">{address.snapshot.fullName} · {address.snapshot.phone}<br/>{[address.snapshot.region,address.snapshot.city,address.snapshot.district,address.snapshot.street,address.snapshot.buildingNumber,address.snapshot.postalCode].filter(Boolean).join('، ')}</p>:null;})()}</>}
-   </section>
-   {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-800">{error}</p>}
-   {loading&&<p className="rounded-xl bg-slate-100 p-4 text-sm font-bold text-slate-600">جارٍ تحديث المنتجات والأسعار…</p>}
-   {!loading&&items.length===0&&<div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center"><p className="font-bold text-slate-700">سلتك فارغة الآن.</p><Link href="/shop" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#16294a] px-5 font-bold text-white">تصفّح المنتجات</Link></div>}
-   <div className="space-y-3">{quote?.lines.map((line,index)=><article key={`${line.productId}-${line.variantKey||''}-${index}`} className="grid min-w-0 grid-cols-[88px_1fr] gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[112px_1fr] sm:gap-4 sm:p-4">
-    <div className="aspect-square overflow-hidden rounded-xl bg-slate-100">{line.image?<img src={line.image} alt="" loading="lazy" className="h-full w-full object-contain"/>:<div className="grid h-full place-items-center text-xs text-slate-400">لا توجد صورة</div>}</div>
-    <div className="min-w-0"><Link href={`/shop/${line.productId}`} className="line-clamp-2 text-sm font-extrabold leading-6 text-[#16294a] sm:text-base">{line.title}</Link>
-     {line.variantName&&<p className="mt-1 text-xs font-semibold text-slate-600">الخيار: {line.variantName}{line.variantVid?` · VID ${line.variantVid}`:''}{line.variantSku?` · SKU ${line.variantSku}`:''}</p>}
-     {Object.entries(line.variantAttributes||{}).length>0&&<dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-slate-50 p-2 text-xs">{Object.entries(line.variantAttributes).map(([key,value])=><div key={`${key}-${value}`} className="flex min-w-0 gap-1"><dt className="shrink-0 font-bold text-slate-500">{key}:</dt><dd className="min-w-0 break-words font-semibold text-[#16294a]">{value}</dd></div>)}</dl>}
-     <p className="mt-2 text-sm font-bold text-[#c4510b]">{money(line.unitPriceMinor)} <span className="text-xs font-medium text-slate-500">للوحدة</span>{line.originalPriceMinor>line.unitPriceMinor&&<><del className="ms-2 text-xs font-medium text-slate-500">{money(line.originalPriceMinor)}</del><span className="ms-2 rounded-full bg-red-50 px-2 py-1 text-xs font-extrabold text-red-700">خصم {money(line.discountMinor)}</span></>}</p>
-     <p className={`mt-1 text-xs font-bold ${line.available?'text-emerald-700':'text-red-700'}`}>{line.available?`متوفر · الكمية المتاحة ${line.stock}`:'الكمية أو الخيار غير متوفر حاليًا'}</p>
-     {line.saudiShippingAvailable&&<p className="mt-1 break-words text-xs leading-5 text-slate-600">الشحن إلى السعودية متاح من بيانات الناقل{line.deliveryEstimate?` · المدة المسجلة ${line.deliveryEstimate}`:''}{line.shippingFeeMinor!==null?` · ${money(line.shippingFeeMinor)}`:''}</p>}
-     <div className="mt-3 flex flex-wrap items-center gap-2"><div className="flex items-center rounded-lg border border-slate-300"><button type="button" disabled={line.quantity<=1} aria-label={`إنقاص كمية ${line.title}`} onClick={()=>save(setCartQuantity(items,line.productId,line.quantity-1,line.variantKey))} className="min-h-10 min-w-10 text-lg font-black disabled:opacity-40">−</button><input aria-label={`كمية ${line.title}`} type="number" min={1} max={Math.max(1,line.stock)} value={line.quantity} onChange={event=>{const qty=Number(event.target.value);if(Number.isSafeInteger(qty)&&qty>0&&qty<=Math.max(1,line.stock))save(setCartQuantity(items,line.productId,qty,line.variantKey));}} className="h-10 w-12 border-x border-slate-200 text-center text-sm"/><button type="button" disabled={!line.available||line.quantity>=line.stock} aria-label={`زيادة كمية ${line.title}`} onClick={()=>save(setCartQuantity(items,line.productId,line.quantity+1,line.variantKey))} className="min-h-10 min-w-10 text-lg font-black disabled:opacity-40">+</button></div>
-      <button type="button" onClick={()=>save(removeCartLine(items,line.productId,line.variantKey))} className="min-h-10 rounded-lg px-3 text-xs font-bold text-red-700 hover:bg-red-50">حذف</button><span className="ms-auto text-sm font-extrabold text-[#16294a]">{money(line.totalMinor)}</span></div>
-    </div>
-   </article>)}</div>
+ const selAddr=addresses.find(a=>a.id===selectedAddress);
+ const totalLabel=quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor);
+ return <div className="mx-auto max-w-xl space-y-3 px-1 pb-28">
+  {/* ===== عنوان الشحن (من ملف العضو) — تعديل + تأكيد ===== */}
+  <section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+   <div className="flex items-center justify-between gap-2">
+    <h2 className="inline-flex items-center gap-1.5 text-sm font-extrabold text-[#16294a]"><MapPin className="h-4 w-4 text-[#16294a]"/>عنوان الشحن</h2>
+    <Link href={signedIn?'/account/addresses':'/login'} className="shrink-0 text-xs font-bold text-[#16294a] underline">{addresses.length?'تعديل':'إضافة عنوان'}</Link>
+   </div>
+   {!signedIn?<p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-900">سجّل الدخول لاستخدام عنوانك المحفوظ.</p>
+    :addresses.length===0?<p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-900">أضف عنوان شحن سعودياً إلى حسابك أولاً.</p>
+    :<>
+     {addresses.length>1&&<select aria-label="اختر عنوان الشحن" value={selectedAddress} onChange={event=>{setSelectedAddress(event.target.value);setAddrConfirmed(false);}} className="mt-2 min-h-10 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-[13px] font-bold">{addresses.map(address=><option key={address.id} value={address.id}>{address.label}{address.isDefault?' · افتراضي':''} — {address.snapshot.city}</option>)}</select>}
+     {selAddr&&<p className="mt-2 text-[13px] font-semibold leading-6 text-slate-700"><b className="text-[#16294a]">{selAddr.snapshot.fullName}</b> · {selAddr.snapshot.phone}<br/><span className="text-slate-500">{[selAddr.snapshot.region,selAddr.snapshot.city,selAddr.snapshot.district,selAddr.snapshot.street,selAddr.snapshot.buildingNumber,selAddr.snapshot.postalCode].filter(Boolean).join('، ')}</span></p>}
+     <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-[13px] font-bold text-[#16294a]"><input type="checkbox" checked={addrConfirmed} onChange={event=>setAddrConfirmed(event.target.checked)} className="h-4 w-4 accent-[#16294a]"/>أؤكّد صحة عنوان الشحن</label>
+    </>}
   </section>
-  <aside id="order-summary" className="h-fit scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 sm:p-5"><h2 className="text-lg font-extrabold text-[#16294a]">ملخص الطلب</h2>
-   <div className="mt-4 space-y-3 text-sm"><div className="flex justify-between gap-2"><span>السلع ({totalQuantity})</span><b>{quote?money(quote.subtotalMinor):'—'}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>الخصومات</span><b>{quote?money(quote.discountMinor):'—'}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>الشحن</span><b>{quote?.shippingFeeMinor===null||quote?.shippingFeeMinor===undefined?'غير متاح بعد':money(quote.shippingFeeMinor)}</b></div>{quote?.vatEnabled&&<div className="flex justify-between gap-2 text-slate-600"><span>ضريبة السلع والشحن</span><b>{quote.productVatMinor===null?'بانتظار سياسة معتمدة':money(quote.productVatMinor+(quote.shippingVatMinor||0))}</b></div>}
-    <div className="flex items-baseline justify-between gap-2 border-t border-slate-200 pt-3 text-base font-extrabold text-[#c4510b]"><span>الإجمالي</span><b className="text-xl">{quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor)}</b></div></div>
-   {quote?.deliveryEstimate&&<p className="mt-3 text-xs text-slate-600">التوصيل المتوقع: {quote.deliveryEstimate}</p>}
-   <button type="button" disabled className="mt-5 min-h-12 w-full cursor-not-allowed rounded-xl bg-slate-300 px-4 text-sm font-extrabold text-slate-600" aria-disabled="true">الدفع غير متاح حاليًا</button>
-   <p className="mt-2 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">الشراء والدفع ما زالا معطّلين. لن يُنشأ طلب ولن يُخصم مبلغ. سنفعّل المتابعة بعد اجتياز اختبارات التوفر والشحن والدفع واعتمادها.</p>
-   {invalid&&<p className="mt-2 text-xs font-bold text-red-700">عدّل الكميات أو احذف المنتجات غير المتاحة لمتابعة السلة.</p>}
-   <div className="mt-4 flex flex-wrap gap-2 text-xs"><Link href="/shop" className="font-bold text-[#16294a] underline">متابعة التصفح</Link><Link href="/account/addresses" className="font-bold text-[#16294a] underline">إدارة عناوين الشحن</Link></div>
-  </aside>
-  {items.length>0&&<div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-6px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden"><div className="mx-auto flex max-w-xl items-center gap-3"><div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">الإجمالي قبل الدفع</p><p className="truncate text-base font-black text-[#c4510b]">{quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor)}</p></div><button type="button" onClick={()=>document.getElementById('order-summary')?.scrollIntoView({behavior:'smooth',block:'center'})} className="min-h-12 flex-1 rounded-xl bg-[#16294a] px-3 text-sm font-extrabold text-white">مراجعة الطلب</button></div></div>}
+
+  {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-800">{error}</p>}
+  {loading&&<p className="rounded-xl bg-slate-100 p-3 text-sm font-bold text-slate-600">جارٍ تحديث المنتجات والأسعار…</p>}
+  {!loading&&items.length===0&&<div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center"><p className="font-bold text-slate-700">سلتك فارغة الآن.</p><Link href="/shop" className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#16294a] px-5 font-bold text-white">تصفّح المنتجات</Link></div>}
+
+  {/* ===== المنتجات (مختصرة: صورة صغيرة · عنوان · كمية · سعر) ===== */}
+  {!!quote?.lines.length&&<section className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">{quote.lines.map((line,index)=><div key={`${line.productId}-${line.variantKey||''}-${index}`} className="flex gap-2.5 p-3">
+   <Link href={`/shop/${line.productId}`} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">{line.image?<img src={line.image} alt="" loading="lazy" className="h-full w-full object-contain"/>:<span className="grid h-full place-items-center text-[10px] text-slate-400">—</span>}</Link>
+   <div className="min-w-0 flex-1">
+    <Link href={`/shop/${line.productId}`} className="line-clamp-2 text-[13px] font-bold leading-[1.4] text-[#16294a]">{line.title}</Link>
+    {line.variantName&&<p className="mt-0.5 truncate text-[11px] text-slate-500" dir="auto">{line.variantName}</p>}
+    {!line.available&&<p className="mt-0.5 text-[11px] font-bold text-red-700">غير متوفر حالياً</p>}
+    {line.saudiShippingAvailable&&line.deliveryEstimate&&<p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-700"><Truck className="h-3 w-3"/>{line.deliveryEstimate}</p>}
+    <div className="mt-1.5 flex items-center justify-between gap-2">
+     <div className="flex items-center rounded-lg border border-slate-300"><button type="button" disabled={line.quantity<=1} aria-label="إنقاص" onClick={()=>save(setCartQuantity(items,line.productId,line.quantity-1,line.variantKey))} className="h-8 w-8 text-base font-black disabled:opacity-40">−</button><span className="w-8 border-x border-slate-200 text-center text-[13px] font-bold">{line.quantity}</span><button type="button" disabled={!line.available||line.quantity>=line.stock} aria-label="زيادة" onClick={()=>save(setCartQuantity(items,line.productId,line.quantity+1,line.variantKey))} className="h-8 w-8 text-base font-black disabled:opacity-40">+</button></div>
+     <div className="flex items-center gap-2">
+      <button type="button" onClick={()=>save(removeCartLine(items,line.productId,line.variantKey))} aria-label="حذف" className="text-[11px] font-bold text-red-600">حذف</button>
+      <b className="text-sm font-extrabold text-[#c4510b]">{money(line.totalMinor)}</b>
+     </div>
+    </div>
+   </div>
+  </div>)}</section>}
+
+  {/* ===== الملخّص ===== */}
+  {!!quote&&<section className="rounded-2xl border border-slate-200 bg-white p-3.5 text-[13px] shadow-sm">
+   <div className="space-y-1.5">
+    <div className="flex justify-between gap-2"><span className="text-slate-600">السلع ({totalQuantity})</span><b>{money(quote.subtotalMinor)}</b></div>
+    {quote.discountMinor>0&&<div className="flex justify-between gap-2"><span className="text-slate-600">الخصم</span><b className="text-red-600">−{money(quote.discountMinor)}</b></div>}
+    <div className="flex justify-between gap-2"><span className="text-slate-600">الشحن</span><b>{quote.shippingFeeMinor===null||quote.shippingFeeMinor===undefined?'يُحتسب حسب العنوان':quote.shippingFeeMinor===0?'مجاني':money(quote.shippingFeeMinor)}</b></div>
+    {quote.vatEnabled&&<div className="flex justify-between gap-2"><span className="text-slate-600">الضريبة</span><b>{quote.productVatMinor===null?'—':money(quote.productVatMinor+(quote.shippingVatMinor||0))}</b></div>}
+    <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-2 text-base font-extrabold text-[#16294a]"><span>الإجمالي</span><b className="text-lg text-[#c4510b]">{totalLabel}</b></div>
+   </div>
+   {quote.deliveryEstimate&&<p className="mt-2 inline-flex items-center gap-1 text-[12px] text-emerald-700"><Truck className="h-3.5 w-3.5"/>التوصيل المتوقّع: {quote.deliveryEstimate}</p>}
+  </section>}
+
+  {/* ===== طريقة الدفع ===== */}
+  {!!quote?.lines.length&&<section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+   <h2 className="inline-flex items-center gap-1.5 text-sm font-extrabold text-[#16294a]"><CreditCard className="h-4 w-4"/>طريقة الدفع</h2>
+   <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-500">
+    {['فيزا','ماستركارد','مدى'].map(brand=><span key={brand} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1">{brand}</span>)}
+    <span className="text-slate-400">· إدخال البطاقة في صفحة البنك الآمنة</span>
+   </div>
+   <p className="mt-2 text-[11px] leading-5 text-slate-500">تُدخل بيانات بطاقتك في بوابة البنك الآمنة مباشرةً — لا نحفظ أي بيانات بطاقة.</p>
+  </section>}
+
+  {invalid&&<p className="rounded-xl bg-red-50 p-2.5 text-xs font-bold text-red-700">عدّل الكميات أو احذف غير المتوفر لمتابعة الدفع.</p>}
+
+  {/* ===== شريط الدفع الثابت ===== */}
+  {items.length>0&&<div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-6px_24px_rgba(15,23,42,.08)] backdrop-blur">
+   <div className="mx-auto flex max-w-xl items-center gap-3">
+    <div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">الإجمالي</p><p className="truncate text-base font-black text-[#c4510b]">{totalLabel}</p></div>
+    {quote?.purchasingEnabled
+     ?<button type="button" disabled={invalid||!selAddr||!addrConfirmed} className="min-h-12 flex-1 rounded-xl bg-[#c4510b] px-4 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">{!selAddr?'أضف عنواناً':!addrConfirmed?'أكّد عنوان الشحن':'الدفع بالبطاقة'}</button>
+     :<button type="button" disabled aria-disabled="true" className="min-h-12 flex-1 cursor-not-allowed rounded-xl bg-slate-300 px-4 text-sm font-extrabold text-slate-600">الدفع غير متاح حالياً</button>}
+   </div>
+  </div>}
  </div>;
 }

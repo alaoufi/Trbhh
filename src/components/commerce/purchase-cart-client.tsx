@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; cart images use native lazy loading. */
 import Link from 'next/link';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
-import {ShoppingCart,CreditCard,MapPin,Truck} from 'lucide-react';
+import {ShoppingCart,MapPin} from 'lucide-react';
 import {formatSar} from '@/lib/commerce/money';
 import {COMMERCE_CART_EVENT,COMMERCE_CART_STORAGE_KEY,addCartLine,countCartUnits,mergeCartLines,normalizeCart,readStoredCart,removeCartLine,setCartQuantity,writeStoredCart,type CartLine} from '@/lib/commerce/cart';
 import type {SaudiAddressSnapshot} from '@/lib/commerce/addresses';
@@ -72,7 +72,7 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
    if(signedIn){try{const response=await fetch('/api/shop/cart/state',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:local})});if(!response.ok)throw new Error('cart_sync');const data=await response.json() as {items:CartLine[]};local=mergeCartLines(local,normalizeCart(data.items));publishCart(local);const saved=await fetch('/api/shop/cart/state',{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:local})});if(!saved.ok)throw new Error('cart_sync');}catch{if(!cancelled)setError('تعذر مزامنة سلتك مع حسابك الآن؛ تبقى السلة المحفوظة على هذا الجهاز متاحة.');}}
    if(cancelled)return;setItems(local);void refresh(local);
   }void load();return()=>{cancelled=true;};},[signedIn]);
- const totalQuantity=items.reduce((sum,item)=>sum+item.quantity,0),invalid=!!quote?.lines.some(line=>!line.available);
+ const invalid=!!quote?.lines.some(line=>!line.available);
  const selAddr=addresses.find(a=>a.id===selectedAddress);
  const totalLabel=quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor);
  return <div className="mx-auto max-w-xl space-y-3 px-1 pb-28">
@@ -100,50 +100,26 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
    <Link href={`/shop/${line.productId}`} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">{line.image?<img src={line.image} alt="" loading="lazy" className="h-full w-full object-contain"/>:<span className="grid h-full place-items-center text-[10px] text-slate-400">—</span>}</Link>
    <div className="min-w-0 flex-1">
     <Link href={`/shop/${line.productId}`} className="line-clamp-2 text-[13px] font-bold leading-[1.4] text-[#16294a]">{line.title}</Link>
-    {line.variantName&&<p className="mt-0.5 truncate text-[11px] text-slate-500" dir="auto">{line.variantName}</p>}
+    {line.variantName&&<p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500" dir="auto">{line.variantName}</p>}
     {!line.available&&<p className="mt-0.5 text-[11px] font-bold text-red-700">غير متوفر حالياً</p>}
-    {line.saudiShippingAvailable&&line.deliveryEstimate&&<p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-emerald-700"><Truck className="h-3 w-3"/>{line.deliveryEstimate}</p>}
-    <div className="mt-1.5 flex items-center justify-between gap-2">
-     <div className="flex items-center rounded-lg border border-slate-300"><button type="button" disabled={line.quantity<=1} aria-label="إنقاص" onClick={()=>save(setCartQuantity(items,line.productId,line.quantity-1,line.variantKey))} className="h-8 w-8 text-base font-black disabled:opacity-40">−</button><span className="w-8 border-x border-slate-200 text-center text-[13px] font-bold">{line.quantity}</span><button type="button" disabled={!line.available||line.quantity>=line.stock} aria-label="زيادة" onClick={()=>save(setCartQuantity(items,line.productId,line.quantity+1,line.variantKey))} className="h-8 w-8 text-base font-black disabled:opacity-40">+</button></div>
-     <div className="flex items-center gap-2">
-      <button type="button" onClick={()=>save(removeCartLine(items,line.productId,line.variantKey))} aria-label="حذف" className="text-[11px] font-bold text-red-600">حذف</button>
-      <b className="text-sm font-extrabold text-[#c4510b]">{money(line.totalMinor)}</b>
+    <div className="mt-1 flex items-center justify-between gap-2">
+     <div className="flex items-center rounded-lg border border-slate-300">
+      <button type="button" aria-label={line.quantity<=1?'إزالة المنتج':'إنقاص'} onClick={()=>line.quantity<=1?save(removeCartLine(items,line.productId,line.variantKey)):save(setCartQuantity(items,line.productId,line.quantity-1,line.variantKey))} className="h-8 w-8 text-lg font-black text-[#16294a]">−</button>
+      <span className="w-8 border-x border-slate-200 text-center text-[13px] font-bold">{line.quantity}</span>
+      <button type="button" disabled={!line.available||line.quantity>=line.stock} aria-label="زيادة" onClick={()=>save(setCartQuantity(items,line.productId,line.quantity+1,line.variantKey))} className="h-8 w-8 text-lg font-black text-[#16294a] disabled:opacity-40">+</button>
      </div>
+     <b className="text-sm font-extrabold text-[#c4510b]">{money(line.totalMinor)}</b>
     </div>
    </div>
   </div>)}</section>}
 
-  {/* ===== الملخّص ===== */}
-  {!!quote&&<section className="rounded-2xl border border-slate-200 bg-white p-3.5 text-[13px] shadow-sm">
-   <div className="space-y-1.5">
-    <div className="flex justify-between gap-2"><span className="text-slate-600">السلع ({totalQuantity})</span><b>{money(quote.subtotalMinor)}</b></div>
-    {quote.discountMinor>0&&<div className="flex justify-between gap-2"><span className="text-slate-600">الخصم</span><b className="text-red-600">−{money(quote.discountMinor)}</b></div>}
-    <div className="flex justify-between gap-2"><span className="text-slate-600">الشحن</span><b>{quote.shippingFeeMinor===null||quote.shippingFeeMinor===undefined?'يُحتسب حسب العنوان':quote.shippingFeeMinor===0?'مجاني':money(quote.shippingFeeMinor)}</b></div>
-    {quote.vatEnabled&&<div className="flex justify-between gap-2"><span className="text-slate-600">الضريبة</span><b>{quote.productVatMinor===null?'—':money(quote.productVatMinor+(quote.shippingVatMinor||0))}</b></div>}
-    <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-2 text-base font-extrabold text-[#16294a]"><span>الإجمالي</span><b className="text-lg text-[#c4510b]">{totalLabel}</b></div>
-   </div>
-   {quote.deliveryEstimate&&<p className="mt-2 inline-flex items-center gap-1 text-[12px] text-emerald-700"><Truck className="h-3.5 w-3.5"/>التوصيل المتوقّع: {quote.deliveryEstimate}</p>}
-  </section>}
-
-  {/* ===== طريقة الدفع ===== */}
-  {!!quote?.lines.length&&<section className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-   <h2 className="inline-flex items-center gap-1.5 text-sm font-extrabold text-[#16294a]"><CreditCard className="h-4 w-4"/>طريقة الدفع</h2>
-   <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-500">
-    {['فيزا','ماستركارد','مدى'].map(brand=><span key={brand} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1">{brand}</span>)}
-    <span className="text-slate-400">· إدخال البطاقة في صفحة البنك الآمنة</span>
-   </div>
-   <p className="mt-2 text-[11px] leading-5 text-slate-500">تُدخل بيانات بطاقتك في بوابة البنك الآمنة مباشرةً — لا نحفظ أي بيانات بطاقة.</p>
-  </section>}
-
-  {invalid&&<p className="rounded-xl bg-red-50 p-2.5 text-xs font-bold text-red-700">عدّل الكميات أو احذف غير المتوفر لمتابعة الدفع.</p>}
-
-  {/* ===== شريط الدفع الثابت ===== */}
+  {/* ===== شريط الدفع الثابت: الإجمالي + «ادفع» ===== */}
   {items.length>0&&<div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-6px_24px_rgba(15,23,42,.08)] backdrop-blur">
    <div className="mx-auto flex max-w-xl items-center gap-3">
     <div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">الإجمالي</p><p className="truncate text-base font-black text-[#c4510b]">{totalLabel}</p></div>
     {quote?.purchasingEnabled
-     ?<button type="button" disabled={invalid||!selAddr||!addrConfirmed} className="min-h-12 flex-1 rounded-xl bg-[#c4510b] px-4 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">{!selAddr?'أضف عنواناً':!addrConfirmed?'أكّد عنوان الشحن':'الدفع بالبطاقة'}</button>
-     :<button type="button" disabled aria-disabled="true" className="min-h-12 flex-1 cursor-not-allowed rounded-xl bg-slate-300 px-4 text-sm font-extrabold text-slate-600">الدفع غير متاح حالياً</button>}
+     ?<button type="button" disabled={invalid||!selAddr||!addrConfirmed} className="min-h-12 flex-1 rounded-xl bg-[#c4510b] px-4 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">{!selAddr?'أضف عنواناً':!addrConfirmed?'أكّد العنوان':'ادفع'}</button>
+     :<button type="button" disabled aria-disabled="true" className="min-h-12 flex-1 cursor-not-allowed rounded-xl bg-slate-300 px-4 text-base font-extrabold text-slate-600">الدفع غير متاح حالياً</button>}
    </div>
   </div>}
  </div>;

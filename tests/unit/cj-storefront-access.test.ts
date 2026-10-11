@@ -60,12 +60,12 @@ describe('CJ storefront precise capabilities', () => {
   it('renders only the controls authorized for a product editor', async () => {
     state.public = true; await expect(html()).rejects.toThrow('not_found');
     state.keys = new Set(['products:view', 'products:edit']); const result = await html();
-    expect(result).toContain('حفظ التعديل'); expect(result).not.toContain('>حذف</button>'); expect(result).not.toContain('>إخفاء</button>');
+    expect(result).toContain('حفظ التعديل'); expect(result).not.toContain('>حذف السلعة</button>'); expect(result).not.toContain('>إخفاء السلعة</button>');
   });
   it('keeps management controls expanded and visible to an authorized manager', async () => {
     state.keys = new Set(['products:view', 'products:edit', 'products:suspend', 'products:delete']);
     const result = await html();
-    expect(result).toContain('حفظ التعديل'); expect(result).toContain('>إخفاء</button>'); expect(result).toContain('>حذف</button>');
+    expect(result).toContain('حفظ التعديل'); expect(result).toContain('>إخفاء السلعة</button>'); expect(result).toContain('>حذف السلعة</button>');
     expect(result).not.toContain('<details class="min-w-0 rounded-2xl border border-primary/20');
   });
   it('explains the permission gate to a read-only product viewer', async () => {
@@ -73,7 +73,7 @@ describe('CJ storefront precise capabilities', () => {
     const result = await html();
     expect(result).toContain('أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة');
     expect(result).toContain('href="/admin/access-control"');
-    expect(result).not.toContain('>حذف</button>');
+    expect(result).not.toContain('>حذف السلعة</button>');
   });
   it('does not render unverified CJ options as selectable product variants', async () => {
     state.keys = new Set(['products:view']);

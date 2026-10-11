@@ -19,7 +19,7 @@ import { cjProductDisplayTitle, cjDescriptionText, cjPriceLabel } from '@/lib/cj
 import { PriceText } from '@/components/price-text';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
-import { getCjCategoryOptions } from '@/lib/cj/categories';
+import { getCjCategoryOptions, getCjCategoryText, parseCjCategoryTree } from '@/lib/cj/categories';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
 export const dynamic = 'force-dynamic';
@@ -62,6 +62,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // خيارات السلعة (اللون/المقاس/القابس...) مجمّعة بالعربية من المحلّل المُختبَر
   // الشحن والمخزون والمدّة الحقيقية تُعرض حيّاً من CJ عبر CjLiveNumbers في قسم الشحن.
   const categoryOptions = await getCjCategoryOptions();
+  // شجرة التصنيفات (رئيسي + فرعية) لعرضها مجمّعة بوضوح في قائمة اختيار السلعة.
+  const categoryTree = canManage ? parseCjCategoryTree(await getCjCategoryText()) : [];
   const highlightOptions = canManage ? (await (await import('@/lib/cj/highlight')).cjHighlights()).map(h => ({ value: `${h.label}|${h.color}`, label: h.label, color: h.color })) : [];
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
@@ -126,54 +128,69 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         <li className="flex items-start gap-3 py-2.5"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>دفع آمن وخصوصية</b> — بياناتك محمية، والسعر بالريال شامل ربح تربح (يُضاف الشحن والضريبة إن وُجدت عند الطلب).</span></li>
       </ul>
     </section>
-    {canManage && <section aria-labelledby="cj-product-management" className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><h2 id="cj-product-management" className="text-sm font-bold text-primary">إدارة السلعة</h2><div className="mt-4">
-      {canManage && (
-        <div className="card-3d rounded-2xl p-3 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-bold text-primary">إدارة السلعة{capabilities.agent ? ' (وكيلها)' : ''}:</span>
-            {/* إخفاء/إظهار */}
-            {capabilities.suspend && <form action={hideCjStorefront}><input type="hidden" name="id" value={id} /><input type="hidden" name="hidden" value={p.hidden ? '0' : '1'} /><button className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">{p.hidden ? 'إظهار' : 'إخفاء'}</button></form>}
-            {/* حذف — فقط إن لا نشاط */}
-            {capabilities.delete && (hasActivity
-              ? <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">الحذف متعذّر (يوجد نشاط) — الإخفاء متاح</span>
-              : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>)}
-          </div>
-          {capabilities.edit && <div>
-            <h3 className="text-sm font-bold text-primary">✎ تعديل مباشر</h3>
-            <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
-              <input type="hidden" name="id" value={id} />
-              <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
-              <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ? cjDescriptionText(p.display_description_ar) : ''} className={editInput} /></label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block">القسم
-                  <select name="trbhhCategory" defaultValue={p.trbhh_category && categoryOptions.includes(p.trbhh_category) ? p.trbhh_category : ''} className={editInput}>
-                    <option value="">— اختر تصنيف تربح —</option>
-                    {categoryOptions.map(option => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                  {categoryOptions.length === 0
-                    ? <span className="mt-1 block text-xs text-amber-700">لا توجد تصنيفات بعد — أضِفها من لوحة الإدارة (إعدادات التوريد ← التصنيفات).</span>
-                    : p.trbhh_category && !categoryOptions.includes(p.trbhh_category) && <span className="mt-1 block text-xs text-amber-700">التصنيف الحالي غير موحّد — اختر تصنيف تربح لتوحيد السلع المتشابهة.</span>}
-                </label>
-                <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
-                <label className="block">التمييز (يظهر على الصورة)
-                  <select name="highlightLabel" defaultValue={highlightOptions.some(o => o.value === (p.highlight_label || '')) ? (p.highlight_label || '') : ''} className={editInput}>
-                    <option value="">— بلا تمييز —</option>
-                    {highlightOptions.map(o => <option key={o.value} value={o.value}>{o.label} ({o.color})</option>)}
-                  </select>
-                  <span className="mt-1 block text-xs text-muted-foreground">الكلمة ولونها تُداران من «أوسمة التمييز» في إعدادات التوريد.</span>
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <SubmitButton className="rounded-lg bg-primary px-4 py-2 font-bold text-white" pendingText="جارٍ الحفظ…">حفظ التعديل</SubmitButton>
-                <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
-              </div>
-            </form>
-          </div>}
+    {canManage && <section aria-labelledby="cj-product-management" className="card-3d min-w-0 rounded-2xl border border-primary/20 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <h2 id="cj-product-management" className="text-base font-extrabold text-primary">إدارة السلعة{capabilities.agent ? ' (وكيلها)' : ''}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          {capabilities.suspend && <form action={hideCjStorefront}><input type="hidden" name="id" value={id} /><input type="hidden" name="hidden" value={p.hidden ? '0' : '1'} /><button className="rounded-lg border border-primary/30 bg-white px-4 py-2 text-sm font-bold text-primary">{p.hidden ? 'إظهار السلعة' : 'إخفاء السلعة'}</button></form>}
+          {capabilities.delete && (hasActivity
+            ? <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">الحذف متعذّر (يوجد نشاط) — الإخفاء متاح</span>
+            : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-700">حذف السلعة</button></form>)}
         </div>
-      )}
+      </div>
 
+      {capabilities.edit && <form action={saveCjStorefrontEdit} className="mt-4 space-y-4 text-sm">
+        <input type="hidden" name="id" value={id} />
 
-    </div></section>}
+        <label className="block">
+          <span className="mb-1 block font-bold text-slate-700">العنوان العربي</span>
+          <input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block font-bold text-slate-700">الوصف العربي</span>
+          <textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ? cjDescriptionText(p.display_description_ar) : ''} className={editInput} />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block font-bold text-slate-700">القسم (رئيسي / فرعي)</span>
+            <select name="trbhhCategory" defaultValue={p.trbhh_category && categoryOptions.includes(p.trbhh_category) ? p.trbhh_category : ''} className={editInput}>
+              <option value="">— اختر تصنيف تربح —</option>
+              {categoryTree.map(cat => <optgroup key={cat.main} label={cat.main}>
+                <option value={cat.main}>{cat.main} — (القسم الرئيسي)</option>
+                {cat.subs.map(sub => <option key={`${cat.main} / ${sub}`} value={`${cat.main} / ${sub}`}>{`${cat.main} / ${sub}`}</option>)}
+              </optgroup>)}
+            </select>
+            {categoryOptions.length === 0
+              ? <span className="mt-1 block text-xs text-amber-700">لا توجد تصنيفات بعد — أضِفها من لوحة الإدارة (إعدادات التوريد ← التصنيفات).</span>
+              : p.trbhh_category && !categoryOptions.includes(p.trbhh_category)
+                ? <span className="mt-1 block text-xs text-amber-700">التصنيف الحالي غير موحّد — اختر تصنيف تربح.</span>
+                : <span className="mt-1 block text-xs text-muted-foreground">اختر القسم الرئيسي أو قسماً فرعياً تابعاً له.</span>}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block font-bold text-slate-700">السعر (ر.س)</span>
+            <input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} />
+            <span className="mt-1 block text-xs text-muted-foreground">اتركه فارغاً لاستخدام السعر المحسوب تلقائياً.</span>
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="mb-1 block font-bold text-slate-700">وسم التمييز (يظهر على صورة البطاقة)</span>
+          <select name="highlightLabel" defaultValue={highlightOptions.some(o => o.value === (p.highlight_label || '')) ? (p.highlight_label || '') : ''} className={editInput}>
+            <option value="">— بلا تمييز —</option>
+            {highlightOptions.map(o => <option key={o.value} value={o.value}>{`${o.label}  (${o.color})`}</option>)}
+          </select>
+          <span className="mt-1 block text-xs text-muted-foreground">الكلمة ولونها تُداران من «أوسمة التمييز» في إعدادات التوريد.</span>
+        </label>
+
+        <div className="space-y-2 border-t border-slate-100 pt-4">
+          <SubmitButton className="w-full rounded-xl bg-primary px-5 py-3 text-base font-extrabold text-white shadow-sm sm:w-auto sm:min-w-56" pendingText="جارٍ الحفظ…">حفظ التعديل</SubmitButton>
+          <p className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</p>
+        </div>
+      </form>}
+    </section>}
     {view.isStaff && !canManage && <p role="note" className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة. يمكن لمسؤول الصلاحيات مراجعتها من <Link className="font-bold text-primary underline" href="/admin/access-control">إدارة الصلاحيات</Link>.</p>}
     {others.length > 0 && <section className="min-w-0 space-y-3"><h2 className="text-lg font-extrabold text-primary">منتجات مشابهة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
     {/* شريط شراء ثابت (نمط المتاجر) فوق القائمة السفلية؛ ينتقل لمحرّك الاختيار والإضافة. للإدارة. */}

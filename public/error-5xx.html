@@ -1,0 +1,53 @@
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>تربح — صيانة مؤقتة</title>
+  <meta name="robots" content="noindex" />
+  <style>
+    :root { --navy:#16294a; --gold:#f0b429; }
+    * { box-sizing: border-box; }
+    html,body { margin:0; height:100%; }
+    body {
+      background:#f1f5f9; color:#16294a;
+      font-family: system-ui, "Segoe UI", Tahoma, Arial, sans-serif;
+      display:flex; align-items:center; justify-content:center; padding:20px; min-height:100%;
+    }
+    .card {
+      width:100%; max-width:420px; background:#fff; border:1px solid #e2e8f0;
+      border-radius:24px; overflow:hidden; box-shadow:0 10px 40px rgba(15,23,42,.12); text-align:center;
+    }
+    .bar { height:6px; background:var(--gold); }
+    .body { padding:32px 24px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+    .logo {
+      width:72px; height:72px; border-radius:18px; background:var(--navy);
+      display:flex; align-items:center; justify-content:center;
+      color:var(--gold); font-weight:900; font-size:26px; letter-spacing:1px;
+      box-shadow:0 4px 14px rgba(22,41,74,.25);
+    }
+    .icon { font-size:34px; }
+    h1 { margin:0; font-size:20px; font-weight:800; color:var(--navy); }
+    p  { margin:8px 0 0; font-size:14px; line-height:1.9; color:#475569; }
+    .btn {
+      display:inline-flex; align-items:center; gap:8px; margin-top:4px;
+      background:var(--navy); color:#fff; border:0; cursor:pointer;
+      border-radius:12px; padding:11px 22px; font-size:14px; font-weight:700;
+    }
+    .foot { margin:0; padding-top:8px; font-size:11px; color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="bar"></div>
+    <div class="body">
+      <div class="logo">تربح</div>
+      <div class="icon">🛠️</div>
+      <h1>الموقع تحت صيانة مؤقتة</h1>
+      <p>نُجري تحديثاً سريعاً على المنصة. بياناتك محفوظة بأمان — يرجى المحاولة بعد لحظات.</p>
+      <button class="btn" onclick="location.reload()">إعادة المحاولة</button>
+      <p class="foot">منصة تربح · trbhh.com</p>
+    </div>
+  </div>
+</body>
+</html>

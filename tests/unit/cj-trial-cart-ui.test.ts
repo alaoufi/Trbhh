@@ -3,6 +3,7 @@ import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 const mock=vi.hoisted(()=>({access:vi.fn()}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:mock.access}));
+vi.mock('@/lib/commerce/address-book',()=>({listMemberAddresses:async()=>[]}));
 import CartPage from '@/app/cj/cart/page';
 import {AddToTrialCart,CartLink} from '@/components/cj/cart-controls';
 import {TrialCart} from '@/components/cj/trial-cart';
@@ -11,7 +12,7 @@ beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
 describe('private CJ trial cart presentation',()=>{
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{
     const tree=await CartPage();expect(mock.access).toHaveBeenCalledExactlyOnceWith('products','view');expect(tree.props.accountId).toBe(9);
-    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة الشراء');expect(html).toContain('يعيد التحقق من الخيار والسعر والمخزون والشحن');
+    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة الشراء');
     expect(html).toContain('role="status"');expect(html).toContain('aria-live="polite"');
     expect(html).not.toContain('CJ');
     expect(html).not.toMatch(/name="ship(?:Name|Phone|City|Address1)"|href="\/(?:shop|account\/orders)/);
@@ -31,8 +32,8 @@ describe('private CJ trial cart presentation',()=>{
     expect(html).toContain('اللون: أزرق، المقاس: S');expect(html).toContain('SKU-BS');expect(html).toContain('المتاح الموثق: 2');expect(html).toContain('اختر اللون أو المقاس');
   });
   it('describes the admin purchase flow and never leaks the supplier name in the cart',()=>{
-    const html=renderToStaticMarkup(createElement(TrialCart,{accountId:9}));
-    expect(html).toContain('سلة شراء خاصة بالإدارة');expect(html).toContain('أضِف خياراً متحقّقاً');
+    const html=renderToStaticMarkup(createElement(TrialCart,{accountId:9,ship:null}));
+    expect(html).toContain('سلة الشراء');expect(html).toContain('جارٍ تحميل السلة');
     expect(html).not.toContain('CJ');expect(html).not.toMatch(/name="ship(?:Name|Phone|City|Address1)"/);
   });
 });

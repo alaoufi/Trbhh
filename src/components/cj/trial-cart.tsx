@@ -8,23 +8,22 @@ import {setTrialCartQuantity,MAX_TRIAL_QTY,type TrialCartItem,type TrialCartQuot
 import {cjVariantDisplayOptions} from '@/lib/cj/variant-display';
 import {placeCjTrialOrder} from '@/app/cj/cart/actions';
 
-const shipInput='min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm';
-
-function CartQuantity({qty,title,max=MAX_TRIAL_QTY,onCommit}:{qty:number;title:string;max?:number;onCommit:(value:string)=>void}){
+function CartQuantity({qty,title,max=MAX_TRIAL_QTY,onCommit,onRemove}:{qty:number;title:string;max?:number;onCommit:(value:string)=>void;onRemove:()=>void}){
   const [draft,setDraft]=useState(String(qty));
   useEffect(()=>setDraft(String(qty)),[qty]);
   function commit(){if(!/^[1-9]\d?$/.test(draft))setDraft(String(qty));onCommit(draft);}
-  function step(delta:number){const current=/^[1-9]\d?$/.test(draft)?Number(draft):qty,next=Math.min(max,Math.max(1,current+delta));setDraft(String(next));onCommit(String(next));}
+  function step(delta:number){const current=/^[1-9]\d?$/.test(draft)?Number(draft):qty;if(delta<0&&current<=1){onRemove();return;}const next=Math.min(max,Math.max(1,current+delta));setDraft(String(next));onCommit(String(next));}
   return <div className="inline-flex items-center rounded-lg border border-primary/25">
-    <button type="button" disabled={qty<=1} onClick={()=>step(-1)} aria-label={`إنقاص كمية ${title}`} className="h-9 w-9 text-base font-black disabled:opacity-40">−</button>
+    <button type="button" onClick={()=>step(-1)} aria-label={qty<=1?`إزالة ${title}`:`إنقاص كمية ${title}`} className="h-9 w-9 text-lg font-black text-primary">−</button>
     <input aria-label={`كمية ${title}`} type="number" min={1} max={max} step={1} value={draft} onChange={event=>setDraft(event.target.value)} onBlur={commit} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}}} className="h-9 w-10 border-x border-primary/20 text-center text-[13px]"/>
-    <button type="button" disabled={qty>=max} onClick={()=>step(1)} aria-label={`زيادة كمية ${title}`} className="h-9 w-9 text-base font-black disabled:opacity-40">+</button>
+    <button type="button" disabled={qty>=max} onClick={()=>step(1)} aria-label={`زيادة كمية ${title}`} className="h-9 w-9 text-lg font-black text-primary disabled:opacity-40">+</button>
   </div>;
 }
 
-export function TrialCart({accountId}:{accountId:number}){
+type ShipDefault={name:string;phone:string;city:string;region:string;address1:string;address2:string};
+export function TrialCart({accountId,ship}:{accountId:number;ship:ShipDefault|null}){
   const {items,ready,notice,save}=useTrialCart(accountId);
-  const [quote,setQuote]=useState<TrialCartQuote|null>(null),[quoteKey,setQuoteKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[feedback,setFeedback]=useState('');
+  const [quote,setQuote]=useState<TrialCartQuote|null>(null),[quoteKey,setQuoteKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[feedback,setFeedback]=useState('');
   const generation=useRef(0);
   useEffect(()=>{
     const current=++generation.current;if(!ready)return;
@@ -39,11 +38,11 @@ export function TrialCart({accountId}:{accountId:number}){
         const result=await response.json() as TrialCartQuote;
         if(controller.signal.aborted||generation.current!==current)return;
         setQuoteKey(JSON.stringify(items));setQuote(result);
-        setFeedback(result.rejected.length?'تغيّر السعر أو المخزون أو الشحن، أو تعذر التحقق. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'تمت إعادة التحقق من كل خيار؛ أنشئ الطلب ثم اعتمده وادفع من صفحة الطلب.');
+        setFeedback(result.rejected.length?'تغيّر السعر أو المخزون أو الشحن، أو تعذر التحقق. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'');
       }catch(cause){if(!controller.signal.aborted&&generation.current===current)setError(cause instanceof Error&&cause.message==='permission'?'انتهت الجلسة أو لم تعد صلاحية عرض المنتجات متاحة. أعد تسجيل الدخول.':'تعذر تحديث السلة. لا يوجد إجمالي معتمد؛ أعد المحاولة.');}
       finally{window.clearTimeout(timeout);if(!controller.signal.aborted&&generation.current===current)setBusy(false);}
     })();return()=>{window.clearTimeout(timeout);controller.abort();};
-  },[accountId,items,ready,refresh]);
+  },[accountId,items,ready]);
   function quantity(item:TrialCartItem,value:string){
     try{if(!/^[1-9]\d?$/.test(value))throw Error('invalid_quantity');save(setTrialCartQuantity(items,item.id,Number(value),item.variantId));setFeedback('تُحدّث الكمية والسعر التقديري.');}
     catch{setFeedback('اختر كمية صحيحة بين ١ و٩٩. هذا حد للتجربة وليس إثباتًا للمخزون.');}
@@ -52,40 +51,36 @@ export function TrialCart({accountId}:{accountId:number}){
   const currentQuote=quote&&quoteKey===JSON.stringify(items)?quote:null;
   return <div className="mx-auto min-w-0 max-w-4xl space-y-5 px-4 py-6 [overflow-wrap:anywhere]" dir="rtl">
     <header className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-extrabold text-primary">سلة الشراء (إدارة)</h1><Link href="/cj" className="min-h-11 rounded-xl border border-primary/25 px-4 py-2 font-bold text-primary">متابعة تصفح المنتجات</Link></header>
-    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-6">سلة شراء خاصة بالإدارة. بعد إنشاء الطلب يُعتمد ويُدفع من المحفظة من صفحة الطلب، ثم يُتابَع حتى التسليم.</p>
-    <details className="rounded-xl border border-primary/15 px-3 text-sm leading-6"><summary className="min-h-11 cursor-pointer py-2.5 font-bold text-primary">معلومات الأسعار والتوفر</summary><div className="space-y-2 pb-3"><p>قبل عرض الإجمالي، تربح يعيد التحقق من الخيار والسعر والمخزون والشحن. إذا تغيّر أي منها تتوقف إعادة التسعير وتحتاج مراجعة المنتج. الضريبة لا تُحسب هنا ما لم تفعّلها سياسة مالية معتمدة.</p><p>حتى ٥٠ خيارًا و٩٩ قطعة لكل سطر. إنشاء الطلب لا يخصم رصيدًا ولا يُرسل الطلب تلقائيًا.</p></div></details>
-    <p role="status" aria-live="polite" className="text-sm text-primary">{[notice,feedback].filter(Boolean).join(' ')}</p>
+    <p role="status" aria-live="polite" className="text-[13px] font-bold text-primary empty:hidden">{[notice,feedback].filter(Boolean).join(' ')}</p>
     {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-    {!ready?<p>جارٍ تحميل السلة المحلية…</p>:!items.length?<p className="rounded-xl border border-dashed border-primary/25 p-8 text-center">السلة فارغة. أضف منتجًا لتجربة الكميات والإجمالي.</p>:<>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>{setQuote(null);setRefresh(value=>value+1);}} disabled={busy} className="min-h-11 rounded-xl border border-primary/25 px-4 py-2 font-bold disabled:opacity-50">إعادة التحقق</button><button type="button" onClick={()=>{save([],'أُفرغت سلة التجربة.');setQuote(null);}} className="min-h-11 rounded-xl border border-red-300 px-4 py-2 font-bold text-red-700">إفراغ السلة</button></div>
-      <section aria-label="منتجات سلة التجربة" aria-busy={busy} className="space-y-3">
+    {!ready?<p>جارٍ تحميل السلة…</p>:!items.length?<p className="rounded-xl border border-dashed border-primary/25 p-8 text-center">السلة فارغة.</p>:<>
+      <section aria-label="منتجات السلة" aria-busy={busy} className="space-y-2">
         {items.map((item,index)=>{const line=currentQuote?.lines.find(line=>line.id===item.id&&line.variantId===item.variantId),rejected=currentQuote?.rejected.find(line=>line.id===item.id&&line.variantId===item.variantId),label=line?.title||`المنتج ${index+1}`;return <article key={`${item.id}:${item.variantId??''}`} className="grid grid-cols-[56px_minmax(0,1fr)] gap-2.5 rounded-2xl border border-primary/15 bg-white p-2.5 sm:grid-cols-[72px_minmax(0,1fr)]">
           <CjProductImage src={line?.image} alt={line?.title||'صورة المنتج'} className="h-14 w-14 rounded-xl object-contain sm:row-span-2 sm:h-[72px] sm:w-[72px]"/>
           <Link href={`/cj/${item.id}`} className="line-clamp-2 min-w-0 text-[13px] font-bold leading-[1.4] text-primary [overflow-wrap:anywhere]">{line?.title||(rejected?'منتج غير متاح':'جارٍ تحميل بيانات المنتج')}</Link>
           <div className="col-span-2 min-w-0 space-y-2 sm:col-span-1 sm:col-start-2">
           {line?.variantName&&<div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-2 text-sm leading-6">{/* الخيار المترجَم مُخزَّن في اللقطة (الإجراء الموحّد)؛ وإلا احتياط القاموس المحلي. */}{item.snapshot?.displayLabel?<p className="col-span-2"><span className="text-slate-600">الخيار:</span> <b dir="auto">{item.snapshot.displayLabel}</b></p>:cjVariantDisplayOptions({variantName:item.snapshot?.rawVariantName||line.variantName,variantKey:item.snapshot?.optionKey||line.variantName,attributes:item.snapshot?.attributes||{}}).map((option,optionIndex)=><p key={`${option.label}-${optionIndex}`}><span className="text-slate-600">{option.label}:</span> <b dir="auto">{option.value}</b></p>)}{line.variantStock!=null&&<p className="col-span-2 text-xs text-slate-600">المخزون وقت التحقق: <b>{line.variantStock}</b></p>}{line.shippingName&&<p className="col-span-2 text-xs text-slate-600">مسار الشحن: <b>{line.shippingName}</b>{line.deliveryDays&&<> · المدة: {line.deliveryDays}</>}</p>}</div>}
-          <CartQuantity qty={item.qty} title={label} max={line?.variantStock??MAX_TRIAL_QTY} onCommit={value=>quantity(item,value)}/>
+          <CartQuantity qty={item.qty} title={label} max={line?.variantStock??MAX_TRIAL_QTY} onCommit={value=>quantity(item,value)} onRemove={()=>save(items.filter(row=>row.id!==item.id||row.variantId!==item.variantId),'أُزيل الخيار من السلة.')}/>
           {line?<div className="space-y-1 text-[13px]"><div className="flex justify-between gap-2"><span className="text-slate-500">سعر الوحدة</span><b className="text-primary">{formatSar(line.unitMinor)} ر.س</b></div><div className="flex justify-between gap-2"><span className="text-slate-500">الشحن والرسوم</span><b className="text-primary">{formatSar(line.shippingMinor+line.shippingAdditionalMinor)} ر.س</b></div>{line.vatEnabled&&<div className="flex justify-between gap-2"><span className="text-slate-500">الضريبة</span><b>{formatSar(line.vatMinor)} ر.س</b></div>}<div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-1 font-extrabold text-amber-900"><span>الإجمالي (×{item.qty})</span><b className="text-base">{formatSar(line.totalMinor)} ر.س</b></div></div>:rejected?<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{rejected.reason==='invalid_price'?'السعر غير صالح. أزل هذا السطر.':rejected.reason==='variant_required'?'اختر اللون أو المقاس من صفحة المنتج قبل الإضافة.':rejected.reason==='variant_unavailable'?'تعذر إثبات توفر الخيار؛ أعد التحقق من صفحة المنتج.':rejected.reason==='price_changed'?'تغير السعر منذ إضافته. راجع السعر الجديد قبل الإضافة مجددًا.':rejected.reason==='stock_changed'?'تغير المخزون أو الكمية المتاحة. راجع صفحة المنتج واختر كمية جديدة.':rejected.reason==='shipping_changed'?'تغير مسار الشحن أو تكلفته أو مدته. راجع تفاصيل الشحن قبل الإضافة مجددًا.':rejected.reason==='tax_changed'?'تغيرت سياسة الضريبة أو إجمالي السطر؛ راجع السعر من جديد.':rejected.reason==='verification_required'?'تغيرت الكمية أو انتهى إثبات التحقق. أعد الإضافة من صفحة المنتج.':'المنتج مخفي أو لم يعد متاحًا. أزل هذا السطر.'}</p>:<p className="text-sm text-muted-foreground">{busy?'جارٍ إعادة التحقق من المخزون والشحن…':'السعر غير مؤكد الآن.'}</p>}
           <button type="button" onClick={()=>save(items.filter(row=>row.id!==item.id||row.variantId!==item.variantId),'أُزيل الخيار من السلة.')} className="min-h-11 text-sm font-bold text-red-700" aria-label={`إزالة ${label}${line?.variantName?`، ${line.variantName}`:''}`}>إزالة</button></div>
         </article>;})}
       </section>
-      {currentQuote&&!currentQuote.rejected.length&&!busy&&!error&&<section aria-label="إجمالي السلة" className="rounded-2xl border-2 border-primary bg-primary p-5 text-white shadow-sm"><p className="text-sm font-bold text-white/80">الإجمالي بعد التحقق الحي · السلع + الشحن</p><p className="mt-1 text-3xl font-black tracking-tight">{formatSar(currentQuote.totalMinor)} <span className="text-lg">ر.س</span></p><p className="mt-2 text-xs leading-5 text-white/75">الإجمالي بعد التحقق الحيّ. الخصم يتمّ عند الاعتماد والدفع من صفحة الطلب ضمن السقف.</p></section>}
     </>}
     {items.length>0&&currentQuote&&!currentQuote.rejected.length&&!busy&&!error
-      ? <form action={placeCjTrialOrder} aria-label="إتمام الطلب" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="font-extrabold text-primary">إتمام الطلب</h2>
+      ? <form action={placeCjTrialOrder} aria-label="إتمام الطلب" className="space-y-2.5 rounded-2xl border border-slate-200 bg-white p-3">
           <input type="hidden" name="items" value={JSON.stringify(items)}/>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <input name="shipName" required maxLength={160} placeholder="الاسم الكامل" className={shipInput}/>
-            <input name="shipPhone" required maxLength={40} inputMode="tel" placeholder="رقم الجوال" className={shipInput}/>
-            <input name="shipCity" required maxLength={120} placeholder="المدينة" className={shipInput}/>
-            <input name="shipRegion" maxLength={120} placeholder="المنطقة (اختياري)" className={shipInput}/>
-            <input name="shipAddress1" required maxLength={400} placeholder="العنوان التفصيلي" className={`${shipInput} sm:col-span-2`}/>
-            <input name="shipAddress2" maxLength={400} placeholder="تفاصيل إضافية (اختياري)" className={`${shipInput} sm:col-span-2`}/>
-          </div>
-          <button type="submit" className="flex min-h-14 w-full items-center justify-center rounded-xl bg-primary px-4 text-lg font-extrabold text-white">إنشاء الطلب ثم الاعتماد والدفع</button>
-          <p className="text-center text-xs text-slate-600">يُنشأ الطلب بعد تحقّق حيّ من السعر والمخزون والشحن، ثم تنتقل لصفحة الطلب لاعتماده والدفع من المحفظة ضمن السقف، ومتابعته حتى التسليم.</p>
+          {/* عنوان الشحن من ملف العضو — لا إدخال يدوي */}
+          <div className="flex items-center justify-between gap-2"><span className="text-[13px] font-extrabold text-primary">عنوان الشحن</span><Link href="/account/addresses" className="text-xs font-bold text-primary underline">تعديل</Link></div>
+          {ship
+            ? <>
+                <p className="text-[13px] font-semibold leading-6 text-slate-700"><b className="text-primary">{ship.name}</b> · {ship.phone}<br/><span className="text-slate-500">{[ship.region,ship.city,ship.address1,ship.address2].filter(Boolean).join('، ')}</span></p>
+                <input type="hidden" name="shipName" value={ship.name}/><input type="hidden" name="shipPhone" value={ship.phone}/><input type="hidden" name="shipCity" value={ship.city}/><input type="hidden" name="shipRegion" value={ship.region}/><input type="hidden" name="shipAddress1" value={ship.address1}/><input type="hidden" name="shipAddress2" value={ship.address2}/>
+                <label className="flex cursor-pointer items-center gap-2 text-[13px] font-bold text-primary"><input type="checkbox" required className="h-4 w-4 accent-[#16294a]"/>أؤكّد صحة عنوان الشحن</label>
+              </>
+            : <p className="rounded-lg bg-amber-50 p-2.5 text-[13px] font-bold text-amber-900">لا يوجد عنوان محفوظ — <Link href="/account/addresses" className="underline">أضف عنواناً</Link> أولاً.</p>}
+          <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-2 text-[15px] font-extrabold text-primary"><span>الإجمالي</span><b className="text-lg text-[#c4510b]">{formatSar(currentQuote.totalMinor)} ر.س</b></div>
+          <button type="submit" disabled={!ship} className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#c4510b] px-4 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">ادفع</button>
         </form>
-      : <section aria-label="إتمام الطلب" className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-600">أضِف خياراً متحقّقاً إلى السلّة لإتمام الطلب.</section>}
+      : null}
   </div>;
 }

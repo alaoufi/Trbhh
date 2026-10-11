@@ -62,11 +62,28 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   // freight estimate. If either read fails or gives no available route, keep
   // the product in staff staging but make it ineligible for public display.
   const availabilityJson = await readCjAvailability(clean, fullVariants, deps.availability);
+  // توحيد التصنيف مع إعلانات تربح: نصنّف السلعة آلياً إلى أقرب قسم تربح مشابه
+  // (نفس مصنّف الإعلانات وجدول الأقسام). يبقى فارغاً إن لم تُعرّف أقسام بعد، ولا
+  // يُستبدل أي تصنيف يدوي سابق عند إعادة الاستيراد (محفوظ في طبقة upsert).
+  let autoCategoryId: number | null = null;
+  let autoCategoryLabel = '';
+  try {
+    const { classifyAdText } = await import('@/lib/classifier');
+    const { getCategories } = await import('@/lib/data');
+    const cats = await getCategories();
+    if (cats.length > 0) {
+      const classified = await classifyAdText(nameAr || d.productName || '', descAr || plainDescription || catAr || '');
+      if (classified?.categoryId) {
+        const match = cats.find(c => c.id === classified.categoryId);
+        if (match) { autoCategoryId = match.id; autoCategoryLabel = match.name; }
+      }
+    }
+  } catch { /* تعذّر التصنيف الآلي لا يمنع الاستيراد */ }
   await upsert({
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
     sourceDescription: d.description || null, descriptionAr: descAr,
-    // Never present a failed English translation as an Arabic category label.
-    trbhhCategory: catAr || '', sourceCategory: d.categoryName || '', image: gallery[0] || '', images: gallery, detailsJson, availabilityJson, price,
+    // القسم موحّد مع إعلانات تربح (معرّف + اسمه). لا نعرض تصنيف المورّد كقسم.
+    trbhhCategory: autoCategoryLabel, categoryId: autoCategoryId, sourceCategory: d.categoryName || '', image: gallery[0] || '', images: gallery, detailsJson, availabilityJson, price,
   }, { createOnly: deps.createOnly === true });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

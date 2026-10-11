@@ -54,6 +54,7 @@ export type UpsertCjInput = {
   sourceDescription?: string | null;
   descriptionAr?: string | null;
   trbhhCategory?: string | null;
+  categoryId?: number | null;
   sourceCategory?: string | null;
   image?: string;
   images?: string[];
@@ -162,14 +163,15 @@ export async function upsertCjProduct(input: UpsertCjInput, opts: { createOnly?:
   const srcDesc = input.sourceDescription ?? null;
   const descAr = (input.descriptionAr ?? '') || null;
   const category = (input.trbhhCategory ?? '').trim();
+  const categoryId = input.categoryId && input.categoryId > 0 ? BigInt(input.categoryId) : null;
   const imagesJson = input.images && input.images.length ? JSON.stringify([...new Set(input.images.filter(Boolean))].slice(0, 12)) : null;
   const detailsJson = input.detailsJson ?? null;
   await prisma.$executeRaw`
     INSERT INTO cj_products
-      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, source_category, image, images, details_json, availability_json, availability_checked_at,
+      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, category_id, source_category, image, images, details_json, availability_json, availability_checked_at,
        supplier_cost_minor, shipping_cost_minor, other_costs_minor, profit_minor, sale_price_minor, margin_bps, currency, last_sync_at)
     VALUES
-      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${(input.sourceCategory ?? '').slice(0, 200)}, ${input.image ?? ''}, ${imagesJson}, ${detailsJson}, ${input.availabilityJson ?? null}, ${input.availabilityJson ? Prisma.sql`UTC_TIMESTAMP(3)` : Prisma.sql`NULL`},
+      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${categoryId}, ${(input.sourceCategory ?? '').slice(0, 200)}, ${input.image ?? ''}, ${imagesJson}, ${detailsJson}, ${input.availabilityJson ?? null}, ${input.availabilityJson ? Prisma.sql`UTC_TIMESTAMP(3)` : Prisma.sql`NULL`},
        ${p.supplierCostMinor}, ${p.shippingCostMinor}, ${p.otherCostsMinor}, ${p.profitMinor}, ${p.salePriceMinor}, ${p.marginBps}, ${p.currency}, CURRENT_TIMESTAMP(3))
     ON DUPLICATE KEY UPDATE ${opts.createOnly ? Prisma.sql`id=id` : Prisma.sql`
       cj_sku=VALUES(cj_sku), name=VALUES(name), image=VALUES(image),
@@ -181,6 +183,7 @@ export async function upsertCjProduct(input: UpsertCjInput, opts: { createOnly?:
       name_ar=CASE WHEN cj_products.name_ar='' THEN VALUES(name_ar) ELSE cj_products.name_ar END,
       display_description_ar=CASE WHEN cj_products.display_description_ar IS NULL OR cj_products.display_description_ar='' THEN VALUES(display_description_ar) ELSE cj_products.display_description_ar END,
       trbhh_category=CASE WHEN cj_products.trbhh_category='' THEN VALUES(trbhh_category) ELSE cj_products.trbhh_category END,
+      category_id=CASE WHEN cj_products.category_id IS NULL THEN VALUES(category_id) ELSE cj_products.category_id END,
       source_category=VALUES(source_category),
       supplier_cost_minor=VALUES(supplier_cost_minor), shipping_cost_minor=VALUES(shipping_cost_minor),
       other_costs_minor=VALUES(other_costs_minor), profit_minor=VALUES(profit_minor),

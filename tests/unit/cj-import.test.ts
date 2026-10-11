@@ -3,6 +3,11 @@ import { importCjProductByPid, type CjImportDeps } from '@/lib/cj/import';
 import type { CjResult, CjProductDetail } from '@/lib/cj/types';
 import type { UpsertCjInput } from '@/lib/cj/mapping';
 
+// توحيد التصنيف: نعزل مصنّف الإعلانات وقائمة الأقسام عن الشبكة/القاعدة في الاختبار.
+const catState = vi.hoisted(() => ({ categories: [] as { id: number; name: string }[], classifyId: 0 }));
+vi.mock('@/lib/data', () => ({ getCategories: async () => catState.categories }));
+vi.mock('@/lib/classifier', () => ({ classifyAdText: async () => ({ categoryId: catState.classifyId, confidence: 0.5, matched: [] }) }));
+
 const detail = (pid: string, sellPrice: number | null = 10): CjProductDetail => ({
   pid, productName: `اسم ${pid}`, productSku: `SKU-${pid}`, sellPrice, productImage: `https://img/${pid}.jpg`, categoryName: 'ملابس', description: 'وصف', variants: [],
 });
@@ -31,6 +36,24 @@ describe('CJ selective import → staging with cost×FX + shipping + margin', ()
     expect(upserts).toHaveLength(1);
     expect(upserts[0]).toMatchObject({ cjProductId: '2609231107131613900', cjSku: 'SKU-2609231107131613900' });
     expect(upserts[0].price.salePriceMinor).toBe(5525);
+  });
+
+  it('auto-assigns the matching trbhh category on import (unified taxonomy)', async () => {
+    catState.categories = [{ id: 7, name: 'ملابس رجالية' }];
+    catState.classifyId = 7;
+    const { deps, upserts } = harness();
+    await importCjProductByPid('2609231107131613900', deps);
+    expect(upserts[0]).toMatchObject({ categoryId: 7, trbhhCategory: 'ملابس رجالية' });
+    catState.categories = []; catState.classifyId = 0;
+  });
+
+  it('leaves the category empty when no trbhh categories are defined yet', async () => {
+    catState.categories = []; catState.classifyId = 7;
+    const { deps, upserts } = harness();
+    await importCjProductByPid('2609231107131613900', deps);
+    expect(upserts[0].categoryId ?? null).toBeNull();
+    expect(upserts[0].trbhhCategory).toBe('');
+    catState.classifyId = 0;
   });
 
   it('rejects a malformed PID without calling CJ or writing', async () => {

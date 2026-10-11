@@ -953,8 +953,25 @@ async function run(): Promise<void> {
   await backfillAccountDeletedAction();
   await backfillLegacyReceiptHashes();
   await backfillLegacyNotificationReadAt();
+  await widenCjHighlightLabel();
   await seedCjSupplier();
   await seedDefaultAdCategories();
+}
+
+/**
+ * توسعة عمود cj_products.highlight_label إلى VARCHAR(80) مرّة واحدة فقط وعند الحاجة
+ * (التثبيتات القديمة التي أنشأته بعرض ٤٠). كان تنفيذ MODIFY بلا شرط في كل إقلاع يُعيد
+ * بناء الجدول ويُبطئ/يُعلّق البدء على الجداول الكبيرة. هنا نفحص الطول أولاً فلا نلمسه إن
+ * كان ٨٠ بالفعل.
+ */
+async function widenCjHighlightLabel(): Promise<void> {
+  const rows = await prisma.$queryRawUnsafe<{ len: number | null }[]>(
+    `SELECT CHARACTER_MAXIMUM_LENGTH AS len FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='cj_products' AND COLUMN_NAME='highlight_label'`,
+  ).catch(() => [] as { len: number | null }[]);
+  const len = Number(rows?.[0]?.len ?? 0);
+  if (len > 0 && len < 80) {
+    await prisma.$executeRawUnsafe(`ALTER TABLE cj_products MODIFY COLUMN highlight_label VARCHAR(80) NOT NULL DEFAULT ''`).catch(() => {});
+  }
 }
 
 /**

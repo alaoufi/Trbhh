@@ -53,8 +53,8 @@ export const CJ_DDL: string[] = [
   `ALTER TABLE cj_products ADD COLUMN agent_user_id BIGINT UNSIGNED NULL`,
   `ALTER TABLE cj_products ADD COLUMN agent_claimed_at DATETIME(3) NULL`,
   `ALTER TABLE cj_products ADD COLUMN highlight_label VARCHAR(80) NOT NULL DEFAULT ''`,
-  // توسعة التثبيتات التي أنشأت العمود سابقاً بعرض ٤٠ (ليتسع «الكلمة|اللون»).
-  `ALTER TABLE cj_products MODIFY COLUMN highlight_label VARCHAR(80) NOT NULL DEFAULT ''`,
+  // ملاحظة: توسعة التثبيتات القديمة (VARCHAR 40 → 80) تُجرى مرّة واحدة فقط وعند الحاجة
+  // عبر widenCjHighlightLabel في schema-sync — لا تُكرَّر كل إقلاع (كانت تُعيد بناء الجدول).
   // توحيد التصنيف مع إعلانات تربح: ربط السلعة بجدولي categories/sub_categories نفسيهما.
   `ALTER TABLE cj_products ADD COLUMN category_id BIGINT NULL`,
   `ALTER TABLE cj_products ADD COLUMN subcategory_id INT NULL`,

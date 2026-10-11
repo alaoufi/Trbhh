@@ -954,6 +954,54 @@ async function run(): Promise<void> {
   await backfillLegacyReceiptHashes();
   await backfillLegacyNotificationReadAt();
   await seedCjSupplier();
+  await seedDefaultAdCategories();
+}
+
+/**
+ * بذرة لمرة واحدة: شجرة أقسام وفرعية جاهزة للسوق السعودي — مفعّلة مباشرةً — تُستخدم
+ * موحّدةً لإعلانات تربح وسلع CJ. تعمل مرّة واحدة فقط (علم ad_categories_seeded_v1)،
+ * ولا تلمس أي أقسام قائمة، ولا تُعيد الزرع بعد حذف الإدارة لأيٍّ منها. واجهة «الأقسام»
+ * للأعضاء تبقى محكومة بمفتاحها المستقل (categories_v2_enabled) ولا تتأثر بهذه البذرة.
+ */
+const DEFAULT_AD_CATEGORY_TREE: { name: string; subs: string[] }[] = [
+  { name: 'المنزل والمطبخ', subs: ['أدوات مطبخ', 'تنظيم وترتيب', 'إضاءة', 'ديكور', 'مفروشات'] },
+  { name: 'الإلكترونيات والإكسسوارات', subs: ['سماعات', 'شواحن وكوابل', 'كفرات وحمايات', 'ساعات ذكية', 'إضاءة LED'] },
+  { name: 'الموضة والأزياء', subs: ['ملابس رجالية', 'ملابس نسائية', 'أحذية', 'حقائب', 'إكسسوارات'] },
+  { name: 'الجمال والعناية', subs: ['مكياج', 'عناية بالبشرة', 'عناية بالشعر', 'عطور', 'أدوات تجميل'] },
+  { name: 'الرياضة واللياقة', subs: ['أدوات رياضية', 'ملابس رياضية', 'تخييم ورحلات', 'دراجات هوائية'] },
+  { name: 'السيارات والدراجات', subs: ['إكسسوارات سيارات', 'خوذ ودراجات نارية', 'عدّة وصيانة'] },
+  { name: 'الأطفال والألعاب', subs: ['ألعاب أطفال', 'مستلزمات أطفال', 'قرطاسية'] },
+  { name: 'الأدوات والمعدات', subs: ['عدّة يدوية', 'أدوات كهربائية', 'تنظيم ورشة'] },
+  { name: 'الحيوانات الأليفة', subs: ['مستلزمات قطط', 'مستلزمات كلاب'] },
+];
+
+async function seedDefaultAdCategories(): Promise<void> {
+  // اختبار ترقية القاعدة التاريخية يتحقّق من الحفاظ على الصفوف لا من بذر محتوى افتراضي.
+  if (process.env.UPGRADE_DB_TESTS === '1') return;
+  const { getSetting, setSetting } = await import('@/lib/settings');
+  const seeded = await getSetting('ad_categories_seeded_v1', '0').catch(() => '1');
+  if (seeded === '1') return; // تمّت البذرة سابقاً — لا نُعيدها (نحترم حذف الإدارة)
+  let order = DEFAULT_AD_CATEGORY_TREE.length;
+  for (const node of DEFAULT_AD_CATEGORY_TREE) {
+    const existing = await prisma.categories.findFirst({ where: { name: node.name }, select: { id: true } }).catch(() => null);
+    let catId: bigint | null = null;
+    if (existing) {
+      catId = existing.id;
+      await prisma.categories.update({ where: { id: catId }, data: { is_active: 'yes' } }).catch(() => {});
+    } else {
+      const created = await prisma.categories.create({ data: { name: node.name, photo_path: '', is_active: 'yes', ordered: order } }).catch(() => null);
+      catId = created ? created.id : null;
+    }
+    order -= 1;
+    if (catId == null) continue;
+    let subOrder = node.subs.length;
+    for (const sub of node.subs) {
+      const subExists = await prisma.sub_categories.findFirst({ where: { category_id: Number(catId), name: sub }, select: { id: true } }).catch(() => null);
+      if (!subExists) await prisma.sub_categories.create({ data: { category_id: Number(catId), name: sub, order: subOrder, active: 1 } }).catch(() => {});
+      subOrder -= 1;
+    }
+  }
+  await setSetting('ad_categories_seeded_v1', '1').catch(() => {});
 }
 
 /** بذرة لمرة واحدة: مورد نظام «CJdropshipping» ليظهر ضمن قائمة الموردين مثل بقية

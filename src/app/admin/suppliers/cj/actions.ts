@@ -5,7 +5,7 @@ import { hasAccess, requireAccess } from '@/lib/access-control/guards';
 import { defaultMarginBps, setDefaultMarginBps } from '@/lib/cj/pricing';
 import { cjSyncSettings, saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount, setCjProductAvailability, setCjProductGallery, setCjProductDetails, buildCjDetails } from '@/lib/cj/mapping';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, cjProductOrderCount, setCjProductAvailability, setCjProductGallery, setCjProductDetails, buildCjDetails } from '@/lib/cj/mapping';
 import { translateToArabicCached, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
 import { upsertGlossaryTerm, deleteGlossaryTerm } from '@/lib/cj/glossary';
 import { readCjAvailability, verifyCjVariantForSaudi } from '@/lib/cj/availability';
@@ -564,7 +564,7 @@ export async function saveCjStorefrontEdit(form: FormData) {
   const { session, product: row } = await ensureCjProductManager(id, 'edit');
   const nameAr = String(form.get('nameAr') || '').trim();
   const descAr = String(form.get('descriptionAr') || '').trim();
-  const cat = String(form.get('trbhhCategory') || '').trim();
+  const categoryRef = String(form.get('categoryRef') || '').trim();
   const priceRaw = String(form.get('priceSar') || '').trim();
   // وسم التمييز: لا يُحفظ إلا من القائمة المعتمدة (أو تفريغه = بلا تمييز).
   const highlightRaw = String(form.get('highlightLabel') || '').trim();
@@ -575,10 +575,25 @@ export async function saveCjStorefrontEdit(form: FormData) {
   if (nameAr) { await setCjProductNameAr(id, nameAr); if (row?.name) await learnTranslation(row.name, nameAr); }
   await setCjProductDescriptionAr(id, descAr);
   if (row?.source_description && descAr) await learnTranslation(row.source_description, descAr);
-  // توحيد التصنيف: لا يُحفظ إلا تصنيف من قائمة تصنيفات تربح المعتمدة (أو تفريغه). لا تصنيف مورد.
-  const { getCjCategoryOptions } = await import('@/lib/cj/categories');
-  const trbhhCategories = await getCjCategoryOptions();
-  await setCjProductCategory(id, cat && trbhhCategories.includes(cat) ? cat : '');
+  // توحيد التصنيف مع إعلانات تربح: نفس جدولي categories/sub_categories.
+  // القيمة «catId:subId» — تُتحقّق مقابل القائمة المعتمدة قبل الحفظ (أو تُفرَّغ).
+  const { setCjProductCategoryRef } = await import('@/lib/cj/mapping');
+  const [refCatStr, refSubStr] = categoryRef.split(':');
+  const refCat = Number(refCatStr);
+  const refSub = Number(refSubStr || 0);
+  if (categoryRef && Number.isInteger(refCat) && refCat > 0) {
+    const { getCategories, getSubCategories } = await import('@/lib/data');
+    const [cats, subs] = await Promise.all([getCategories(), getSubCategories()]);
+    const cat = cats.find(c => c.id === refCat);
+    if (!cat) await setCjProductCategoryRef(id, null, null, '');
+    else {
+      const sub = refSub > 0 ? subs.find(s => s.id === refSub && s.categoryId === refCat) : null;
+      const label = sub ? `${cat.name} / ${sub.name}` : cat.name;
+      await setCjProductCategoryRef(id, cat.id, sub ? sub.id : null, label);
+    }
+  } else {
+    await setCjProductCategoryRef(id, null, null, '');
+  }
   if (priceRaw === '') await setCjProductPriceOverride(id, null);
   else { const v = Number(priceRaw); if (Number.isFinite(v) && v >= 0) await setCjProductPriceOverride(id, Math.round(v * 100)); }
   await auditProduct(session.uid, row);

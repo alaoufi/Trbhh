@@ -19,7 +19,7 @@ import { cjProductDisplayTitle, cjDescriptionText, cjPriceLabel } from '@/lib/cj
 import { PriceText } from '@/components/price-text';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
-import { getCjCategoryOptions, getCjCategoryText, parseCjCategoryTree } from '@/lib/cj/categories';
+import { getCategories, getSubCategories } from '@/lib/data';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
 export const dynamic = 'force-dynamic';
@@ -61,9 +61,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     ? `${weightMin}${typeof weightMax === 'number' && Number.isFinite(weightMax) && weightMax > weightMin ? `–${weightMax}` : ''} غ` : 'غير محدد';
   // خيارات السلعة (اللون/المقاس/القابس...) مجمّعة بالعربية من المحلّل المُختبَر
   // الشحن والمخزون والمدّة الحقيقية تُعرض حيّاً من CJ عبر CjLiveNumbers في قسم الشحن.
-  const categoryOptions = await getCjCategoryOptions();
-  // شجرة التصنيفات (رئيسي + فرعية) لعرضها مجمّعة بوضوح في قائمة اختيار السلعة.
-  const categoryTree = canManage ? parseCjCategoryTree(await getCjCategoryText()) : [];
+  // توحيد التصنيف مع إعلانات تربح: نفس جدولي categories/sub_categories.
+  const [adCategories, adSubcategories] = canManage ? await Promise.all([getCategories(), getSubCategories()]) : [[], []];
+  const curCatId = p.category_id != null ? Number(p.category_id) : 0;
+  const curSubId = p.subcategory_id != null ? Number(p.subcategory_id) : 0;
+  const curCategoryRef = curCatId > 0 ? `${curCatId}:${curSubId || ''}` : '';
   const highlightOptions = canManage ? (await (await import('@/lib/cj/highlight')).cjHighlights()).map(h => ({ value: `${h.label}|${h.color}`, label: h.label, color: h.color })) : [];
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
@@ -155,18 +157,16 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block font-bold text-slate-700">القسم (رئيسي / فرعي)</span>
-            <select name="trbhhCategory" defaultValue={p.trbhh_category && categoryOptions.includes(p.trbhh_category) ? p.trbhh_category : ''} className={editInput}>
-              <option value="">— اختر تصنيف تربح —</option>
-              {categoryTree.map(cat => <optgroup key={cat.main} label={cat.main}>
-                <option value={cat.main}>{cat.main} — (القسم الرئيسي)</option>
-                {cat.subs.map(sub => <option key={`${cat.main} / ${sub}`} value={`${cat.main} / ${sub}`}>{`${cat.main} / ${sub}`}</option>)}
+            <select name="categoryRef" defaultValue={curCategoryRef} className={editInput}>
+              <option value="">— اختر قسم تربح —</option>
+              {adCategories.map(cat => <optgroup key={cat.id} label={cat.name}>
+                <option value={`${cat.id}:`}>{cat.name} — (القسم الرئيسي)</option>
+                {adSubcategories.filter(s => s.categoryId === cat.id).map(s => <option key={s.id} value={`${cat.id}:${s.id}`}>{`${cat.name} / ${s.name}`}</option>)}
               </optgroup>)}
             </select>
-            {categoryOptions.length === 0
-              ? <span className="mt-1 block text-xs text-amber-700">لا توجد تصنيفات بعد — أضِفها من لوحة الإدارة (إعدادات التوريد ← التصنيفات).</span>
-              : p.trbhh_category && !categoryOptions.includes(p.trbhh_category)
-                ? <span className="mt-1 block text-xs text-amber-700">التصنيف الحالي غير موحّد — اختر تصنيف تربح.</span>
-                : <span className="mt-1 block text-xs text-muted-foreground">اختر القسم الرئيسي أو قسماً فرعياً تابعاً له.</span>}
+            {adCategories.length === 0
+              ? <span className="mt-1 block text-xs text-amber-700">لا توجد أقسام بعد — أضِفها من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link> (نفس أقسام إعلانات تربح).</span>
+              : <span className="mt-1 block text-xs text-muted-foreground">نفس أقسام إعلانات تربح — اختر القسم الرئيسي أو فرعاً تابعاً له.</span>}
           </label>
 
           <label className="block">

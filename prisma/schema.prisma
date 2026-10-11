@@ -2325,6 +2325,8 @@ model cj_products {
   agent_user_id       BigInt?   @db.UnsignedBigInt
   agent_claimed_at    DateTime? @db.DateTime(3)
   highlight_label     String    @default("") @db.VarChar(80)
+  category_id         BigInt?
+  subcategory_id      Int?
   hidden              Int       @default(0) @db.TinyInt
   sale_price_override_minor Int?
   image               String    @default("") @db.VarChar(1024)
@@ -2344,6 +2346,7 @@ model cj_products {
   @@unique([cj_product_id, cj_variant_id], map: "cj_product_variant")
   @@index([commerce_product_id], map: "cj_products_commerce")
   @@index([agent_user_id], map: "cj_products_agent")
+  @@index([category_id], map: "cj_products_category")
 }
 
 model cj_agents {

@@ -28,6 +28,8 @@ export type CjProductRow = {
   agent_user_id: bigint | null;
   agent_claimed_at: Date | null;
   highlight_label: string;
+  category_id: bigint | null;
+  subcategory_id: number | null;
   hidden: number;
   sale_price_override_minor: number | null;
   image: string;
@@ -329,6 +331,23 @@ export async function listProductsMissingImage(limit = 40): Promise<CjProductRow
 export async function setCjProductCategory(id: number, category: string): Promise<void> {
   if (!Number.isInteger(id) || id <= 0) return;
   await prisma.$executeRaw`UPDATE cj_products SET trbhh_category=${category.slice(0, 200)} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/**
+ * توحيد التصنيف مع إعلانات تربح: تربط السلعة بمعرّف القسم/الفرعي من جدولي
+ * categories/sub_categories نفسيهما، وتخزّن الاسم النصّي للعرض السريع والتوافق.
+ * تمرير categoryId=null يفرّغ التصنيف.
+ */
+export async function setCjProductCategoryRef(
+  id: number,
+  categoryId: number | null,
+  subcategoryId: number | null,
+  label: string,
+): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  const cat = categoryId && categoryId > 0 ? BigInt(categoryId) : null;
+  const sub = subcategoryId && subcategoryId > 0 ? subcategoryId : null;
+  await prisma.$executeRaw`UPDATE cj_products SET category_id=${cat}, subcategory_id=${sub}, trbhh_category=${label.slice(0, 200)} WHERE id=${BigInt(id)}`.catch(() => {});
 }
 
 /** Preserve a legacy English category as source before replacing its display value. */

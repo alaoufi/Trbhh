@@ -13,7 +13,7 @@ vi.mock('@/lib/cj/agents', () => ({ isActiveAgent: async () => state.active, get
 vi.mock('@/lib/cj/mapping', () => {
   const product = async () => ({ id: 4n, cj_product_id: 'CJ4', agent_user_id: state.assigned, name: 'Fixture', name_ar: 'سلعة', image: state.gallery[0] || '', sale_price_minor: 1000, currency: 'SAR', hidden: 0 });
   return { getCjProductById: product, getStorefrontCjProduct: product, listStorefrontCjProducts: async () => [], getVerifiedCjVariants: () => state.verifiedVariants, parseCjImages: () => state.gallery, parseCjDetails: () => state.details, parseCjAvailability: () => null, cjShipEstimateFromAvailability: () => null, cjArabicName: async (r: { name_ar?: string; name?: string }) => r.name_ar || r.name || '', cjArabicDescription: async () => '', cjProductOrderCount: async () => 0,
-    removeCjProductById: state.write, setCjProductNameAr: state.write, setCjProductHidden: state.write, setCjProductPriceOverride: state.write, setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, setCjProductGallery: state.write, setCjProductHighlight: state.write,
+    removeCjProductById: state.write, setCjProductNameAr: state.write, setCjProductHidden: state.write, setCjProductPriceOverride: state.write, setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, setCjProductCategoryRef: state.write, setCjProductGallery: state.write, setCjProductHighlight: state.write,
     listUntranslatedCjProducts: vi.fn(), updateCjReview: vi.fn() };
 });
 vi.mock('@/lib/cj/pricing', () => ({ setDefaultMarginBps: vi.fn() }));
@@ -21,6 +21,7 @@ vi.mock('@/lib/cj/sync', () => ({ saveCjSyncSettings: vi.fn(), syncCjCatalog: vi
 vi.mock('@/lib/cj/import', () => ({ importCjProductByPid: vi.fn() }));
 vi.mock('@/lib/cj/translate', () => ({ translateToArabic: vi.fn(), translateManyCached: vi.fn(), learnTranslation: vi.fn(), translateManyForDisplay: async () => new Map<string, string>() }));
 vi.mock('@/lib/cj/highlight', () => ({ cjHighlights: async () => [{ label: 'متميز', color: '#dc2626' }], cjHighlightsText: async () => 'متميز | #dc2626', saveCjHighlights: vi.fn(), allowedHighlightValues: async () => ['متميز|#dc2626'], parseHighlightValue: () => null }));
+vi.mock('@/lib/data', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/data')>()), getCategories: async () => [], getSubCategories: async () => [] }));
 vi.mock('@/lib/cj/client', () => ({ getCategories: vi.fn(), getProduct: state.sourceFetch }));
 vi.mock('@/lib/cj/orders/store', () => ({ createOrder: vi.fn(), transitionOrder: vi.fn(), setOrderTracking: vi.fn() }));
 vi.mock('@/lib/cj/translate-warm', () => ({ warmCjTranslations: vi.fn(), refreshCjMedia: vi.fn() }));

@@ -55,7 +55,11 @@ export const CJ_DDL: string[] = [
   `ALTER TABLE cj_products ADD COLUMN highlight_label VARCHAR(80) NOT NULL DEFAULT ''`,
   // توسعة التثبيتات التي أنشأت العمود سابقاً بعرض ٤٠ (ليتسع «الكلمة|اللون»).
   `ALTER TABLE cj_products MODIFY COLUMN highlight_label VARCHAR(80) NOT NULL DEFAULT ''`,
+  // توحيد التصنيف مع إعلانات تربح: ربط السلعة بجدولي categories/sub_categories نفسيهما.
+  `ALTER TABLE cj_products ADD COLUMN category_id BIGINT NULL`,
+  `ALTER TABLE cj_products ADD COLUMN subcategory_id INT NULL`,
   `CREATE INDEX cj_products_agent ON cj_products (agent_user_id)`,
+  `CREATE INDEX cj_products_category ON cj_products (category_id)`,
 
   // ملف الوكيل: عضو مُنح دور وكيل — جواله وواتسه وحصّته الأسبوعية.
   `CREATE TABLE IF NOT EXISTS cj_agents (

@@ -11,7 +11,6 @@ import { testConnection, listProducts, getInventoryByPid, getWarehouses, calcula
 import { sampleCjProducts } from '@/lib/cj/sample';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { getSetting } from '@/lib/settings';
-import { getCjCategoryText } from '@/lib/cj/categories';
 import { cjHighlightsText } from '@/lib/cj/highlight';
 import { saveCjMargin, saveCjSync, runCjSync, saveCjHighlightSettings } from './actions';
 import { SubmitButton } from '@/components/cj/submit-button';
@@ -33,13 +32,12 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   await requireAdminPage('/admin/suppliers/cj');
   const sp = await searchParams;
   const cfg = cjConfig();
-  const [commerce, marginBps, mapped, sync, deliveryDays, categoryTree, highlightLabelsText] = await Promise.all([
+  const [commerce, marginBps, mapped, sync, deliveryDays, highlightLabelsText] = await Promise.all([
     getCommerceConfig().catch(() => null),
     defaultMarginBps(),
     countCjProducts(),
     cjSyncSettings(),
     getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'),
-    getCjCategoryText(),
     cjHighlightsText(),
   ]);
   const liveAllowed = process.env.SUPPLIER_ALLOW_LIVE_ORDERS === 'true';
@@ -135,10 +133,9 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
           <label className="text-sm">سعر صرف الدولار (ر.س)<input className={`${input} ms-2 w-24`} name="usdToSar" inputMode="decimal" defaultValue={(sync.usdToSarX100 / 100).toString()} /></label>
           <label className="text-sm">تقدير الشحن/منتج (ر.س)<input className={`${input} ms-2 w-24`} name="shippingSar" inputMode="decimal" defaultValue={(sync.shippingMinor / 100).toString()} /></label>
           <label className="text-sm sm:col-span-2">مدّة التوصيل التقديرية (نصّ يظهر للعميل)<input className={`${input} ms-2 w-48`} name="deliveryDays" defaultValue={deliveryDays} placeholder="مثال: ٧–١٥ يوم عمل" /></label>
-          <label className="block text-sm sm:col-span-2">التصنيفات (سطر لكل قسم رئيسي، وأقسامه الفرعية بعد «:» مفصولة بفواصل)
-            <textarea className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm" name="categoryTree" rows={6} defaultValue={categoryTree} placeholder={"المنزل والحديقة: وسائد، سجاد، ستائر\nملابس رجالية: ستُرات، أحذية\nإلكترونيات: سماعات، شواحن"} dir="rtl" />
-            <span className="mt-1 block text-xs text-muted-foreground">تُعرض هذه الأقسام للاختيار على السلعة (قسم رئيسي أو «رئيسي / فرعي»)، ويمكن كتابة قيمة جديدة أيضاً.</span>
-          </label>
+          <p className="rounded-lg border border-primary/15 bg-primary/5 p-2 text-xs text-muted-foreground sm:col-span-2">
+            التصنيفات موحّدة مع إعلانات تربح — تُدار من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link> (نفس جدول الأقسام/الفرعية)، وتُختار على كل سلعة من صفحتها. لا توجد قائمة تصنيفات منفصلة لـ CJ.
+          </p>
           <div className="sm:col-span-2"><SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ إعدادات المزامنة</SubmitButton></div>
         </form></AccessBoundary>
         <AccessBoundary module="integrations" action="sync"><form action={runCjSync}>

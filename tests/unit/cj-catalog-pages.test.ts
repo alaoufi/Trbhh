@@ -6,6 +6,7 @@ vi.mock('@/lib/auth', () => ({ getSession: async () => ({ uid: 1 }) }));
 vi.mock('@/lib/cj/storefront', () => ({ cjStorefrontView: async () => ({ isStaff: state.staff }), cjProductImages: () => [], cjImg: (url: string) => url }));
 vi.mock('@/lib/cj/catalog-feed', () => ({ CJ_CATALOG_TABS: [{ id: 'all', label: 'الكل' }, { id: 'imported', label: 'السلع المستوردة' }, { id: 'members', label: 'اعلانات الاعضاء' }, { id: 'verified', label: 'اعلانات موثقة' }, { id: 'trbhh', label: 'اعلانات تربح' }], loadCjCatalog: state.feed }));
 vi.mock('@/lib/cj/approved-catalog', () => ({ getApprovedPreview: state.preview }));
+vi.mock('@/lib/data', () => ({ getCategories: async () => [] }));
 vi.mock('@/components/ad-card', () => ({ AdCardMarketplace: () => null }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw Error('not_found'); } }));
 import Catalog from '@/app/cj/page';

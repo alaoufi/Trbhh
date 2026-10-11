@@ -273,10 +273,27 @@ export async function saveCjReview(form: FormData) {
   if (form.has('status')) await requireCjAccess('products', 'approve');
   const visibility = form.has('manageVisibility') || form.has('hidden');
   if (visibility) await requireCjAccess('products', 'suspend');
+  // القسم موحّد مع إعلانات تربح: «catId:subId» يُتحقّق مقابل القائمة المعتمدة.
+  const categoryRef = String(form.get('categoryRef') || '').trim();
+  const { setCjProductCategoryRef } = await import('@/lib/cj/mapping');
+  const [refCatStr, refSubStr] = categoryRef.split(':');
+  const refCat = Number(refCatStr);
+  const refSub = Number(refSubStr || 0);
+  let catLabel = '';
+  if (categoryRef && Number.isInteger(refCat) && refCat > 0) {
+    const { getCategories, getSubCategories } = await import('@/lib/data');
+    const [cats, subs] = await Promise.all([getCategories(), getSubCategories()]);
+    const cat = cats.find(c => c.id === refCat);
+    if (cat) {
+      const sub = refSub > 0 ? subs.find(s => s.id === refSub && s.categoryId === refCat) : null;
+      catLabel = sub ? `${cat.name} / ${sub.name}` : cat.name;
+      await setCjProductCategoryRef(id, cat.id, sub ? sub.id : null, catLabel);
+    } else await setCjProductCategoryRef(id, null, null, '');
+  } else await setCjProductCategoryRef(id, null, null, '');
   await updateCjReview(id, {
     nameAr: String(form.get('nameAr') || '').trim(),
     descriptionAr: String(form.get('descriptionAr') || '').trim(),
-    trbhhCategory: String(form.get('trbhhCategory') || '').trim(),
+    trbhhCategory: catLabel,
     ...(form.has('status') ? { status: String(form.get('status') || 'draft') } : {}),
   });
   const rawPrice = String(form.get('priceSar') || '').trim();

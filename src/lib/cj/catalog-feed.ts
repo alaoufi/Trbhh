@@ -24,7 +24,9 @@ export function parseCjCatalogQuery(query: CjCatalogQuery) {
   const tab = CJ_CATALOG_TABS.find(item => item.id === query.tab)?.id ?? 'all';
   const page = typeof query.page === 'string' && /^[1-9]\d{0,8}$/.test(query.page) ? Number(query.page) : 1;
   const q = typeof query.q === 'string' ? query.q.trim().slice(0, 80) : '';
-  return { tab, page, q };
+  // تصفية بالقسم الموحّد (نفس أقسام إعلانات تربح). 0 = كل الأقسام.
+  const cat = typeof query.cat === 'string' && /^[1-9]\d{0,8}$/.test(query.cat) ? Number(query.cat) : 0;
+  return { tab, page, q, cat };
 }
 
 /** Read-only private catalog. The public listing predicates run before count/offset. */
@@ -35,15 +37,16 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
   // ليراجعها المشرف. البوابة الصارمة (شحن ومخزون محقّقان خلال 6 ساعات) تُطبَّق فقط
   // على العرض العام الفعلي عند تفعيله. الشراء يبقى معطّلاً بمفتاحه المستقل.
   const readyOnly = view.isPublic;
-  const { tab, page: requestedPage, q } = parseCjCatalogQuery(query);
+  const { tab, page: requestedPage, q, cat } = parseCjCatalogQuery(query);
   const normQ = q ? normalizeArabicForSearch(q).toLowerCase() : '';
   const imports = tab === 'all' || tab === 'imported';
   const members = tab === 'all' || tab === 'members' || tab === 'verified';
-  const commerceScope = tab === 'all' || tab === 'imported' || tab === 'trbhh' ? tab : null;
+  // المتجر المعتمد لا يحمل تصنيفاً مشتركاً — نستثنيه عند التصفية بقسم موحّد.
+  const commerceScope = !cat && (tab === 'all' || tab === 'imported' || tab === 'trbhh') ? tab : null;
   let adWhere: Prisma.adsWhereInput = { id: { in: [] } };
   if (members) {
     const [publicWhere, linked, trusted] = await Promise.all([
-      publicAdSearchWhere(normQ ? { q } : {}),
+      publicAdSearchWhere({ ...(normQ ? { q } : {}), ...(cat ? { categoryId: cat } : {}) }),
       // Exclude linked catalog sources even when hidden: ads cannot bypass a source gate.
       prisma.$queryRaw<{ ad_id: bigint }[]>`SELECT DISTINCT cp.ad_id FROM commerce_products cp WHERE cp.ad_id IS NOT NULL`,
       tab === 'verified' ? prisma.users.findMany({ where: { trusted: 1 }, select: { id: true } }) : Promise.resolve([]),
@@ -63,8 +66,9 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
     commerceScope && !normQ ? countApprovedCatalog(commerceScope) : 0,
     members ? prisma.ads.count({ where: adWhere }) : 0,
   ]);
-  // بحث بالاسم العربي/الأصلي والقسم مع تطبيع الهمزات وة/ه (كبحث CJ العربي).
-  const cjProducts = normQ ? cjAll.filter(row => normalizeArabicForSearch(`${row.name_ar} ${row.name} ${row.trbhh_category}`).toLowerCase().includes(normQ)) : cjAll;
+  // تصفية بالقسم الموحّد (category_id نفسه المستخدم في الإعلانات) ثم بحث نصّي.
+  const cjByCat = cat ? cjAll.filter(row => row.category_id != null && Number(row.category_id) === cat) : cjAll;
+  const cjProducts = normQ ? cjByCat.filter(row => normalizeArabicForSearch(`${row.name_ar} ${row.name} ${row.trbhh_category}`).toLowerCase().includes(normQ)) : cjByCat;
   const cjCount = cjProducts.length;
   const total = cjCount + commerceCount + adCount;
   const pageCount = Math.max(1, Math.ceil(total / CJ_CATALOG_PAGE_SIZE));
@@ -87,5 +91,5 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
     ...approved.map(product => ({ key: product.key, source: 'commerce' as const, product })),
     ...ads.map(ad => ({ key: `ad:${ad.id}`, source: 'ad' as const, ad })),
   ];
-  return { tab, page, pageCount, total, items, q };
+  return { tab, page, pageCount, total, items, q, cat };
 }

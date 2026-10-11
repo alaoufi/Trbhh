@@ -15,8 +15,9 @@ vi.mock('@/components/access-boundary', () => ({ AccessBoundary: ({ children, mo
 vi.mock('@/lib/prisma', () => ({ prisma: { users: { findFirst: async () => ({ id: 3n, phoneNumber: '' }) }, cj_products: { findMany: async () => state.existing } } }));
 vi.mock('@/lib/cj/mapping', () => ({ getCjProductById: async () => ({ ...state.product }), parseCjAvailability: () => null, cjProductOrderCount: async () => 0,
   removeCjProductById: state.write, setCjProductNameAr: state.write, setCjProductHidden: state.write, setCjProductStatus: state.write, setCjProductPriceOverride: async (id: number, minor: number | null) => { state.write(id, minor); state.product.sale_price_override_minor = minor; }, updateCjReview: state.write,
-  setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, listUntranslatedCjProducts: async () => [state.product],
+  setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, setCjProductCategoryRef: vi.fn(), listUntranslatedCjProducts: async () => [state.product],
 }));
+vi.mock('@/lib/data', async (io) => ({ ...(await io<typeof import('@/lib/data')>()), getCategories: async () => [], getSubCategories: async () => [] }));
 vi.mock('@/lib/cj/pricing', () => ({ setDefaultMarginBps: state.write, defaultMarginBps: async () => 3000 }));
 vi.mock('@/lib/cj/sync', () => ({ saveCjSyncSettings: state.write, cjSyncSettings: async () => ({ enabled: false }), syncCjCatalog: async () => { state.write(); return { ok: true, imported: 1, pages: 1, skipped: 0 }; } }));
 vi.mock('@/lib/cj/import', () => ({ importCjProductByPid: async (...args: unknown[]) => { state.imports(...args); state.write(); return { ok: true, pid: 'CJ4', salePriceMinor: 1200, supplierCostMinor: 900 }; } }));

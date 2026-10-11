@@ -30,6 +30,7 @@ vi.mock('@/lib/cj/mapping',()=>{
   return {importedCjPids:async()=>new Set(),listCjProducts:async()=>[row()],listVisibleCjProducts:async()=>[row()],getCjProductById:async()=>row(),parseCjAvailability:()=>null};
 });
 vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:()=>['https://example.test/saved-gallery.jpg'],cjStorefrontPublic:async()=>false}));
+vi.mock('@/lib/data', async (io) => ({ ...(await io<typeof import('@/lib/data')>()), getCategories: async () => [], getSubCategories: async () => [] }));
 vi.mock('@/lib/settings',()=>({getSetting:async(_k:string,fallback='')=>fallback}));
 vi.mock('@/lib/cj/translate',async(importOriginal)=>{
   const actual=await importOriginal<typeof import('@/lib/cj/translate')>();

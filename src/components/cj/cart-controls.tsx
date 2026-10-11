@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import {ShoppingCart} from 'lucide-react';
 import {useEffect,useId,useState} from 'react';
 import {addTrialCartItem,readTrialCart,writeTrialCart,validateTrialCart,MAX_TRIAL_QTY,type TrialCartItem} from '@/lib/cj/trial-cart';
 
@@ -30,7 +31,10 @@ export function useTrialCart(accountId:number){
 
 export function CartLink({accountId}:{accountId:number}){
   const {items}=useTrialCart(accountId),count=items.reduce((total,item)=>total+item.qty,0);
-  return <Link href="/cj/cart" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/25 bg-white px-4 py-2 font-bold text-primary" aria-label={`سلة التجربة، ${count} قطعة`}>سلة التجربة <span className="ms-2" aria-hidden="true">({count})</span></Link>;
+  return <Link href="/cj/cart" aria-label={`السلة، ${count} قطعة`} className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-white text-primary">
+    <ShoppingCart className="h-5 w-5" aria-hidden="true" />
+    {count > 0 && <span className="absolute -top-1.5 -end-1.5 grid min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-extrabold leading-5 text-white">{count}</span>}
+  </Link>;
 }
 
 export function AddToTrialCart({productId,accountId,variants=[],requiresVariant=false}:{productId:number;accountId:number;variants?:CjSelectableVariant[];requiresVariant?:boolean}){

@@ -11,6 +11,7 @@ import { Breadcrumb } from '@/components/breadcrumb';
 import { CjProductGallery } from '@/components/cj/product-gallery';
 import { CjProductDescription } from '@/components/cj/product-description';
 import { CjProductCard } from '@/components/cj/product-card';
+import { CategoryRefPicker } from '@/components/cj/category-ref-picker';
 import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
 import { SubmitButton } from '@/components/cj/submit-button';
@@ -65,7 +66,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const [adCategories, adSubcategories] = canManage ? await Promise.all([getCategories(), getSubCategories()]) : [[], []];
   const curCatId = p.category_id != null ? Number(p.category_id) : 0;
   const curSubId = p.subcategory_id != null ? Number(p.subcategory_id) : 0;
-  const curCategoryRef = curCatId > 0 ? `${curCatId}:${curSubId || ''}` : '';
   const highlightOptions = canManage ? (await (await import('@/lib/cj/highlight')).cjHighlights()).map(h => ({ value: `${h.label}|${h.color}`, label: h.label, color: h.color })) : [];
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
@@ -99,7 +99,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         <div id="cj-buy" className="scroll-mt-24" />
         {view.isStaff && session && (displayVariants.length > 0
           ? <>
-              {verifiedVariants.length === 0 && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">تجربة إدارية: لم يُحقَّق توفّر هذه السلعة للعرض العام بعد. يتم التحقّق حيّاً من المخزون والشحن عند اختيار الخيار، ولا يُنفَّذ أي دفع فعلي إلا بعد الاعتماد والتحقّق من الأرقام.</p>}
+              {verifiedVariants.length === 0 && <p role="status" className="text-xs font-bold text-red-600">تجربة إدارية — يُتحقَّق من التوفّر حيّاً عند الاختيار (لا تظهر للعميل).</p>}
               <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} labels={panelLabels} optionsByVid={panelOptions} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
             </>
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات متاحة لهذه السلعة حالياً.</p>)}
@@ -127,7 +127,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <ul className="divide-y divide-slate-100 text-sm leading-7 text-slate-700">
         <li className="flex items-start gap-3 py-2.5"><Truck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>توصيل لكل مناطق المملكة</b> — تُحتسب تكلفة الشحن ومدّته حسب الوجهة وتظهر عند الطلب (مدّة التجهيز تُضاف للتوصيل).</span></li>
         <li className="flex items-start gap-3 py-2.5"><RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>استرجاع واستبدال</b> وفق سياسة تربح المعلنة.</span></li>
-        <li className="flex items-start gap-3 py-2.5"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>دفع آمن وخصوصية</b> — بياناتك محمية، والسعر بالريال شامل ربح تربح (يُضاف الشحن والضريبة إن وُجدت عند الطلب).</span></li>
+        <li className="flex items-start gap-3 py-2.5"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>دفع آمن وخصوصية</b> — بياناتك محمية، والسعر بالريال نهائي (يُضاف الشحن والضريبة إن وُجدت عند الطلب).</span></li>
       </ul>
     </section>
     {canManage && <section aria-labelledby="cj-product-management" className="card-3d min-w-0 rounded-2xl border border-primary/20 p-4 sm:p-5">
@@ -154,27 +154,17 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
           <textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ? cjDescriptionText(p.display_description_ar) : ''} className={editInput} />
         </label>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block font-bold text-slate-700">القسم (رئيسي / فرعي)</span>
-            <select name="categoryRef" defaultValue={curCategoryRef} className={editInput}>
-              <option value="">— اختر قسم تربح —</option>
-              {adCategories.map(cat => <optgroup key={cat.id} label={cat.name}>
-                <option value={`${cat.id}:`}>{cat.name} — (القسم الرئيسي)</option>
-                {adSubcategories.filter(s => s.categoryId === cat.id).map(s => <option key={s.id} value={`${cat.id}:${s.id}`}>{`${cat.name} / ${s.name}`}</option>)}
-              </optgroup>)}
-            </select>
-            {adCategories.length === 0
-              ? <span className="mt-1 block text-xs text-amber-700">لا توجد أقسام بعد — أضِفها من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link> (نفس أقسام إعلانات تربح).</span>
-              : <span className="mt-1 block text-xs text-muted-foreground">نفس أقسام إعلانات تربح — اختر القسم الرئيسي أو فرعاً تابعاً له.</span>}
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block font-bold text-slate-700">السعر (ر.س)</span>
-            <input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} />
-            <span className="mt-1 block text-xs text-muted-foreground">اتركه فارغاً لاستخدام السعر المحسوب تلقائياً.</span>
-          </label>
+        <div className="space-y-1">
+          <span className="block font-bold text-slate-700">القسم (نفس أقسام إعلانات تربح)</span>
+          <CategoryRefPicker categories={adCategories.map(c => ({ id: c.id, name: c.name }))} subcategories={adSubcategories} currentCategoryId={curCatId} currentSubcategoryId={curSubId} selectClassName={editInput} />
+          {adCategories.length === 0 && <span className="mt-1 block text-xs text-amber-700">لا توجد أقسام بعد — أضِفها من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link>.</span>}
         </div>
+
+        <label className="block">
+          <span className="mb-1 block font-bold text-slate-700">السعر (ر.س)</span>
+          <input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} />
+          <span className="mt-1 block text-xs text-muted-foreground">اتركه فارغاً لاستخدام السعر المحسوب تلقائياً.</span>
+        </label>
 
         <label className="block">
           <span className="mb-1 block font-bold text-slate-700">وسم التمييز (يظهر على صورة البطاقة)</span>
@@ -195,8 +185,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     {others.length > 0 && <section className="min-w-0 space-y-3"><h2 className="text-lg font-extrabold text-primary">منتجات مشابهة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
     {/* شريط شراء ثابت (نمط المتاجر) فوق القائمة السفلية؛ ينتقل لمحرّك الاختيار والإضافة. للإدارة. */}
     {view.isStaff && session && displayVariants.length > 0 && <div className="fixed inset-x-0 bottom-[4.5rem] z-30 border-t border-slate-200 bg-white/95 px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-        {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="min-w-0"><span className="block text-[10px] text-slate-500">السعر (شامل ربح تربح)</span><PriceText>{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText></div>}
+      {/* مسافة يسارية (pe في RTL) تترك ركن ختم «متجر موثّق» العائم حرّاً فلا يُغطّي الزر. */}
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 pe-24 md:pe-0">
+        {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="min-w-0"><span className="block text-[10px] text-slate-500">السعر</span><PriceText>{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText></div>}
         <a href="#cj-buy" className="inline-flex min-h-12 w-1/2 max-w-xs items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-white">اختر وأضف إلى السلة</a>
       </div>
     </div>}

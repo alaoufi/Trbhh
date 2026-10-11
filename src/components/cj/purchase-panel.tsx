@@ -73,12 +73,12 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
     try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');setAdded(true);}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
   }
-  return <section aria-label="خيارات الشراء التجريبي" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-    <h2 className="font-extrabold text-primary">اختر المنتج</h2>
+  return <section aria-label="خيارات الشراء التجريبي" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5">
+    <h2 className="text-[15px] font-extrabold text-primary">اختر المنتج</h2>
     {selector
-      ? <div className="space-y-3">{selector.groups.map(group=><div key={group.label}>
-          <p className="mb-1.5 text-sm font-bold text-slate-700">{group.label}</p>
-          <div className="flex flex-wrap gap-2">{group.values.map(val=><button key={val} type="button" onClick={()=>setChosen(c=>({...c,[group.label]:val}))} aria-pressed={chosen[group.label]===val} dir="auto" className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${chosen[group.label]===val?'border-primary bg-primary text-white shadow-sm':'border-slate-300 bg-white text-slate-700 hover:border-primary/50'}`}>{val}</button>)}</div>
+      ? <div className="space-y-2.5">{selector.groups.map(group=><div key={group.label}>
+          <p className="mb-1 text-[13px] font-bold leading-tight text-slate-700" dir="auto">{group.label}</p>
+          <div className="flex flex-wrap gap-1.5">{group.values.map(val=><button key={val} type="button" onClick={()=>setChosen(c=>({...c,[group.label]:val}))} aria-pressed={chosen[group.label]===val} dir="auto" title={val} className={`min-h-9 max-w-[16rem] rounded-lg border px-3 py-1 text-[13px] font-semibold leading-tight transition ${chosen[group.label]===val?'border-primary bg-primary text-white shadow-sm':'border-slate-300 bg-white text-slate-700 hover:border-primary/50'}`}>{val}</button>)}</div>
         </div>)}
         {comboComplete&&!selected&&<p role="status" className="text-sm font-bold text-amber-800">هذا التركيب غير متوفّر — اختر تركيباً آخر.</p>}
       </div>
@@ -87,7 +87,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
             <option value="">اختر الخيار</option>{variants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)}</option>)}
           </select>
         </label>}
-    {selected&&<div className="grid grid-cols-2 gap-2 text-sm">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">{option.label}</span><b className="break-words" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 p-2"><span className="block text-xs text-slate-500">الوزن</span><b>{selected.variantWeight} غ</b></div>}</div>}
+    {selected&&<div className="grid grid-cols-2 gap-1.5 text-[13px]">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500" dir="auto">{option.label}</span><b className="break-words leading-tight" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500">الوزن</span><b className="leading-tight">{selected.variantWeight} غ</b></div>}</div>}
     <p role="status" aria-live="polite" className={`text-sm font-bold ${quote?'text-emerald-700':'text-amber-800'}`}>{quote?`${quote.priceChanged?'تم تحديث السعر · ':''}متوفر · الكمية المتاحة: ${quote.stockQuantity}`:failureMessage[status]|| (status==='verification_failed'?'تعذّر التحقق، حاول مرة أخرى':status?`تعذّر التحقق من الخيار (${status})`:'اختر اللون أو المقاس لبدء التحقق')}</p>
     {quote&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm">
       {/* يُعرض سعر المنتج النهائي فقط (شامل ربح تربح) — بلا أي ذكر للتكلفة أو المورّد أو المستودع. */}

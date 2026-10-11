@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { requireAccess } from '@/lib/access-control/guards';
 import { getCjProductById } from '@/lib/cj/mapping';
 import { getCategories, getSubCategories } from '@/lib/data';
+import { CategoryRefPicker } from '@/components/cj/category-ref-picker';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { approveCjProduct, removeCjProduct, saveCjReview, toggleCjHidden } from '../../actions';
 
@@ -33,7 +34,6 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
   const [adCategories, adSubcategories] = await Promise.all([getCategories(), getSubCategories()]);
   const curCatId = row.category_id != null ? Number(row.category_id) : 0;
   const curSubId = row.subcategory_id != null ? Number(row.subcategory_id) : 0;
-  const curCategoryRef = curCatId > 0 ? `${curCatId}:${curSubId || ''}` : '';
 
   return (
     <div className="space-y-4">
@@ -81,18 +81,11 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
           <label className="block text-sm">الوصف العربي
             <textarea className={input} name="descriptionAr" rows={5} defaultValue={row.display_description_ar ?? ''} placeholder="وصف السلعة بالعربية" />
           </label>
-          <label className="block text-sm">القسم (موحّد مع إعلانات تربح)
-            <select className={input} name="categoryRef" defaultValue={curCategoryRef}>
-              <option value="">— اختر قسم تربح —</option>
-              {adCategories.map(cat => <optgroup key={cat.id} label={cat.name}>
-                <option value={`${cat.id}:`}>{cat.name} — (القسم الرئيسي)</option>
-                {adSubcategories.filter(s => s.categoryId === cat.id).map(s => <option key={s.id} value={`${cat.id}:${s.id}`}>{`${cat.name} / ${s.name}`}</option>)}
-              </optgroup>)}
-            </select>
-            {adCategories.length === 0
-              ? <span className="mt-1 block text-xs text-amber-700">لا توجد أقسام بعد — أضِفها من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link>.</span>
-              : <span className="mt-1 block text-xs text-muted-foreground">نفس أقسام إعلانات تربح.</span>}
-          </label>
+          <div className="space-y-1 text-sm">
+            <span className="block font-bold text-slate-700">القسم (نفس أقسام إعلانات تربح)</span>
+            <CategoryRefPicker categories={adCategories.map(c => ({ id: c.id, name: c.name }))} subcategories={adSubcategories} currentCategoryId={curCatId} currentSubcategoryId={curSubId} selectClassName={input} />
+            {adCategories.length === 0 && <span className="mt-1 block text-xs text-amber-700">لا توجد أقسام بعد — أضِفها من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link>.</span>}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="block text-sm">سعر البيع (ر.س) — فارغ = المحسوب
               <input className={input} name="priceSar" inputMode="decimal" defaultValue={row.sale_price_override_minor != null ? (row.sale_price_override_minor / 100).toString() : ''} placeholder={(row.sale_price_minor / 100).toString()} />

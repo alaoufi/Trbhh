@@ -63,4 +63,11 @@ jobs:
           for name in capacity.json media-mode.txt code.tar.gz image.tar.gz storage.tar.gz legacy.tar.gz before.json full-before.json database.sql.gz restored.json full-restored.json VERIFIED candidate-image-id.txt DEPLOYMENT_VERIFIED; do
             if [[ -f "$backup/$name" && ! -L "$backup/$name" ]]; then printf 'CHECKPOINT_%s_BYTES=%s\n' "$name" "$(stat -c %s "$backup/$name")"; else printf 'CHECKPOINT_%s=absent\n' "$name"; fi
           done
+
+          for name in storage-before.json legacy-before.json legacy-current.json full-current.json full-restored.json; do
+            if [[ -f "$backup/$name" && ! -L "$backup/$name" ]]; then printf 'PROOF_%s_BYTES=%s\n' "$name" "$(stat -c %s "$backup/$name")"; else printf 'PROOF_%s=absent\n' "$name"; fi
+          done
+          for name in storage-extracted legacy-extracted; do
+            if [[ -d "$backup/$name" && ! -L "$backup/$name" ]]; then bytes=$(du -sb "$backup/$name" | cut -f1); printf 'EXTRACTED_%s_BYTES=%s\n' "$name" "$bytes"; fi
+          done
           REMOTE

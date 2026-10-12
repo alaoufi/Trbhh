@@ -59,6 +59,15 @@ async function main() {
     const options = Array.isArray(freight) ? freight : Array.isArray(freight?.freightList) ? freight.freightList : Array.isArray(freight?.list) ? freight.list : [];
     report.shipping = options.filter(row => typeof row.logisticName === 'string' && Number.isFinite(Number(row.logisticPrice)) && Number(row.logisticPrice) >= 0).slice(0, 10).map(row => ({ name: row.logisticName.slice(0, 80), priceUsd: Number(row.logisticPrice), origin, destination: 'SA', quantity: 1 }));
     report.checks.push({ name: 'saudi_freight_quote', ok: report.shipping.length > 0 });
+    report.quantityQuotes = [];
+    for (const count of [2, 1]) {
+      const next = await request(base, '/logistic/freightCalculate', 'POST', { startCountryCode: origin, endCountryCode: 'SA', zip: '11564', products: [{ vid, quantity: count }] }, token);
+      const list = Array.isArray(next) ? next : Array.isArray(next?.freightList) ? next.freightList : Array.isArray(next?.list) ? next.list : [];
+      report.quantityQuotes.push({quantity:count,options:list.filter(row=>typeof row.logisticName==='string'&&Number.isFinite(Number(row.logisticPrice))&&Number(row.logisticPrice)>=0).slice(0,10).map(row=>({name:row.logisticName.slice(0,80),priceUsd:Number(row.logisticPrice)}))});
+    }
+    const original=report.shipping[0],returned=report.quantityQuotes[1]?.options.find(row=>row.name===original?.name);
+    report.checks.push({name:'quantity_2_then_1_live_recalculation',ok:report.quantityQuotes.every(row=>row.options.length>0)});
+    report.sameRouteRoundtrip={name:original?.name??null,firstPriceUsd:original?.priceUsd??null,returnedPriceUsd:returned?.priceUsd??null,unchanged:!!returned&&returned.priceUsd===original.priceUsd};
   } catch (error) {
     // Only fixed diagnostic identifiers are emitted. Never serialize a response/auth object.
     const allowed = ['runtime_identity_unavailable', 'unexpected_cj_destination', 'cj_key_unavailable', 'cj_auth_invalid_response', 'cj_read_failed', 'product_identity_mismatch', 'inventory_shape_mismatch', 'no_valid_variant', 'variant_inventory_shape_mismatch'];

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {useEffect,useRef,useState} from 'react';
 import {useTrialCart} from './cart-controls';
 import {CjProductImage} from './product-image';
+import {SubmitButton} from './submit-button';
 import {formatSar} from '@/lib/commerce/money';
 import {setTrialCartQuantity,validateTrialCart,MAX_TRIAL_QTY,type TrialCartItem,type TrialCartQuote} from '@/lib/cj/trial-cart';
 import {cjVariantDisplayOptions} from '@/lib/cj/variant-display';
@@ -109,7 +110,7 @@ export function TrialCart({accountId,ship}:{accountId:number;ship:ShipDefault|nu
               </>
             : <p className="rounded-lg bg-amber-50 p-2.5 text-[13px] font-bold text-amber-900">لا يوجد عنوان محفوظ — <Link href="/account/addresses" className="underline">أضف عنواناً</Link> أولاً.</p>}
           <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-2 text-[15px] font-extrabold text-primary"><span>الإجمالي</span><b className="text-lg text-[#c4510b]">{formatSar(currentQuote.totalMinor)} ر.س</b></div>
-          <button type="submit" disabled={!ship} className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#c4510b] px-4 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">ادفع</button>
+          <SubmitButton disabled={!ship} className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#c4510b] px-4 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">ادفع</SubmitButton>
         </form>
       : null}
   </div>;

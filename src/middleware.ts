@@ -75,7 +75,9 @@ export function middleware(req: NextRequest) {
   // keep serving a stale copy after a deploy — the exact symptom of two browsers
   // showing different versions of the home page. Static bundles and media are
   // excluded by this middleware's matcher, so they stay long-cached as before.
-  if (req.cookies.get('trbhh_session')) {
+  // Protected admin pages can stream an HTML login redirect before authentication.
+  // Their responses must stay private even when the session cookie is absent.
+  if (req.cookies.get('trbhh_session') || req.nextUrl.pathname === '/admin' || req.nextUrl.pathname.startsWith('/admin/')) {
     res.headers.set('Cache-Control', 'private, no-store, must-revalidate');
     res.headers.set('Vary', 'Cookie');
   } else if (!req.nextUrl.pathname.startsWith('/api/')) {

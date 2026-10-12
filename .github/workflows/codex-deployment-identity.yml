@@ -1,0 +1,61 @@
+name: Read deployment identity diagnostics
+on:
+  push:
+    branches: [codex/deploy-diagnostics-20261012]
+permissions:
+  contents: read
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect deployment identity without changing the server
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          port=${VPS_PORT:-22}
+          [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          [[ -n "$VPS_SSH_KEY" && -n "$VPS_KNOWN_HOSTS" ]]
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/diag-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/diag-hosts"
+          trap 'rm -f -- "$RUNNER_TEMP/diag-key" "$RUNNER_TEMP/diag-hosts"' EXIT
+          ssh -i "$RUNNER_TEMP/diag-key" -p "$port" -o UserKnownHostsFile="$RUNNER_TEMP/diag-hosts" -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'bash -s' <<'REMOTE'
+          set +x +v
+          set -eu
+          cd /root/trbhh
+          printf 'CHECKOUT_SHA=%s\n' "$(git rev-parse HEAD)"
+          printf 'WORKTREE_CHANGES=%s\n' "$(git status --porcelain --untracked-files=no | wc -l)"
+          running=$(docker compose ps -q app)
+          image=$(docker inspect -f '{{.Image}}' "$running")
+          printf 'IMAGE_REVISION=%s\n' "$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")"
+          marker=/root/trbhh-release-tools/ACTIVE_DEPLOYMENT
+          if [[ -f "$marker" && ! -L "$marker" ]]; then
+            stale=$(cat "$marker")
+            if [[ "$stale" =~ ^[1-9][0-9]{0,19}$ ]]; then
+              printf 'ACTIVE_RUN=%s\n' "$stale"
+              backup="/root/trbhh-release-backups/finance-$stale"
+              for name in VERIFIED commit.txt candidate.txt image-id.txt SHA256SUMS DEPLOYMENT_VERIFIED ROLLED_BACK; do
+                if [[ -f "$backup/$name" && ! -L "$backup/$name" ]]; then printf 'MANIFEST_%s=present\n' "$name"; else printf 'MANIFEST_%s=absent\n' "$name"; fi
+              done
+              for name in commit.txt candidate.txt; do
+                if [[ -f "$backup/$name" ]]; then value=$(cat "$backup/$name"); if [[ "$value" =~ ^[0-9a-f]{40}$ ]]; then printf '%s=%s\n' "$name" "$value"; fi; fi
+              done
+              if [[ -f "$backup/SHA256SUMS" ]] && (cd "$backup" && sha256sum --check --status SHA256SUMS); then printf 'MANIFEST_INTEGRITY=valid\n'; else printf 'MANIFEST_INTEGRITY=invalid\n'; fi
+              if [[ -f "$backup/image-id.txt" && "$(cat "$backup/image-id.txt")" == "$image" ]]; then printf 'BASELINE_IMAGE_MATCH=true\n'; else printf 'BASELINE_IMAGE_MATCH=false\n'; fi
+              if systemctl is-active --quiet "trbhh-finance-rollback-$stale.timer"; then printf 'OLD_WATCHDOG=active\n'; else printf 'OLD_WATCHDOG=inactive\n'; fi
+            else printf 'ACTIVE_MARKER=invalid\n'; fi
+          elif [[ -e "$marker" || -L "$marker" ]]; then printf 'ACTIVE_MARKER=unsafe_type\n'
+          else printf 'ACTIVE_MARKER=absent\n'; fi
+          if [[ -e /root/trbhh-release-backups/finance-38277238094 ]]; then printf 'FAILED_ATTEMPT_BACKUP=present\n'; else printf 'FAILED_ATTEMPT_BACKUP=absent\n'; fi
+          docker exec -i "$running" node - <<'NODE'
+          (async()=>{try{const r=await fetch('http://127.0.0.1:3000/api/version',{signal:AbortSignal.timeout(5000)});const b=await r.json();console.log('APP_REVISION='+(/^[0-9a-f]{40}$/.test(b.commit)?b.commit:'invalid'));console.log('APP_HTTP='+r.status);}catch{console.log('APP_HTTP=unavailable');process.exitCode=1;}})();
+          NODE
+          REMOTE

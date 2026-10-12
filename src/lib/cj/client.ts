@@ -17,7 +17,12 @@ import type {
 const TIMEOUT_MS = 20000;
 const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000; // جدّد قبل الانتهاء بيوم
 
-type CjEnvelope<T> = { code?: number; result?: boolean; message?: string; data?: T };
+type CjEnvelope<T> = { code?: number; result?: boolean; success?: boolean; message?: string; data?: T };
+
+function successfulEnvelope(env: CjEnvelope<unknown>): boolean {
+  return env.code === 200 && env.result !== false && env.success !== false
+    && (env.result === true || env.success === true);
+}
 
 // CJ يفرض حدّ معدّل صارم (طلب واحد/ثانية). نسلسل كل الطلبات بفاصل ≥1.1ث لتفادي
 // code=1600200 «Too Many Requests». التسلسل على مستوى العملية يكفي (مثيل واحد).
@@ -67,20 +72,20 @@ async function accessToken(cfg: CjConfig): Promise<CjResult<string>> {
   const endpoint = canRefresh ? '/authentication/refreshAccessToken' : '/authentication/getAccessToken';
   const payload = canRefresh
     ? { refreshToken: stored!.tokens.refreshToken }
-    : { email: cfg.email, password: cfg.apiKey };
+    : { apiKey: cfg.apiKey };
   const { status, body } = await fetchJson(`${cfg.base}${endpoint}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }).catch(() => ({ status: 0, body: null }));
   const env = (body || {}) as CjEnvelope<{ accessToken?: string; refreshToken?: string; accessTokenExpiryDate?: string; refreshTokenExpiryDate?: string }>;
   const data = env.data;
-  if (status !== 200 || !data?.accessToken || !data?.refreshToken) {
+  if (status !== 200 || !successfulEnvelope(env) || !data?.accessToken || !data?.refreshToken) {
     // فشل التجديد → جرّب مصادقة كاملة مرّة واحدة.
     if (canRefresh) {
       const { status: s2, body: b2 } = await fetchJson(`${cfg.base}/authentication/getAccessToken`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: cfg.email, password: cfg.apiKey }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: cfg.apiKey }),
       }).catch(() => ({ status: 0, body: null }));
       const e2 = (b2 || {}) as CjEnvelope<{ accessToken?: string; refreshToken?: string; accessTokenExpiryDate?: string; refreshTokenExpiryDate?: string }>;
-      if (s2 === 200 && e2.data?.accessToken && e2.data?.refreshToken) {
+      if (s2 === 200 && successfulEnvelope(e2) && e2.data?.accessToken && e2.data?.refreshToken) {
         await writeCjAuth({ tokens: { accessToken: e2.data.accessToken, refreshToken: e2.data.refreshToken }, accessExpiresAt: toDate(e2.data.accessTokenExpiryDate), refreshExpiresAt: toDate(e2.data.refreshTokenExpiryDate) }, cfg.encryptionKey);
         return { ok: true, data: e2.data.accessToken };
       }
@@ -105,7 +110,7 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   }).catch(() => ({ status: 0, body: null }));
   const env = (body || {}) as CjEnvelope<T>;
-  if (status !== 200 || (env.result === false)) {
+  if (status !== 200 || !successfulEnvelope(env)) {
     // سجلّ تشخيصي آمن (بلا توكن/سرّ): المسار + حالة HTTP + رمز/رسالة CJ — ليظهر السبب
     // الحقيقي في docker logs عند أخطاء مثل inventory_error/freight_error (حدّ معدّل، خيار
     // غير متوفّر، وجهة غير مدعومة…) بدل ابتلاعه. المسار بلا سلسلة الاستعلام (قد تحوي vid فقط).
@@ -119,8 +124,9 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
 
 export async function testConnection(): Promise<CjResult<{ connected: true; email: string; accessTokenExpiresAt: string | null }>> {
   const cfg = cjConfig();
-  const tok = await accessToken(cfg);
-  if (!tok.ok) return tok;
+  const probe = await call<{ list?: unknown[] }>('/product/list', { query: { pageNum: 1, pageSize: 1 } });
+  if (!probe.ok) return probe;
+  if (!Array.isArray(probe.data?.list)) return { ok: false, error: 'cj_invalid_response', status: 200 };
   const stored = await readCjAuth(cfg.encryptionKey).catch(() => null);
   return { ok: true, data: { connected: true, email: cfg.email, accessTokenExpiresAt: stored?.accessExpiresAt ? stored.accessExpiresAt.toISOString() : null } };
 }
@@ -362,6 +368,9 @@ export async function confirmCjOrder(orderId: string): Promise<CjResult<{ confir
 /* ------------------------- محوّلات ------------------------- */
 
 function str(v: unknown): string | null { return typeof v === 'string' && v.trim() ? v : null; }
+function identifier(v: unknown): string | null {
+  return typeof v === 'number' && Number.isFinite(v) ? String(v) : str(v);
+}
 function num(v: unknown): number | null { const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN; return Number.isFinite(n) ? n : null; }
 /** سعر CJ قد يأتي رقماً أو نصاً أو نطاقاً «a--b» / «a-b» — نأخذ أدنى قيمة صالحة. */
 function parsePrice(v: unknown): number | null {
@@ -404,7 +413,7 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
 function mapInventory(s: Record<string, unknown>): CjInventory {
   return {
     vid: String(s.vid ?? ''),
-    areaId: str(s.areaId ?? s.storageAreaId),
+    areaId: identifier(s.areaId ?? s.storageAreaId),
     areaName: str(s.areaEn ?? s.areaEnName ?? s.countryNameEn ?? s.areaName),
     countryCode: str(s.countryCode),
     storageNum: num(s.totalInventory ?? s.storageNum ?? s.totalInventoryNum) ?? 0,

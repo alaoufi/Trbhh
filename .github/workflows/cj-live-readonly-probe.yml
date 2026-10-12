@@ -2,10 +2,11 @@ name: CJ live product 12 read-only probe
 
 on:
   push:
-    branches: [codex/cj-product-page-20260924]
+    branches: [codex/cj-product-page-20260924, codex/cj-api-mcp-repair-20261012]
     paths:
       - '.github/workflows/cj-live-readonly-probe.yml'
       - 'scripts/release/cj-live-readonly-probe.cjs'
+      - 'scripts/release/cj-api-read-check.cjs'
 
 permissions:
   contents: read
@@ -15,6 +16,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  api_read_check:
+    if: github.ref == 'refs/heads/codex/cj-api-mcp-repair-20261012'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify current CJ API authentication and bounded product reads
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          port=${VPS_PORT:-22}
+          [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          [[ -n "$VPS_SSH_KEY" && -n "$VPS_KNOWN_HOSTS" ]]
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/cj-check-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/cj-check-hosts"
+          trap 'rm -f -- "$RUNNER_TEMP/cj-check-key" "$RUNNER_TEMP/cj-check-hosts"' EXIT
+          ssh -i "$RUNNER_TEMP/cj-check-key" -p "$port" -o UserKnownHostsFile="$RUNNER_TEMP/cj-check-hosts" -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/cj-api-read-check.cjs
   probe:
     if: github.ref == 'refs/heads/codex/cj-product-page-20260924'
     runs-on: ubuntu-latest

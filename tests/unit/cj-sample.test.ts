@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { sampleCjProducts, type CjSampleDeps } from '@/lib/cj/sample';
+import { describe, expect, it, vi } from 'vitest';
+import { sampleCjProducts, sampleOneCjProduct, type CjSampleDeps } from '@/lib/cj/sample';
 import type { CjResult, CjProductSummary, CjProductDetail, CjInventory } from '@/lib/cj/types';
 
 const summary = (pid: string): CjProductSummary => ({ pid, productName: `اسم ${pid}`, productSku: `SKU-${pid}`, sellPrice: 12.5, productImage: `https://img/${pid}.jpg`, categoryName: 'إلكترونيات' });
@@ -16,10 +16,33 @@ const deps = (over: Partial<CjSampleDeps> = {}): CjSampleDeps => ({
   listProducts: async () => ({ ok: true, data: [summary('1'), summary('2'), summary('3'), summary('4')] } as CjResult<CjProductSummary[]>),
   getProduct: async (pid) => ({ ok: true, data: detail(pid) }),
   getInventoryByVid: async (vid) => ({ ok: true, data: invByVid(vid) }),
+  getInventoryByPid: async (pid) => ({ ok: true, data: [...invByVid(`${pid}-A`), ...invByVid(`${pid}-B`)] }),
   ...over,
 });
 
 describe('CJ read-only detailed sample (PID/SKU/name/images/price/variants/weight/stock/category)', () => {
+  it('reads all variant stock in one PID request without per-variant requests', async () => {
+    const batch = vi.fn(async () => ({ ok: true as const, data: [...invByVid('1-A'), ...invByVid('1-B')] }));
+    const perVariant = vi.fn(async () => ({ ok: true as const, data: [] }));
+    const result = await sampleOneCjProduct('1', deps({ getInventoryByPid: batch, getInventoryByVid: perVariant }));
+    expect(batch).toHaveBeenCalledExactlyOnceWith('1');
+    expect(perVariant).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, data: { totalStock: 57, variants: [{ stock: 50 }, { stock: 7 }] } });
+  });
+
+  it('keeps missing or invalid batch stock unknown and excludes unrelated VIDs', async () => {
+    const result = await sampleOneCjProduct('1', deps({ getInventoryByPid: async () => ({ ok: true, data: [
+      ...invByVid('1-A'), { ...invByVid('1-B')[0], storageNum: Number.NaN }, ...invByVid('OTHER-A'),
+    ] }) }));
+    expect(result).toMatchObject({ ok: true, data: { totalStock: 50, variants: [{ stock: 50 }, { stock: null }] } });
+  });
+
+  it('retains details with unknown stock after batch failure without multiplying requests', async () => {
+    const perVariant = vi.fn(async () => ({ ok: true as const, data: [] }));
+    const result = await sampleOneCjProduct('1', deps({ getInventoryByPid: async () => ({ ok: false, error: 'supplier_unavailable' }), getInventoryByVid: perVariant }));
+    expect(result).toMatchObject({ ok: true, data: { totalStock: 0, variants: [{ stock: null }, { stock: null }] } });
+    expect(perVariant).not.toHaveBeenCalled();
+  });
   it('assembles all requested fields and aggregates stock per variant (by vid)', async () => {
     const r = await sampleCjProducts(3, deps());
     expect(r.ok).toBe(true);

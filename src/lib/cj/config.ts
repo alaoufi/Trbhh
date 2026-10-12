@@ -32,6 +32,6 @@ export function cjConfig(): CjConfig {
     apiKey,
     webhookSecret,
     encryptionKey,
-    configured: !!(email && apiKey && /^[a-fA-F0-9]{64}$/.test(encryptionKey)),
+    configured: !!(apiKey && /^[a-fA-F0-9]{64}$/.test(encryptionKey)),
   };
 }

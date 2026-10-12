@@ -17,6 +17,22 @@ describe('CJ trial cart server revalidation',()=>{
     expect(result).toMatchObject({currency:'SAR',totalMinor:3700,lines:[{id:4,qty:2,variantId:'blue-s',title:'سلعة',variantName:'Color-Black-Size-XL',variantSku:'SKU-BS',variantStock:5,unitMinor:1500,shippingMinor:700,shippingName:'Saudi Standard',totalMinor:3700}]});
     expect(mock.verify).toHaveBeenCalledExactlyOnceWith('private-pid',expect.objectContaining({vid:'blue-s'}),2,{},375,{otherCostsMinor:0,marginBps:3000,saleOverrideMinor:null});
   });
+  it('returns to the original total for 1 → 2 → 1 using quantity-specific freight',async()=>{
+    const totals:number[]=[];
+    for(const qty of [1,2,1]){
+      const shipping=qty===2?950:700;
+      mock.verify.mockResolvedValueOnce(live({shippingOptions:[{name:'Saudi Standard',priceMinor:shipping,additionalMinor:0,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}]}));
+      const result=await quoteCjTrialCart([{id:4,qty,variantId:'blue-s',snapshot:snapshot({verifiedQuantity:qty,shippingMinor:shipping,totalMinor:1500*qty+shipping})}]);
+      expect(result.rejected).toEqual([]);totals.push(result.totalMinor);
+    }
+    expect(totals).toEqual([2200,3950,2200]);expect(mock.verify).toHaveBeenCalledTimes(3);
+  });
+  it('rejects a missing approved route rather than accepting an alternative total',async()=>{
+    mock.verify.mockResolvedValueOnce(live({shippingOptions:[{name:'Alternative',priceMinor:100,additionalMinor:0,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}]}));
+    const result=await quoteCjTrialCart([{id:4,qty:1,variantId:'blue-s',snapshot:snapshot()}]);
+    expect(result.lines).toEqual([]);expect(result.totalMinor).toBe(0);
+    expect(result.rejected).toEqual([{id:4,variantId:'blue-s',reason:'shipping_changed'}]);
+  });
   it('blocks stale price, changed stock, and changed freight instead of silently updating the order amount',async()=>{
     mock.verify.mockResolvedValueOnce(live({salePriceMinor:1600}));
     expect((await quoteCjTrialCart([{id:4,qty:1,variantId:'blue-s',snapshot:snapshot()}])).rejected).toEqual([{id:4,variantId:'blue-s',reason:'price_changed'}]);

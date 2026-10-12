@@ -415,7 +415,7 @@ function mapInventory(s: Record<string, unknown>): CjInventory {
 function mapFreight(o: Record<string, unknown>): CjFreightOption {
   return {
     logisticName: String(o.logisticName ?? o.logisticAisle ?? ''),
-    logisticPrice: num(o.logisticPrice) ?? 0,
+    logisticPrice: num(o.logisticPrice) ?? Number.NaN,
     logisticAging: str(o.logisticAging),
     logisticPriceCn: num(o.logisticPriceCn),
     taxesFeeUsd: num(o.taxesFee),

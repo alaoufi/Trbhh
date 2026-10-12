@@ -1,4 +1,4 @@
-name: Read deployment identity diagnostics
+name: Reconcile verified superseded deployment marker
 on:
   push:
     branches: [codex/deploy-diagnostics-20261012]
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Inspect deployment identity without changing the server
+      - name: Verify current identity and archive the superseded marker
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -58,4 +58,40 @@ jobs:
           docker exec -i "$running" node - <<'NODE'
           (async()=>{try{const r=await fetch('http://127.0.0.1:3000/api/version',{signal:AbortSignal.timeout(5000)});const b=await r.json();console.log('APP_REVISION='+(/^[0-9a-f]{40}$/.test(b.commit)?b.commit:'invalid'));console.log('APP_HTTP='+r.status);}catch{console.log('APP_HTTP=unavailable');process.exitCode=1;}})();
           NODE
+
+          # Reconcile only the exact superseded attempt observed by read-only diagnostics.
+          exec 9>/run/lock/trbhh-finance-deploy.lock
+          flock -w 5 9
+          expected=c37790f2e08d0907cd5c2ff2d091e698a2e2c65e
+          old=37944504207
+          marker=/root/trbhh-release-tools/ACTIVE_DEPLOYMENT
+          backup="/root/trbhh-release-backups/finance-$old"
+          archived="/root/trbhh-release-tools/ACTIVE_DEPLOYMENT.superseded-$old-38277238094"
+          [[ -f "$marker" && ! -L "$marker" && "$(cat "$marker")" == "$old" ]]
+          [[ ! -e "$archived" && ! -L "$archived" ]]
+          [[ "$(git rev-parse HEAD)" == "$expected" && -z "$(git status --porcelain --untracked-files=no)" ]]
+          [[ "$(cat "$backup/commit.txt")" == "1eecf005519bd91ac3a5e3b77208820853b695f7" ]]
+          [[ "$(cat "$backup/candidate.txt")" == "b7ccdc3a557e04bda61f8201159bb029277643e3" ]]
+          (cd "$backup" && sha256sum --check --status SHA256SUMS)
+          git merge-base --is-ancestor "$(cat "$backup/candidate.txt")" "$expected"
+          git merge-base --is-ancestor "$(cat "$backup/commit.txt")" "$expected"
+          ! systemctl is-active --quiet "trbhh-finance-rollback-$old.timer"
+          ! systemctl is-active --quiet "trbhh-finance-rollback-$old.service"
+          running=$(docker compose ps -q app)
+          image=$(docker inspect -f '{{.Image}}' "$running")
+          [[ "$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" == "$expected" ]]
+          docker exec -i "$running" node - "$expected" <<'NODE'
+          const {PrismaClient}=require('@prisma/client');const db=new PrismaClient({log:[]});
+          (async()=>{try{
+            const r=await fetch('http://127.0.0.1:3000/api/version',{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(5000)});
+            if(r.status!==200||(await r.json()).commit!==process.argv[2])throw Error('identity');
+            const home=await fetch('http://127.0.0.1:3000/',{redirect:'manual',signal:AbortSignal.timeout(10000)});
+            if(home.status!==200)throw Error('home');
+            const rows=await db.$queryRawUnsafe("SELECT v FROM site_settings WHERE k IN ('commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled')");
+            if(rows.some(row=>!['0','false',null].includes(row.v))||process.env.SUPPLIER_ALLOW_LIVE_ORDERS!=='false')throw Error('gates');
+            console.log('CURRENT_HEALTH_AND_PURCHASE_GATES=verified');
+          }catch{console.log('CURRENT_HEALTH_AND_PURCHASE_GATES=failed');process.exitCode=1;}finally{await db.$disconnect();}})();
+          NODE
+          mv -- "$marker" "$archived"
+          printf 'SUPERSEDED_MARKER_ARCHIVED=true\n'
           REMOTE

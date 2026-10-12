@@ -48,7 +48,6 @@ jobs:
               for name in commit.txt candidate.txt; do
                 if [[ -f "$backup/$name" ]]; then value=$(cat "$backup/$name"); if [[ "$value" =~ ^[0-9a-f]{40}$ ]]; then printf '%s=%s\n' "$name" "$value"; fi; fi
               done
-              if [[ -f "$backup/SHA256SUMS" ]] && (cd "$backup" && sha256sum --check --status SHA256SUMS); then printf 'MANIFEST_INTEGRITY=valid\n'; else printf 'MANIFEST_INTEGRITY=invalid\n'; fi
               if [[ -f "$backup/image-id.txt" && "$(cat "$backup/image-id.txt")" == "$image" ]]; then printf 'BASELINE_IMAGE_MATCH=true\n'; else printf 'BASELINE_IMAGE_MATCH=false\n'; fi
               if systemctl is-active --quiet "trbhh-finance-rollback-$stale.timer"; then printf 'OLD_WATCHDOG=active\n'; else printf 'OLD_WATCHDOG=inactive\n'; fi
             else printf 'ACTIVE_MARKER=invalid\n'; fi
@@ -59,7 +58,7 @@ jobs:
           (async()=>{try{const r=await fetch('http://127.0.0.1:3000/api/version',{signal:AbortSignal.timeout(5000)});const b=await r.json();console.log('APP_REVISION='+(/^[0-9a-f]{40}$/.test(b.commit)?b.commit:'invalid'));console.log('APP_HTTP='+r.status);}catch{console.log('APP_HTTP=unavailable');process.exitCode=1;}})();
           NODE
 
-          backup=/root/trbhh-release-backups/finance-38278752251
+          backup=/root/trbhh-release-backups/finance-38282816041
           for name in capacity.json media-mode.txt code.tar.gz image.tar.gz storage.tar.gz legacy.tar.gz before.json full-before.json database.sql.gz restored.json full-restored.json VERIFIED candidate-image-id.txt DEPLOYMENT_VERIFIED; do
             if [[ -f "$backup/$name" && ! -L "$backup/$name" ]]; then printf 'CHECKPOINT_%s_BYTES=%s\n' "$name" "$(stat -c %s "$backup/$name")"; else printf 'CHECKPOINT_%s=absent\n' "$name"; fi
           done

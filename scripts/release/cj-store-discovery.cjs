@@ -1,6 +1,6 @@
 'use strict';
 // Read-only discovery. Credentials stay inside the existing production container.
-const {PrismaClient}=require('@prisma/client');
+
 const fs=require('node:fs');
 function successfulRead(route,data){
  if(data?.result===false||data?.success===false)return false;
@@ -9,6 +9,7 @@ function successfulRead(route,data){
  return route==='/shop/getShops'&&data?.code===0&&data.success===true&&Array.isArray(data.data);
 }
 async function main(){
+ const {PrismaClient}=require('@prisma/client');
  const db=new PrismaClient({log:[]});
  let last=0;const calls=[];
  try{

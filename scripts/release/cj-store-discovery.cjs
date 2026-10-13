@@ -13,6 +13,9 @@ async function main(){
  const db=new PrismaClient({log:[]});
  let last=0;const calls=[];
  try{
+  const catalog=await db.cj_products.findMany({select:{id:true,cj_product_id:true,name_ar:true,status:true,hidden:true,margin_bps:true,last_sync_at:true},orderBy:{id:'asc'}});
+  console.log(JSON.stringify({format:'trbhh-cj-catalog-v1',count:catalog.length,visible:catalog.filter(p=>p.hidden===0).length,products:catalog},(_,v)=>typeof v==='bigint'?String(v):v));
+
   const base=(process.env.CJ_API_BASE||'https://developers.cjdropshipping.com/api2.0/v1').replace(/\/+$/,'');
   if(base!=='https://developers.cjdropshipping.com/api2.0/v1')throw Error('unexpected_destination');
   const key=process.env.CJ_API_KEY;if(!key)throw Error('missing_api_key');
@@ -29,8 +32,6 @@ async function main(){
   if(!Array.isArray(shops))throw Error('invalid_shop_list');
   const connections=await request('/product/conn/connection?shopId=2609231037543532300&platformProductId=trbhh-cj-247&page=1&pageSize=100','GET',undefined,auth.accessToken);
   console.log(JSON.stringify({format:'cj-connection-readback-v1',total:connections?.total,list:connections?.list?.map(l=>({shopId:l.shopId,platformProductId:l.platformProductId,platformVariantId:l.platformVariantId,cjProductId:l.cjProductId,cjVariantId:l.cjVariantId,defaultArea:l.defaultArea,logistics:l.logistics,sourceCountryCode:l.sourceCountryCode,targetCountryCode:l.targetCountryCode,keys:Object.keys(l)}))}));
-  const catalog=await db.cj_products.findMany({select:{id:true,cj_product_id:true,name_ar:true,status:true,hidden:true,margin_bps:true,last_sync_at:true},orderBy:{id:'asc'}});
-  console.log(JSON.stringify({format:'trbhh-cj-catalog-v1',count:catalog.length,visible:catalog.filter(p=>p.hidden===0).length,products:catalog},(_,v)=>typeof v==='bigint'?String(v):v));
   const row=await db.cj_products.findUnique({where:{id:247n}});
   if(!row||row.hidden!==0)throw Error('product_unavailable');
   const product=await request('/product/query?pid='+encodeURIComponent(row.cj_product_id),'GET',undefined,auth.accessToken);

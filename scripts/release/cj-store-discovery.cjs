@@ -2,6 +2,12 @@
 // Read-only discovery. Credentials stay inside the existing production container.
 const {PrismaClient}=require('@prisma/client');
 const fs=require('node:fs');
+function successfulRead(route,data){
+ if(data?.result===false||data?.success===false)return false;
+ if(data?.code===200&&(data.result===true||data.success===true))return true;
+ // Observed shop gateway envelope; never accept code 0 for any other endpoint.
+ return route==='/shop/getShops'&&data?.code===0&&data.success===true&&Array.isArray(data.data);
+}
 async function main(){
  const db=new PrismaClient({log:[]});
  let last=0;const calls=[];
@@ -13,7 +19,7 @@ async function main(){
    const delay=1200-(Date.now()-last);if(delay>0)await new Promise(r=>setTimeout(r,delay));last=Date.now();
    const res=await fetch(base+route,{method,redirect:'error',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',...(token?{'CJ-Access-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{})});
    const data=await res.json();calls.push({route,http:res.status,code:data.code,result:data.result,success:data.success,responseKeys:Object.keys(data),message:String(data.message||data.msg||" ").replace(/https?:\/\/\S+|[A-Za-z0-9_@.-]{24,}/g,"[redacted]").slice(0,160)});
-   if(!res.ok||data.code!==200||data.result===false||data.success===false||!(data.result===true||data.success===true))throw Error('cj_discovery_failed');
+   if(!res.ok||!successfulRead(route,data))throw Error('cj_discovery_failed');
    return data.data;
   }
   const auth=await request('/authentication/getAccessToken','POST',{apiKey:key});
@@ -25,4 +31,5 @@ async function main(){
   console.log(JSON.stringify({format:'cj-store-discovery-v1',commit:fs.readFileSync('/app/RELEASE_COMMIT','utf8').trim(),authenticatedUserId:auth.userId==null?null:String(auth.userId),shops:shops.map(s=>({id:String(s.id),name:s.name,status:s.status,type:s.type})),product:row?{id:row.id,cjProductId:row.cj_product_id,hidden:row.hidden,variantCount:(JSON.parse(row.details_json||'{}').variants||[]).length}:null,settings,calls},(_,v)=>typeof v==='bigint'?String(v):v));
  }catch(error){console.error(JSON.stringify({ok:false,error:['unexpected_destination','missing_api_key','invalid_authentication','invalid_shop_list'].includes(error.message)?error.message:'discovery_failed',calls}));process.exitCode=1;}finally{await db.$disconnect();}
 }
-void main();
+module.exports={successfulRead};
+if(require.main===module||(module.id==='[stdin]'&&process.argv[1]==='-'))void main();

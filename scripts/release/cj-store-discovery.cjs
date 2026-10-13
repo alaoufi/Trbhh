@@ -20,7 +20,7 @@ function readinessReport(settings,env=process.env){
  const fields=required.map(key=>({key,present:Boolean(env[key]?.trim())}));
  const mode=['sandbox','production'].includes(env.ALRAJHI_ENVIRONMENT)?env.ALRAJHI_ENVIRONMENT:'absent_or_invalid';
  const margin=values.get('commerce_default_margin_bps');
- return {format:'cj-readiness-audit-v1',readOnly:true,marginBps:/^\d{1,6}$/.test(margin||'')?Number(margin):null,settings:Object.fromEntries(flags.map(key=>[key,values.get(key)==='1'])),paymentMode:['test','live'].includes(values.get('pay_mode'))?values.get('pay_mode'):'absent_or_invalid',paymentProvider:/^[a-z_]{1,30}$/.test(values.get('pay_provider')||'')?values.get('pay_provider'):null,bank:{mode,fields,configured:mode!=='absent_or_invalid'&&fields.every(field=>field.present)},environment:Object.fromEntries(['SUPPLIER_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'].map(key=>[key,env[key]==='true']))};
+ return {format:'cj-readiness-audit-v1',readOnly:true,marginBps:/^\d{1,6}$/.test(margin||'')?Number(margin):null,settings:Object.fromEntries(flags.map(key=>[key,values.get(key)==='1'])),paymentMode:['test','live'].includes(values.get('pay_mode'))?values.get('pay_mode'):'absent_or_invalid',paymentProvider:/^[a-z_]{1,30}$/.test(values.get('pay_provider')||'')?values.get('pay_provider'):null,bank:{mode,fields,configured:mode!=='absent_or_invalid'&&fields.every(field=>field.present)},environment:Object.fromEntries(['SUPPLIER_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED','CJ_ALLOW_LIVE_ORDERS'].map(key=>[key,env[key]==='true']))};
 }
 function successfulRead(route,data){
  if(data?.result===false||data?.success===false)return false;
@@ -94,3 +94,4 @@ async function main(){
 }
 module.exports={successfulRead,readinessReport};
 if(require.main===module||(module.id==='[stdin]'&&process.argv[1]==='-'))void main();
+

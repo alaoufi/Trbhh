@@ -11,6 +11,8 @@ function successfulRead(route,data){
 async function main(){
  const {PrismaClient}=require('@prisma/client');
  const db=new PrismaClient({log:[]});
+ const keepAlive=setInterval(()=>{},1000);
+ console.log(JSON.stringify({event:'catalog_audit_started',version:2}));
  let last=0;const calls=[];
  try{
   const catalog=await db.cj_products.findMany({select:{id:true,cj_product_id:true,name_ar:true,status:true,hidden:true,margin_bps:true,last_sync_at:true},orderBy:{id:'asc'}});
@@ -40,7 +42,7 @@ async function main(){
   console.log(JSON.stringify({format:'cj-link-source-v1',product:{pid:product.pid,title:product.productNameEn||product.productName,image:product.productImage},variants:Array.isArray(variants)?variants.map(v=>({vid:v.vid,sku:v.variantSku,title:v.variantNameEn||v.variantName,image:v.variantImage,weight:v.variantWeight})):null,warehouses:inventory?.inventories?.map(v=>({areaId:v.areaId,areaEn:v.areaEn,countryCode:v.countryCode})),sampleInventory:inventory?.variantInventories?.slice(0,1)},(_,v)=>typeof v==='bigint'?String(v):v));
   const settings=await db.site_settings.findMany({where:{k:{in:['commerce_default_margin_bps','cj_usd_to_sar_x100','commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled']}},select:{k:true,v:true}});
   console.log(JSON.stringify({format:'cj-store-discovery-v1',commit:fs.readFileSync('/app/RELEASE_COMMIT','utf8').trim(),authenticatedUserId:auth.userId==null?null:String(auth.userId),shops:shops.map(s=>({id:String(s.id),name:s.name,status:s.status,type:s.type})),product:row?{id:row.id,cjProductId:row.cj_product_id,hidden:row.hidden,variantCount:(JSON.parse(row.details_json||'{}').variants||[]).length}:null,settings,calls},(_,v)=>typeof v==='bigint'?String(v):v));
- }catch(error){console.error(JSON.stringify({ok:false,error:['unexpected_destination','missing_api_key','invalid_authentication','invalid_shop_list'].includes(error.message)?error.message:'discovery_failed',calls}));process.exitCode=1;}finally{await db.$disconnect();}
+ }catch(error){console.error(JSON.stringify({ok:false,error:['unexpected_destination','missing_api_key','invalid_authentication','invalid_shop_list'].includes(error.message)?error.message:'discovery_failed',calls}));process.exitCode=1;}finally{await db.$disconnect();clearInterval(keepAlive);}
 }
 module.exports={successfulRead};
 if(require.main===module||(module.id==='[stdin]'&&process.argv[1]==='-'))void main();

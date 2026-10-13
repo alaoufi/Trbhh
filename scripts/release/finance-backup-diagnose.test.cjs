@@ -66,6 +66,6 @@ test('archive metadata inspection exposes validated counts only and rejects syml
   const run=(command,args,options)=>{calls.push({command,args,options});return {status:0,stdout:JSON.stringify({members:2,directories:1,symlinks:0,hardlinks:0,duplicates:0,unsafePaths:0,symlinkDescendants:0,missingHardlinkTargets:0,SECRET_NAME:'private-customer-file'})};};
   const report=helper().inspectArchive(archive,run);assert.equal(report.available,true);assert.equal(report.members,2);assert.doesNotMatch(JSON.stringify(report),/SECRET|private|customer/);assert.equal(calls[0].options.timeout,120000);
   assert.equal(helper().inspectArchive(archive,()=>({status:0,stdout:'{"members":-1,"SECRET":"private"}'})).available,false);
-  fs.unlinkSync(archive);fs.symlinkSync(path.join(root,'missing'),archive);assert.equal(helper().inspectArchive(archive,()=>{throw Error('must not run');}).available,false);
+  fs.unlinkSync(archive);const linkedDirectory=path.join(root,'linked');fs.mkdirSync(linkedDirectory);fs.symlinkSync(linkedDirectory,archive,process.platform==='win32'?'junction':'dir');assert.equal(helper().inspectArchive(archive,()=>{throw Error('must not run');}).available,false);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

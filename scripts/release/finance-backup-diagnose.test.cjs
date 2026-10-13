@@ -29,3 +29,17 @@ test('media differences expose counts and byte totals only with both-direction s
 test('diagnostic workflow is explicit and leaves cache and deploy operations separate',()=>{
   const source=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(source,/options: \[inspect, diagnose-backup, cache-audit, cache-cleanup\]/);assert.match(source,/PHASE" == diagnose-backup/);assert.match(source,/finance-backup-diagnose.cjs/);
 });
+
+test('current CJ release diagnosis identifies archive corruption and substep without private logs',()=>{
+ const report=helper().summarizeLogs('Finance deployment failed at stage backup; rollbackHealthy=false.','Finance backup failed at stage archives substep verify_archives; no release verification was issued.\ngzip: /private/SECRET/image.tar.gz: invalid compressed data--format violated\n');
+ assert.deepEqual(report.backupStages,['archives']);assert(report.codes.includes('gzip_invalid_data'));assert.doesNotMatch(JSON.stringify(report),/SECRET|private|image.tar/);
+});
+test('only approved failed runs can be inspected and current run is selected exactly',()=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cj-backup-diag-')));
+ try{
+  fs.mkdirSync(path.join(root,'trbhh'));const backup=path.join(root,'trbhh-release-backups/finance-38392214806');fs.mkdirSync(backup,{recursive:true});fs.writeFileSync(path.join(backup,'image.tar.gz'),'fixture');
+  const run=(command)=>command==='git'?{stdout:'a'.repeat(40)}:{stdout:''};
+  const report=helper().collect({root,run,runId:'38392214806'});assert.equal(report.runId,'38392214806');assert.equal(report.backup.files['image.tar.gz'].bytes,7);
+  assert.throws(()=>helper().collect({root,run,runId:'../../private'}));
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

@@ -15,6 +15,11 @@ on:
         options: [inspect, diagnose-backup, cache-audit, cache-cleanup]
         default: inspect
         required: true
+      backup_run_id:
+        description: Allowlisted failed run for read-only diagnosis
+        type: choice
+        options: ['35932588551', '38392214806']
+        default: '35932588551'
       baseline_sha:
         description: Exact serving checkout SHA required for cache operations
         type: string
@@ -26,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   operate:
-    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
+    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/cj-completion-20261013' && inputs.phase == 'diagnose-backup')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -40,6 +45,7 @@ jobs:
       - name: Inspect production or run the selected guarded cache operation
         env:
           PHASE: ${{ inputs.phase || 'inspect' }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id || '35932588551' }}
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -61,7 +67,8 @@ jobs:
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
           if [[ "$PHASE" == diagnose-backup ]]; then
-            "${SSH[@]}" "$target" 'node -' < scripts/release/finance-backup-diagnose.cjs
+            [[ "$BACKUP_RUN_ID" == 35932588551 || "$BACKUP_RUN_ID" == 38392214806 ]]
+            "${SSH[@]}" "$target" "node - '$BACKUP_RUN_ID'" < scripts/release/finance-backup-diagnose.cjs
             exit 0
           fi
           if [[ "$PHASE" != inspect ]]; then

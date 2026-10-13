@@ -10,6 +10,7 @@ import {dispatchPaidNotification} from '@/lib/commerce/notifications';
 import {commerceConfigFromRows} from '@/lib/commerce/config';
 import {updateCommerceProduct} from '@/lib/commerce/products';
 import {CJ_DDL} from '@/lib/cj/schema';
+import {enqueuePaidCjFulfillment} from '@/lib/cj/bank-handoff';
 
 const enabled=process.env.COMMERCE_DB_TESTS==='1';
 const supplierForeignKeys = [
@@ -86,6 +87,8 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     finally {await admin?.$disconnect();}
   });
   beforeEach(async()=>{
+    await client.$executeRaw`DELETE FROM commerce_cj_fulfillment_outbox`;
+    await client.$executeRaw`DELETE FROM commerce_cj_order_quotes`;
     for(const table of ['finance_order_fiscal_snapshots','finance_tax_policies','finance_change_requests','commerce_supplier_accruals','commerce_receipts','commerce_order_suppliers','commerce_product_suppliers','commerce_suppliers','commerce_notifications','commerce_audit_events','commerce_payment_attempts','commerce_order_items','commerce_orders','commerce_products']) await client.$executeRawUnsafe(`DELETE FROM ${table}`);
     await client.$executeRaw`INSERT INTO commerce_products (id,title,price_minor,stock_available,stock_reserved,approved,visible,enabled) VALUES (1,'Fixture product',1025,10,0,1,1,1),(2,'Second product',200,0,0,1,1,1)`;
     // The service's purchasing gate is exercised against this newly-created
@@ -108,6 +111,17 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     const [p]=await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`;
     expect(p).toEqual({stock_available:8,stock_reserved:2});expect(await count('commerce_orders')).toBe(1);
     expect(await count('finance_order_fiscal_snapshots')).toBe(1);
+  });
+  it('keeps a CJ handoff idempotent with real MySQL joins and verified bank receipt',async()=>{
+    const {order,evidence}=await prepared();
+    await settleVerifiedPayment(client,evidence,targets);
+    // This fixture tests the joined SQL handoff, without invoking supplier APIs.
+    const reference=`fixture-cj-${order.id}`,quoteJson=JSON.stringify({supplierReference:reference});
+    await client.$executeRaw`INSERT INTO commerce_cj_order_quotes(commerce_order_id,fulfillment_group,quote_hash,quote_json) VALUES(${order.id},'fixture-group',${'a'.repeat(64)},${quoteJson})`;
+    await client.$transaction(async tx=>{await enqueuePaidCjFulfillment(tx,order.id);await enqueuePaidCjFulfillment(tx,order.id);});
+    const rows=await client.$queryRaw<{commerce_order_id:bigint;supplier_reference:string;status:string}[]>`SELECT commerce_order_id,supplier_reference,status FROM commerce_cj_fulfillment_outbox`;
+    expect(rows).toEqual([{commerce_order_id:order.id,supplier_reference:reference,status:'pending'}]);
+    expect(await count('commerce_receipts')).toBe(1);
   });
   it.each(['missing','latest_incomplete','unapproved','approval_mismatch','legacy_control','invalid_registration'])('rolls back an order with %s fiscal policy without falling back to defaults',async state=>{
     if(state==='missing')await client.$executeRaw`DELETE FROM finance_tax_policies`;

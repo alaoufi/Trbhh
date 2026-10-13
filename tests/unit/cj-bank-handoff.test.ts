@@ -7,6 +7,6 @@ describe('verified bank transaction CJ handoff',()=>{
   const execute=vi.fn().mockResolvedValue(1);const tx={$executeRaw:execute};
   await enqueuePaidCjFulfillment(tx as never,9n);
   const sql=execute.mock.calls[0][0].join('?');
-  expect(sql).toContain('commerce_receipts');expect(sql).toContain("o.status='paid'");expect(sql).toContain('r.amount_minor=o.total_minor');expect(sql).toContain('ON DUPLICATE KEY UPDATE id=id');expect(execute.mock.calls[0].slice(1)).toEqual([9n]);
+  expect(sql).toContain('commerce_receipts');expect(sql).toContain("o.status='paid'");expect(sql).toContain('r.amount_minor=o.total_minor');expect(sql).toContain('ON DUPLICATE KEY UPDATE id=commerce_cj_fulfillment_outbox.id');expect(execute.mock.calls[0].slice(1)).toEqual([9n]);
  });
 });

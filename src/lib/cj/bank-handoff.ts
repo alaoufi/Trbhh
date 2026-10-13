@@ -18,7 +18,7 @@ export async function enqueuePaidCjFulfillment(tx:Tx,orderId:bigint):Promise<voi
  FROM commerce_cj_order_quotes q JOIN commerce_orders o ON o.id=q.commerce_order_id
  JOIN commerce_receipts r ON r.order_id=o.id AND r.amount_minor=o.total_minor AND r.currency='SAR'
  WHERE o.id=${orderId} AND o.status='paid' AND o.currency='SAR'
- ON DUPLICATE KEY UPDATE id=id`;
+ ON DUPLICATE KEY UPDATE id=commerce_cj_fulfillment_outbox.id`;
 }
 export async function requireLiveCjQuotesAtPayment(tx:Tx,orderId:bigint,now:Date):Promise<void>{
  const sources=await tx.$queryRaw<{product_id:bigint;quantity:number;variant_key:string;shipping:unknown;total_minor:number}[]>`SELECT i.product_id,i.quantity,i.variant_key,o.shipping,o.total_minor FROM commerce_order_items i JOIN commerce_orders o ON o.id=i.order_id WHERE i.order_id=${orderId} AND (EXISTS (SELECT 1 FROM cj_products p WHERE p.commerce_product_id=i.product_id) OR EXISTS (SELECT 1 FROM commerce_cj_order_quotes q WHERE q.commerce_order_id=o.id))`;

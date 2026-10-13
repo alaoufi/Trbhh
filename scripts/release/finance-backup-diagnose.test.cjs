@@ -40,7 +40,7 @@ test('media differences expose counts and byte totals only with both-direction s
   assert.equal(helper().summarizeMedia(before,before).comparison.exact,true);assert.equal(helper().summarizeMedia(before,null).current,null);
 });
 test('diagnostic workflow is explicit and leaves cache and deploy operations separate',()=>{
-  const source=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(source,/options: \[inspect, diagnose-backup, replay-backup-media, cache-audit, cache-cleanup, cj-store-discovery\]/);assert.match(source,/PHASE" == diagnose-backup/);assert.match(source,/finance-backup-diagnose.cjs/);
+  const source=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(source,/options: \[inspect, diagnose-backup, replay-backup-media, cache-audit, cache-cleanup, cj-store-discovery, cj-store-connect\]/);assert.match(source,/PHASE" == diagnose-backup/);assert.match(source,/finance-backup-diagnose.cjs/);
 });
 
 test('current CJ release diagnosis identifies archive corruption and substep without private logs',()=>{

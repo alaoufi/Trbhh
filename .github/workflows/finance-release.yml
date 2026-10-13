@@ -124,6 +124,11 @@ jobs:
           console.log(JSON.stringify({financeMediaParentAvailable:ok,financeMediaHistoricalSealAvailable:historicalSealOk,historicalSealSha256}));
           if(!ok||!historicalSealOk)process.exitCode=1;
           PARENT_NODE
+      - name: Require completed CJ discovery evidence
+        if: inputs.phase == 'cj-store-discovery'
+        run: |
+          test -s "$RUNNER_TEMP/cj-discovery.log"
+          grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"
       - name: Remove runner SSH credential
         if: always()
         run: rm -f -- "$HOME/.ssh/finance_key"

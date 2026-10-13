@@ -8,6 +8,34 @@ const inventory=(vid:string,storageNum:number,origin='CN'):CjInventory=>({vid,st
 const options=()=>[{logisticName:'Saudi Standard',logisticPrice:2,logisticAging:'7-12 days',logisticPriceCn:0}];
 
 describe('CJ live availability proof',()=>{
+  it('rejects inventory aggregates outside safe integer precision',async()=>{
+    const result=await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',Number.MAX_SAFE_INTEGER),inventory('v',1)]),getVariants:async()=>ok([variant('v')]),calculateFreight:async()=>ok(options())},375);
+    expect(result.status).toBe('inventory_error');
+  });
+  it.each([{taxesFeeUsd:-3},{clearanceFeeUsd:-1},{totalPostageFeeUsd:-1},{logisticPrice:Number.MAX_VALUE},{taxesFeeUsd:Number.MAX_VALUE}])('rejects malformed or unsafe shipping fees %j',async invalid=>{
+    const result=await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',4)]),getVariants:async()=>ok([variant('v')]),calculateFreight:async()=>ok([{...options()[0],...invalid}])},375);
+    expect(result.status).toBe('no_shipping');
+  });
+  it('re-quotes quantities 1, 2, 1 using CJ values rather than multiplying freight',async()=>{
+    const freight=vi.fn(async(products:{vid:string;quantity:number}[])=>ok([{...options()[0],logisticPrice:products[0].quantity===2?3.1:2}]));
+    const deps={getInventoryByVid:async()=>ok([inventory('v',8)]),getVariants:async()=>ok([variant('v')]),calculateFreight:freight};
+    const results=await Promise.all([1,2,1].map(q=>verifyCjVariantForSaudi('p',variant('v'),q,deps,375)));
+    expect(results.map(r=>r.status==='available'?r.shippingOptions[0].priceMinor:null)).toEqual([750,1163,750]);
+    expect(freight.mock.calls.map(c=>c[0][0].quantity)).toEqual([1,2,1]);
+  });
+  it('does not combine inventory from different origins to promise one shipping route',async()=>{
+    const freight=vi.fn(async()=>ok(options()));
+    const deps={getInventoryByVid:async()=>ok([inventory('v',2,'CN'),inventory('v',4,'US')]),getVariants:async()=>ok([variant('v')]),calculateFreight:freight};
+    const result=await verifyCjVariantForSaudi('p',variant('v'),3,deps,375);
+    expect(result).toMatchObject({status:'available',stockQuantity:4});
+    expect(freight).toHaveBeenCalledExactlyOnceWith([{vid:'v',quantity:3}],undefined,'US');
+    const excessive=await verifyCjVariantForSaudi('p',variant('v'),5,deps,375);
+    expect(excessive.status).toBe('quantity_exceeds_stock');
+  });
+  it('excludes an origin without Saudi shipping from the displayed available stock',async()=>{
+    const result=await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',2,'CN'),inventory('v',400,'US')]),getVariants:async()=>ok([variant('v')]),calculateFreight:async(_products,_zip,origin)=>ok(origin==='CN'?options():[])},375);
+    expect(result).toMatchObject({status:'available',stockQuantity:2,warehouses:[{originCountry:'CN',quantity:2}]});
+  });
   it('checks only the selected VID, exact quantity and inventory origin before quoting freight',async()=>{
     const freight=vi.fn(async()=>ok(options()));
     const result=await verifyCjVariantForSaudi('pid',variant('vid-7',12),3,{

@@ -3,8 +3,10 @@ import { getSession } from '@/lib/auth';
 import { hasAccess } from '@/lib/access-control/guards';
 import { getProduct, getInventoryByPid } from '@/lib/cj/client';
 import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
-import { cjSyncSettings } from '@/lib/cj/sync';
-import { defaultMarginBps } from '@/lib/cj/pricing';
+import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
+import { createDisplayReadCache } from '@/lib/cj/display-freshness';
+import {getCjDestinationZip} from '@/lib/cj/destination';
+import {getStorefrontCjProduct} from '@/lib/cj/mapping';
 
 /**
  * الأرقام الحقيقية الحيّة لبطاقة سلعة واحدة، تُجلب لحظياً عند تحميل الصفحة (بلا تخزين مسبق).
@@ -16,11 +18,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 
-// ذاكرة حيّة قصيرة على الخادم (٥ دقائق) لنتيجة CJ الحقيقية لكل سلعة — ليست تخزيناً مسبقاً
-// لقيم تقديرية، بل حفظ لنتيجة حيّة جُلبت فعلاً كي لا يُعاد نداء CJ (طلب/ثانية) لكل مشاهدة أو
-// تمرير أو مستخدم. السعر/المخزون/الشحن لا تتغيّر خلال دقائق، فتبقى مطابقة لسعر الشراء.
-const LIVE_TTL_MS = 5 * 60 * 1000;
-const liveCache = new Map<string, { at: number; payload: unknown }>();
+// Share active reads only; completed numeric results are never reused.
+const liveCache = createDisplayReadCache<Record<string,unknown>>(0);
 
 export async function GET(request: Request) {
   const session = await getSession().catch(() => null);
@@ -30,24 +29,27 @@ export async function GET(request: Request) {
   const pid = new URL(request.url).searchParams.get('pid')?.trim() ?? '';
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(pid)) return NextResponse.json({ error: 'invalid' }, { status: 400, headers });
 
-  const zipRaw = new URL(request.url).searchParams.get('zip')?.trim() ?? '';
-  const zip = /^\d{5}$/.test(zipRaw) ? zipRaw : undefined;
+  const zip = await getCjDestinationZip(session.uid).catch(()=>null);
+  if(zip===null)return NextResponse.json({status:'unavailable'},{headers});
+  if(!zip)return NextResponse.json({status:'destination_required'},{headers});
 
-  const cacheKey = `${pid}|${zip ?? ''}`;
-  const cached = liveCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < LIVE_TTL_MS) return NextResponse.json(cached.payload, { headers });
-
-  const respond = (payload: unknown) => { liveCache.set(cacheKey, { at: Date.now(), payload }); return NextResponse.json(payload, { headers }); };
+  const idRaw=new URL(request.url).searchParams.get('id');
+  const productId=idRaw===null?null:Number(idRaw);
+  if(productId!==null&&(!Number.isSafeInteger(productId)||productId<1))return NextResponse.json({error:'invalid'},{status:400,headers});
+  const row=productId===null?null:await getStorefrontCjProduct(productId,false).catch(()=>null);
+  if(productId!==null&&(!row||row.hidden!==0||row.cj_product_id!==pid))return NextResponse.json({status:'unavailable'},{headers});
+  const cacheKey = `${pid}|${zip}|${productId??''}`;
+  const refresh=new URL(request.url).searchParams.get('refresh')==='1';
+  const payload=await liveCache.read(cacheKey,async()=>{
+  const respond = (value: Record<string,unknown>) => value;
 
   // getProduct دائماً (للسعر/المتغيّرات). getInventoryByPid فقط عند تعدّد المتغيّرات (لترتيب
   // الاختيار)؛ فالسلعة ذات متغيّر واحد توفّر هذا الطلب. ثم شحن واحد داخل verify.
   const product = await getProduct(pid).catch(() => null);
   if (!product?.ok) return respond({ status: 'unavailable' });
 
-  const [settings, marginBps] = await Promise.all([
-    cjSyncSettings().catch(() => ({ usdToSarX100: 375 } as { usdToSarX100: number })),
-    defaultMarginBps().catch(() => 3000),
-  ]);
+  const settings=await readVerifiedCjPricing();
+  const marginBps=settings.marginBps;
 
   const eligible = product.data.variants.filter((v) => typeof v.variantSellPrice === 'number' && v.variantSellPrice > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid));
   if (!eligible.length) return respond({ status: 'unavailable' });
@@ -68,11 +70,11 @@ export async function GET(request: Request) {
   const check = await verifyCjVariantForSaudi(
     pid, variant, 1,
     { getVariants: async () => ({ ok: true, data: product.data.variants }) },
-    settings.usdToSarX100, { marginBps }, zip,
+    settings.usdToSarX100, row?{marginBps:row.margin_bps,otherCostsMinor:row.other_costs_minor,saleOverrideMinor:row.sale_price_override_minor}:{ marginBps }, zip,
   ).catch(() => null);
 
   // لا نُخزّن حالات الفشل/النفاد (قد تكون عابرة بسبب حدّ المعدّل) كي تُعاد المحاولة فوراً.
-  if (!check || check.status !== 'available') return NextResponse.json({ status: check?.status ?? 'unavailable' }, { headers });
+  if (!check || check.status !== 'available') return { status: check?.status ?? 'unavailable' };
 
   const cheapest = [...check.shippingOptions].sort((a, b) => (a.priceMinor + a.additionalMinor) - (b.priceMinor + b.additionalMinor))[0];
   const shipMinor = cheapest ? cheapest.priceMinor + cheapest.additionalMinor : 0;
@@ -83,5 +85,11 @@ export async function GET(request: Request) {
     stock: check.stockQuantity,
     totalMinor: check.salePriceMinor + shipMinor,
     deliveryDays: cheapest?.deliveryDays ?? null,
+    checkedAt: check.checkedAt,
+    vid: check.vid,
+    quantity: 1,
+    destinationZip:zip,
   });
+  },refresh).catch(()=>({status:'unavailable'}));
+  return NextResponse.json(payload,{headers});
 }

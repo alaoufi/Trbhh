@@ -72,7 +72,7 @@ export type DispatchResult =
 export async function dispatchOrderToCj(orderId: number | bigint, actorId?: number): Promise<DispatchResult> {
   const order = await getOrderById(orderId) as OrderRow | null;
   if (!order) return { ok: false, reason: 'not_found' };
-  if (order.cj_order_id) return { ok: true, cjOrderId: order.cj_order_id }; // أُرسل سابقاً — idempotent
+  if (order.cj_order_id) return { ok: false, reason: 'blocked', detail: 'cj_purchase_commitment_unverified' }; // An ID alone is not acceptance evidence.
   if (!canDispatch(order.status)) return { ok: false, reason: 'not_ready' };
 
   const lines = parseOrderLines(order.cj_lines_json);

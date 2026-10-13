@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound,redirect } from 'next/navigation';
 import { getApprovedPreview } from '@/lib/cj/approved-catalog';
 import { cjStorefrontView } from '@/lib/cj/storefront';
 import { cjPriceLabel } from '@/lib/cj/presentation';
@@ -14,6 +14,7 @@ export default async function ApprovedPreviewPage({ params }: { params: Promise<
   if (!(await cjStorefrontView()).isStaff) notFound();
   const product = await getApprovedPreview((await params).id);
   if (!product) notFound();
+  if(product.cjSourceId)redirect(`/cj/${product.cjSourceId}`);
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 py-5 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="approved-product">
     <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-7 text-amber-950"><b>معاينة خاصة</b> — عرض معلومات السلعة فقط. لا شراء أو دفع أو حجز مخزون من هذه الصفحة.</p>
     <Link href="/cj?tab=trbhh" className="inline-flex min-h-11 items-center text-sm font-bold text-primary hover:underline">العودة إلى اعلانات تربح</Link>

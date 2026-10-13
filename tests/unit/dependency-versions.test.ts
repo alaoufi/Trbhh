@@ -9,9 +9,9 @@ const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json
 
 describe('production dependency security floor', () => {
   it('pins the patched framework and image-processing releases', () => {
-    expect(packageJson.dependencies.next).toBe('16.3.0');
-    expect(packageJson.dependencies.sharp).toBe('0.35.3');
+    expect(packageJson.dependencies.next).toBe('16.3.8');
+    expect(packageJson.dependencies.sharp).toBe('0.35.5');
     expect(packageJson.devDependencies.postcss).toBe('8.5.23');
-    expect(packageJson.devDependencies['eslint-config-next']).toBe('16.3.0');
+    expect(packageJson.devDependencies['eslint-config-next']).toBe('16.3.8');
   });
 });

@@ -3,9 +3,10 @@ const mock=vi.hoisted(()=>({session:vi.fn(),access:vi.fn(),row:vi.fn(),details:v
 vi.mock('@/lib/auth',()=>({getSession:mock.session}));
 vi.mock('@/lib/access-control/guards',()=>({hasAccess:mock.access}));
 vi.mock('@/lib/cj/mapping',()=>({getStorefrontCjProduct:mock.row,parseCjDetails:mock.details}));
-vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:mock.settings}));
+vi.mock('@/lib/cj/verified-pricing',()=>({readVerifiedCjPricing:mock.settings}));
 vi.mock('@/lib/cj/availability',()=>({verifyCjVariantForSaudi:mock.verify}));
 vi.mock('@/lib/cj/tax-quote',()=>({quoteCjVat:mock.tax}));
+vi.mock('@/lib/cj/destination',()=>({getCjDestinationZip:async()=> '23455'}));
 import {POST} from '@/app/api/cj/products/[id]/verify-variant/route';
 import {clearLiveCache} from '@/lib/cj/live-cache';
 
@@ -14,13 +15,23 @@ const row={id:4,hidden:0,cj_product_id:'pid-1',other_costs_minor:10,margin_bps:3
 const variant={vid:'blue-s',sku:'SKU-BS',name:'Black-XL',optionKey:'Color-Black-Size-XL',priceUsd:12,weight:100,attributes:{plug:'EU'}};
 const available={status:'available',vid:'blue-s',sku:'SKU-BS',variantName:'Black-XL',optionKey:'Color-Black-Size-XL',stockQuantity:3,warehouses:[{id:'1',name:'CN',quantity:3,originCountry:'CN'}],supplierPriceMinor:4500,salePriceMinor:5863,shippingOptions:[{name:'Standard',priceMinor:750,additionalMinor:50,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}],checkedAt:'2026-09-24T00:00:00.000Z'};
 function request(body:unknown={variantId:'blue-s',quantity:1},headers:Record<string,string>={}){return new Request(origin+'/api/cj/products/4/verify-variant',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json',...headers},body:JSON.stringify(body)});}
-beforeEach(()=>{vi.clearAllMocks();clearLiveCache();vi.stubEnv('NODE_ENV','production');mock.session.mockResolvedValue({uid:9});mock.access.mockResolvedValue(true);mock.row.mockResolvedValue(row);mock.details.mockReturnValue({variants:[variant]});mock.settings.mockResolvedValue({usdToSarX100:375});mock.verify.mockResolvedValue(available);mock.tax.mockResolvedValue({enabled:true,vatMinor:100,totalMinor:6763});});
+beforeEach(()=>{vi.resetAllMocks();clearLiveCache();vi.stubEnv('NODE_ENV','production');mock.session.mockResolvedValue({uid:9});mock.access.mockResolvedValue(true);mock.row.mockResolvedValue(row);mock.details.mockReturnValue({variants:[variant]});mock.settings.mockResolvedValue({usdToSarX100:375});mock.verify.mockResolvedValue(available);mock.tax.mockResolvedValue({enabled:true,vatMinor:100,totalMinor:6763});});
 afterEach(()=>vi.unstubAllEnvs());
 describe('staff-only CJ exact-variant live check',()=>{
+ it('queries CJ again for 1, 2, 1 and returns the latest supplier price and freight',async()=>{
+  mock.verify.mockResolvedValueOnce(available).mockResolvedValueOnce({...available,shippingOptions:[{...available.shippingOptions[0],priceMinor:1200}]}).mockResolvedValueOnce({...available,salePriceMinor:6000,shippingOptions:[{...available.shippingOptions[0],priceMinor:900}]});
+  const replies=[];for(const quantity of [1,2,1])replies.push(await (await POST(request({variantId:'blue-s',quantity}),{params})).json());
+  expect(mock.verify).toHaveBeenCalledTimes(3);expect(mock.verify.mock.calls.map(c=>c[2])).toEqual([1,2,1]);
+  expect(replies[2]).toMatchObject({salePriceMinor:6000,shippingOptions:[{priceMinor:900}]});
+ });
+ it('does not reuse a previous success after the product is hidden',async()=>{
+  await POST(request(),{params});mock.row.mockResolvedValueOnce({...row,hidden:1});
+  expect((await POST(request(),{params})).status).toBe(404);
+ });
  it('validates current product option, live stock, freight and central tax without exposing source errors',async()=>{
   const response=await POST(request(),{params});const body=await response.json();expect(response.status).toBe(200);
   expect(body).toMatchObject({status:'available',vid:'blue-s',stockQuantity:3,shippingOptions:[{name:'Standard',vatEnabled:true,vatMinor:100,totalMinor:6763}]});
-  expect(mock.verify).toHaveBeenCalledExactlyOnceWith('pid-1',expect.objectContaining({vid:'blue-s',variantSellPrice:12,variantSku:'SKU-BS'}),1,{},375,{otherCostsMinor:10,marginBps:3000,saleOverrideMinor:null});
+  expect(mock.verify).toHaveBeenCalledExactlyOnceWith('pid-1',expect.objectContaining({vid:'blue-s',variantSellPrice:12,variantSku:'SKU-BS'}),1,{},375,{otherCostsMinor:10,marginBps:3000,saleOverrideMinor:null},'23455');
   expect(mock.tax).toHaveBeenCalledExactlyOnceWith(5863,1,800);
  });
  it('requires an authenticated products:view grant',async()=>{

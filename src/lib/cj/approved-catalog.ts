@@ -6,8 +6,8 @@ import { SALLA_OAUTH_SCOPE_VERSION } from '@/lib/suppliers/salla-scope-contract'
 import { cjImg, cjProductImages, cjStorefrontView } from './storefront';
 
 type Scope = 'all' | 'imported' | 'trbhh';
-type Row = { id: bigint; ad_id: bigint | null; title: string; price_minor: number; stock_available: number; images: unknown; description: string | null; supplier_product_id: bigint | null; cj_source_id: bigint | null; cj_image: string | null; cj_images: string | null };
-export type ApprovedPreview = { id: string; key: string; title: string; priceMinor: number; stock: number; images: string[]; description: string; imported: boolean; href: string };
+type Row = { id: bigint; ad_id: bigint | null; title: string; price_minor: number; stock_available: number; images: unknown; description: string | null; supplier_product_id: bigint | null; cj_source_id: bigint | null; cj_pid?:string|null;cj_image: string | null; cj_images: string | null };
+export type ApprovedPreview = { id: string; key: string; title: string; priceMinor: number; stock: number; images: string[]; description: string; imported: boolean; href: string;cjSourceId?:string;cjPid?:string };
 
 /** Same explicit approval contract as /shop, with source readiness enforced before pagination.
  * Never promotes an administrator's advertisement or a paid placement to platform ownership. */
@@ -48,6 +48,7 @@ export async function countApprovedCatalog(scope: Scope): Promise<number> {
 
 const fields = Prisma.sql`cp.id,cp.ad_id,cp.title,cp.price_minor,cp.stock_available,sp.images,sp.description,sp.id AS supplier_product_id,
   (SELECT MIN(cj.id) FROM cj_products cj WHERE cj.commerce_product_id=cp.id) AS cj_source_id,
+  (SELECT cj.cj_product_id FROM cj_products cj WHERE cj.commerce_product_id=cp.id ORDER BY cj.id LIMIT 1) AS cj_pid,
   (SELECT cj.image FROM cj_products cj WHERE cj.commerce_product_id=cp.id ORDER BY cj.id LIMIT 1) AS cj_image,
   (SELECT cj.images FROM cj_products cj WHERE cj.commerce_product_id=cp.id ORDER BY cj.id LIMIT 1) AS cj_images`;
 
@@ -74,7 +75,7 @@ async function previews(rows: Row[]): Promise<ApprovedPreview[]> {
   return rows.map(row => {
     const images = row.cj_source_id != null ? cjProductImages({ image: row.cj_image ?? '', images: row.cj_images }).map(cjImg) : supplierImages(row.images);
     const adImage = row.ad_id == null ? null : imagesByAd.get(String(row.ad_id));
-    return { id: String(row.id), key: `commerce:${row.id}`, title: row.title, priceMinor: row.price_minor, stock: row.stock_available, images: images.length ? images : adImage ? [adImage] : [], description: row.description ?? '', imported: row.supplier_product_id != null || row.cj_source_id != null, href: `/cj/approved/${row.id}` };
+    return { id: String(row.id), key: `commerce:${row.id}`, title: row.title, priceMinor: row.price_minor, stock: row.stock_available, images: images.length ? images : adImage ? [adImage] : [], description: row.description ?? '', imported: row.supplier_product_id != null || row.cj_source_id != null, href:row.cj_source_id!=null?`/cj/${row.cj_source_id}`:`/cj/approved/${row.id}`,...(row.cj_source_id!=null?{cjSourceId:String(row.cj_source_id),...(row.cj_pid?{cjPid:row.cj_pid}:{})}:{}) };
   });
 }
 

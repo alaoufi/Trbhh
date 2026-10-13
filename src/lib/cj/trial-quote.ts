@@ -1,7 +1,7 @@
 import 'server-only';
 import {getStorefrontCjProduct,parseCjDetails} from './mapping';
 import {cjImg,cjProductImages} from './storefront';
-import {cjSyncSettings} from './sync';
+import {readVerifiedCjPricing} from './verified-pricing';
 import {checkedMoney} from '@/lib/commerce/money';
 import {validateTrialCart,trialCartTotal,type TrialCartQuote,type TrialCartItem} from './trial-cart';
 import {verifyCjVariantForSaudi,type VariantCheck} from './availability';
@@ -13,7 +13,7 @@ function safeImage(value:unknown):string|null{
   try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password?cjImg(url.href):null;}catch{return null;}
 }
 type TrialRow=NonNullable<Awaited<ReturnType<typeof getStorefrontCjProduct>>>;
-export type TrialQuoteDeps={getProduct?:(id:number)=>Promise<TrialRow|null>;verify?:(row:TrialRow,variant:CjVariant,quantity:number)=>Promise<VariantCheck>;settings?:()=>Promise<{usdToSarX100:number}>;quoteTax?:(unitMinor:number,quantity:number,shippingMinor:number)=>Promise<{enabled:boolean;vatMinor:number;totalMinor:number}>};
+export type TrialQuoteDeps={destinationZip?:string;getProduct?:(id:number)=>Promise<TrialRow|null>;verify?:(row:TrialRow,variant:CjVariant,quantity:number)=>Promise<VariantCheck>;settings?:()=>Promise<{usdToSarX100:number}>;quoteTax?:(unitMinor:number,quantity:number,shippingMinor:number)=>Promise<{enabled:boolean;vatMinor:number;totalMinor:number}>};
 
 /** Cart refresh is a second live supplier check. No order, reserve, or payment endpoint is called. */
 export async function quoteCjTrialCart(value:unknown,deps:TrialQuoteDeps={}):Promise<TrialCartQuote>{
@@ -28,9 +28,9 @@ export async function quoteCjTrialCart(value:unknown,deps:TrialQuoteDeps={}):Pro
     const saved=variants.find(variant=>variant.vid===item.variantId);
     if(!saved){result.rejected.push({id:item.id,variantId:item.variantId,reason:'variant_unavailable'});continue;}
     if(item.snapshot.verifiedQuantity!==item.qty){result.rejected.push({id:item.id,variantId:item.variantId,reason:'verification_required'});continue;}
-    settings??=await (deps.settings??cjSyncSettings)();
+    settings??=await (deps.settings??readVerifiedCjPricing)();
     const providerVariant:CjVariant={vid:saved.vid,variantSku:saved.sku,variantName:saved.name,variantKey:saved.optionKey,variantSellPrice:saved.priceUsd,variantImage:null,variantWeight:saved.weight,attributes:saved.attributes};
-    const live=await (deps.verify??((product:TrialRow,variant:CjVariant,qty:number)=>verifyCjVariantForSaudi(product.cj_product_id,variant,qty,{},settings!.usdToSarX100,{otherCostsMinor:product.other_costs_minor,marginBps:product.margin_bps,saleOverrideMinor:product.sale_price_override_minor})))(row,providerVariant,item.qty);
+    const live=await (deps.verify??((product:TrialRow,variant:CjVariant,qty:number)=>verifyCjVariantForSaudi(product.cj_product_id,variant,qty,{},settings!.usdToSarX100,{otherCostsMinor:product.other_costs_minor,marginBps:product.margin_bps,saleOverrideMinor:product.sale_price_override_minor},deps.destinationZip)))(row,providerVariant,item.qty);
     if(live.status!=='available'){result.rejected.push({id:item.id,variantId:item.variantId,reason:live.status==='quantity_exceeds_stock'||live.status==='out_of_stock'?'stock_changed':'variant_unavailable'});continue;}
     if(live.salePriceMinor!==item.snapshot.unitMinor){result.rejected.push({id:item.id,variantId:item.variantId,reason:'price_changed'});continue;}
     if(live.stockQuantity!==item.snapshot.stockQuantity){result.rejected.push({id:item.id,variantId:item.variantId,reason:'stock_changed'});continue;}

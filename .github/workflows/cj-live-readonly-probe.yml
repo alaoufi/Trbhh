@@ -2,10 +2,11 @@ name: CJ live product 12 read-only probe
 
 on:
   push:
-    branches: [codex/cj-product-page-20260924]
+    branches: [codex/cj-product-page-20260924, codex/cj-api-mcp-repair-20261012]
     paths:
       - '.github/workflows/cj-live-readonly-probe.yml'
       - 'scripts/release/cj-live-readonly-probe.cjs'
+      - 'scripts/release/cj-api-read-check.cjs'
 
 permissions:
   contents: read
@@ -15,6 +16,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  backup_diagnosis:
+    if: github.ref == 'refs/heads/codex/cj-api-mcp-repair-20261012'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect failed preservation proof without exposing private media
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ -n "$VPS_KNOWN_HOSTS" && -n "$VPS_SSH_KEY" ]]
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/cj-diagnosis-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/cj-diagnosis-hosts"
+          trap 'rm -f -- "$RUNNER_TEMP/cj-diagnosis-key" "$RUNNER_TEMP/cj-diagnosis-hosts"' EXIT
+          ssh -i "$RUNNER_TEMP/cj-diagnosis-key" -p "${VPS_PORT:-22}" -o UserKnownHostsFile="$RUNNER_TEMP/cj-diagnosis-hosts" -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'node -' <<'NODE'
+          const fs=require('node:fs'),root='/root/trbhh-release-backups/finance-38282816041';
+          if(fs.realpathSync(root)!==root)throw Error('unexpected_backup_path');
+          const report={backupRun:'38282816041',media:{}};
+          for(const label of ['storage','legacy']){
+            const row={};for(const phase of ['before','current']){
+              try{const file=root+'/'+label+'-'+phase+'.json',raw=fs.readFileSync(file,'utf8');const m=JSON.parse(raw);row[phase]={valid:Array.isArray(m.entries),count:m.entries?.length??null};row[phase+'Manifest']=m;}
+              catch{row[phase]={valid:false};}
+            }
+            if(row.beforeManifest&&row.currentManifest){const old=new Map(row.beforeManifest.entries.map(e=>[e.path,e])),next=new Map(row.currentManifest.entries.map(e=>[e.path,e]));let missing=0,changed=0,added=0;for(const [p,e]of old){const n=next.get(p);if(!n)missing++;else if(e.kind!==n.kind||e.bytes!==n.bytes||e.sha256!==n.sha256||e.target!==n.target)changed++;}for(const p of next.keys())if(!old.has(p))added++;row.comparison={missing,changed,added};}
+            delete row.beforeManifest;delete row.currentManifest;report.media[label]=row;
+          }
+          const log=fs.readFileSync(root+'/operations.log','utf8');report.watchdogFired=fs.existsSync(root+'/WATCHDOG_FIRED');report.mediaProofError=log.includes('Media proof failed');report.aggregateComparisons=[...log.matchAll(/\{"ok":(?:true|false),"compared":\d+,"missing":\d+,"changed":\d+,"added":\d+\}/g)].map(m=>JSON.parse(m[0]));console.log(JSON.stringify(report));
+          NODE
+  api_read_check:
+    if: github.ref == 'refs/heads/codex/cj-api-mcp-repair-20261012'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify current CJ API authentication and bounded product reads
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          port=${VPS_PORT:-22}
+          [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          [[ -n "$VPS_SSH_KEY" && -n "$VPS_KNOWN_HOSTS" ]]
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/cj-check-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/cj-check-hosts"
+          trap 'rm -f -- "$RUNNER_TEMP/cj-check-key" "$RUNNER_TEMP/cj-check-hosts"' EXIT
+          ssh -i "$RUNNER_TEMP/cj-check-key" -p "$port" -o UserKnownHostsFile="$RUNNER_TEMP/cj-check-hosts" -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/cj-api-read-check.cjs
   probe:
     if: github.ref == 'refs/heads/codex/cj-product-page-20260924'
     runs-on: ubuntu-latest

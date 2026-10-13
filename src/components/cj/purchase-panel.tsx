@@ -7,15 +7,18 @@ import {cjVariantDisplayOptions,type DisplayOption} from '@/lib/cj/variant-displ
 import {addTrialCartItem,type TrialCartSnapshot} from '@/lib/cj/trial-cart';
 import {CartLink,useTrialCart} from './cart-controls';
 import type {CjVariant} from '@/lib/cj/types';
+import {CjText} from './cj-text';
+import {quoteMatchesSelection,type VerifiedSelection} from '@/lib/cj/display-freshness';
 
 type Variant=CjVariant;
-type Check={status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string}[];checkedAt:string}|{status:'out_of_stock'|'quantity_exceeds_stock'|'inventory_error'|'variant_changed'|'no_shipping'|'freight_error'|'invalid_price'|'verification_failed';checkedAt:string};
-const failureMessage:Record<string,string>={checking:'جاري التحقق من المخزون والشحن...',out_of_stock:'غير متوفر حاليًا',quantity_exceeds_stock:'الكمية المطلوبة أكبر من المخزون المتاح',inventory_error:'تعذّر التحقق من المخزون، حاول مرة أخرى',variant_changed:'تغيّرت بيانات الخيار، حدّث الصفحة واختره مجدّداً',no_shipping:'لا يوجد شحن متاح للسعودية لهذا الخيار',freight_error:'تعذّر الحصول على سعر الشحن، حاول مرة أخرى',invalid_price:'تعذّر التحقق من السعر الحالي، لا يمكن الإضافة'};
+type Check={status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string}[];checkedAt:string;destinationZip?:string}|{status:'out_of_stock'|'quantity_exceeds_stock'|'inventory_error'|'variant_changed'|'no_shipping'|'freight_error'|'invalid_price'|'verification_failed';checkedAt:string};
+const failureMessage:Record<string,string>={checking:'جاري التحقق من المخزون والشحن...',destination_required:'أكمل عنوان الشحن والرمز البريدي في ملفك؛ لا تُعرض أرقام غير مؤكدة.',out_of_stock:'غير متوفر حاليًا',quantity_exceeds_stock:'الكمية المطلوبة أكبر من المخزون المتاح',inventory_error:'تعذّر التحقق من المخزون، حاول مرة أخرى',variant_changed:'تغيّرت بيانات الخيار، حدّث الصفحة واختره مجدّداً',no_shipping:'لا يوجد شحن متاح للسعودية لهذا الخيار',freight_error:'تعذّر الحصول على سعر الشحن، حاول مرة أخرى',invalid_price:'تعذّر التحقق من السعر الحالي، لا يمكن الإضافة'};
 const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
 export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
   const [variantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
+  const [checkedSelection,setCheckedSelection]=useState<VerifiedSelection|null>(null);
   // التسميات مُترجمة مسبقاً من الخادم (الإجراء الموحّد). عند غياب خيار واضح (رقم مجرّد) نُلحق
   // رمز السلعة SKU ليتمكّن المستخدم من التمييز بدل «الخيار N» غير المفيد.
   const labelFor=(variant:Variant,index:number)=>{
@@ -54,12 +57,12 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
       try{
         const response=await fetch(`/api/cj/products/${productId}/verify-variant`,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({variantId:selected.vid,quantity:verificationQuantity}),signal:controller.signal});
         const data=await response.json() as Check;
-        if(!active)return;setStatus(response.ok?data.status:data.status||'verification_failed');setCheck(data);setShipping(0);
+        if(!active)return;setStatus(response.ok?data.status:data.status||'verification_failed');setCheck(response.ok?data:null);setCheckedSelection({productId,vid:selected.vid,quantity:verificationQuantity});setShipping(0);
       }catch{if(active){setStatus('verification_failed');setCheck(null);}}
     },200);
     return()=>{active=false;controller.abort();clearTimeout(timer);};
   },[productId,selected,qty,verificationQuantity]);
-  const quote=check?.status==='available'?check:null;
+  const quote=check?.status==='available'&&quoteMatchesSelection(checkedSelection,productId,variantId,verificationQuantity)?check:null;
   // ترتيب شركات الشحن حسب إجمالي الشحن (الأساسي + الإضافي) تصاعدياً — الأرخص أولاً وهو الافتراضي.
   const shipSorted=useMemo(()=>quote?[...quote.shippingOptions].sort((a,b)=>(a.priceMinor+a.additionalMinor)-(b.priceMinor+b.additionalMinor)):[],[quote]);
   const ship=shipSorted[shipping],total=ship?.totalMinor??null;
@@ -77,8 +80,8 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     <h2 className="text-[15px] font-extrabold text-primary">اختر المنتج</h2>
     {selector
       ? <div className="space-y-2.5">{selector.groups.map(group=><div key={group.label}>
-          <p className="mb-1 text-[13px] font-bold leading-tight text-slate-700" dir="auto">{group.label}</p>
-          <div className="flex flex-wrap gap-1.5">{group.values.map(val=><button key={val} type="button" onClick={()=>setChosen(c=>({...c,[group.label]:val}))} aria-pressed={chosen[group.label]===val} dir="auto" title={val} className={`min-h-9 max-w-[16rem] rounded-lg border px-3 py-1 text-[13px] font-semibold leading-tight transition ${chosen[group.label]===val?'border-primary bg-primary text-white shadow-sm':'border-slate-300 bg-white text-slate-700 hover:border-primary/50'}`}>{val}</button>)}</div>
+          <p className="mb-1 text-[13px] font-bold leading-tight text-slate-700" dir="auto"><CjText original={group.label} passive/></p>
+          <div className="flex flex-wrap gap-1.5">{group.values.map(val=><button key={val} type="button" onClick={()=>setChosen(c=>({...c,[group.label]:val}))} aria-pressed={chosen[group.label]===val} dir="auto" title={val} className={`min-h-9 max-w-[16rem] rounded-lg border px-3 py-1 text-[13px] font-semibold leading-tight transition ${chosen[group.label]===val?'border-primary bg-primary text-white shadow-sm':'border-slate-300 bg-white text-slate-700 hover:border-primary/50'}`}><CjText original={val} passive/></button>)}</div>
         </div>)}
         {comboComplete&&!selected&&<p role="status" className="text-sm font-bold text-amber-800">هذا التركيب غير متوفّر — اختر تركيباً آخر.</p>}
       </div>
@@ -92,6 +95,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     {quote&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm">
       {/* يُعرض سعر المنتج النهائي فقط (شامل ربح تربح) — بلا أي ذكر للتكلفة أو المورّد أو المستودع. */}
       <p className="text-slate-700">سعر المنتج: <b className="text-lg text-emerald-800" dir="ltr">{money(quote.salePriceMinor)}</b></p>
+      <p className="text-xs text-slate-600">{quote.destinationZip?`الشحن إلى الرمز البريدي ${quote.destinationZip}`:null}</p>
       <div>
         <p className="mb-1.5 font-bold">شركة الشحن إلى السعودية</p>
         {/* قائمة اختيار منسّقة بدل القائمة المنسدلة: شركة · سعر · مدة، بخط صغير وفواصل وخلفية متبادلة. */}

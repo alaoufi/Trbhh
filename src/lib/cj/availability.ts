@@ -41,25 +41,34 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   const sellable=(row:CjInventory)=>safeQuantity(row.cjInventoryQuantity)||safeQuantity(row.storageNum);
   const exactRows=inventoryResult.data.filter(row=>row.vid===selected.vid&&validOrigin(row.countryCode));
   const warehouses=exactRows.map(row=>({id:row.areaId,name:row.areaName,quantity:sellable(row),originCountry:row.countryCode!.toUpperCase()})).filter(row=>row.quantity>0);
-  const stockQuantity=warehouses.reduce((sum,row)=>sum+row.quantity,0);
+  const stockByOrigin=new Map<string,number>();
+  for(const row of warehouses)stockByOrigin.set(row.originCountry,(stockByOrigin.get(row.originCountry)??0)+row.quantity);
+  let stockQuantity=Math.max(0,...stockByOrigin.values());
+  if(!Number.isSafeInteger(stockQuantity))return {status:'inventory_error',checkedAt};
   if(!stockQuantity)return {status:'out_of_stock',checkedAt};
   if(quantity>stockQuantity)return {status:'quantity_exceeds_stock',checkedAt};
   const calculate=deps.calculateFreight??calculateFreightToKSA;
   // رمز الوجهة الفعلي للمشتري عند توفّره (5 أرقام سعودية)، وإلا الافتراضي داخل calculate.
   const zip=typeof destZip==='string'&&/^\d{5}$/.test(destZip.trim())?destZip.trim():undefined;
-  const freightResults=await Promise.all([...new Set(warehouses.map(row=>row.originCountry))].map(async originCountry=>({originCountry,result:await calculate([{vid:selected.vid,quantity}],zip,originCountry).catch(()=>null)})));
+  const freightResults=await Promise.all([...stockByOrigin].filter(([,stock])=>stock>=quantity).map(async ([originCountry])=>({originCountry,result:await calculate([{vid:selected.vid,quantity}],zip,originCountry).catch(()=>null)})));
   const shippingOptions:SaudiShippingOption[]=[];
   let hadFreightFailure=false;
   for(const {originCountry,result} of freightResults){
     if(!result?.ok){hadFreightFailure=true;continue;}
     for(const option of result.data){
       if(!option.logisticName.trim()||!Number.isFinite(option.logisticPrice)||option.logisticPrice<0)continue;
+      if([option.taxesFeeUsd,option.clearanceFeeUsd,option.totalPostageFeeUsd].some(value=>value!=null&&(!Number.isFinite(value)||value<0)))continue;
       const listedExtra=(Number.isFinite(option.taxesFeeUsd)?option.taxesFeeUsd??0:0)+(Number.isFinite(option.clearanceFeeUsd)?option.clearanceFeeUsd??0:0);
       const totalExtra=Number.isFinite(option.totalPostageFeeUsd)&&option.totalPostageFeeUsd!>option.logisticPrice?option.totalPostageFeeUsd!-option.logisticPrice:listedExtra;
-      shippingOptions.push({name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,usdToSarX100),additionalMinor:minorFromUsd(totalExtra,usdToSarX100),currency:'SAR',deliveryDays:cleanAging(option.logisticAging),originCountry});
+      const priceMinor=minorFromUsd(option.logisticPrice,usdToSarX100),additionalMinor=minorFromUsd(totalExtra,usdToSarX100);
+      if(![priceMinor,additionalMinor,priceMinor+additionalMinor].every(value=>Number.isSafeInteger(value)&&value>=0))continue;
+      shippingOptions.push({name:option.logisticName.trim().slice(0,80),priceMinor,additionalMinor,currency:'SAR',deliveryDays:cleanAging(option.logisticAging),originCountry});
     }
   }
   if(!shippingOptions.length)return {status:hadFreightFailure?'freight_error':'no_shipping',checkedAt};
+  const shippingOrigins=new Set(shippingOptions.map(option=>option.originCountry));
+  stockQuantity=Math.max(...[...shippingOrigins].map(origin=>stockByOrigin.get(origin)??0));
+  const deliverableWarehouses=warehouses.filter(row=>shippingOrigins.has(row.originCountry));
   shippingOptions.sort((a,b)=>a.priceMinor-b.priceMinor||a.name.localeCompare(b.name));
   const supplierPrice=liveVariant.variantSellPrice;
   if(typeof supplierPrice!=='number'||!Number.isFinite(supplierPrice)||supplierPrice<=0)return {status:'invalid_price',checkedAt};
@@ -68,7 +77,7 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   if(pricing?.saleOverrideMinor!=null)salePriceMinor=pricing.saleOverrideMinor;
   else salePriceMinor=computePrice(supplierPriceMinor,0,pricing?.otherCostsMinor??0,pricing?.marginBps??3000).salePriceMinor;
   if(!Number.isSafeInteger(salePriceMinor)||salePriceMinor<=0)return {status:'invalid_price',checkedAt};
-  return {status:'available',vid:liveVariant.vid,sku:liveVariant.variantSku,variantName:liveVariant.variantName??null,optionKey:liveVariant.variantKey??null,stockQuantity,priceChanged:typeof selected.variantSellPrice==='number'&&Number.isFinite(selected.variantSellPrice)&&selected.variantSellPrice!==liveVariant.variantSellPrice,warehouses,supplierPriceMinor,salePriceMinor,shippingOptions,checkedAt};
+  return {status:'available',vid:liveVariant.vid,sku:liveVariant.variantSku,variantName:liveVariant.variantName??null,optionKey:liveVariant.variantKey??null,stockQuantity,priceChanged:typeof selected.variantSellPrice==='number'&&Number.isFinite(selected.variantSellPrice)&&selected.variantSellPrice!==liveVariant.variantSellPrice,warehouses:deliverableWarehouses,supplierPriceMinor,salePriceMinor,shippingOptions,checkedAt};
 }
 
 function validOrigin(value:string|null):boolean{return typeof value==='string'&&/^[A-Za-z]{2}$/.test(value.trim());}

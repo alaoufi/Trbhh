@@ -1,4 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
+// Provider tests use deterministic settings and glossary data, never a real DB.
+vi.mock('@/lib/settings',()=>({getSetting:async()=>''}));
+vi.mock('@/lib/prisma',()=>({prisma:{cj_glossary:{findMany:async()=>[]}}}));
 import {translateArabicCjSearch} from '@/lib/cj/search';
 import {normalizeArabicForSearch} from '@/lib/cj/translate';
 

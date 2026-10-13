@@ -6,7 +6,9 @@ import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { CjAdminNav } from '@/components/cj/admin-nav';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { requireAccess } from '@/lib/access-control/guards';
-import { listCjProducts } from '@/lib/cj/mapping';
+import { loadAdminCjCatalog } from '@/lib/cj/admin-catalog';
+import { CjAdminCatalogControls } from '@/components/cj/admin-catalog-controls';
+import { getCategories } from '@/lib/data';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 import { saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, removeCjProduct } from '../actions';
@@ -23,7 +25,8 @@ const BACK = '/admin/suppliers/cj/imported';
 export default async function CjImportedPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('products', 'view');
   const sp = await searchParams;
-  const importedList = await listCjProducts(200);
+  const [catalog, categories] = await Promise.all([loadAdminCjCatalog(sp), getCategories()]);
+  const importedList = catalog.items;
   const ar = await getCachedArabic(importedList.flatMap((r) => [r.name, r.trbhh_category]));
   const nameOf = (r: { name: string; name_ar: string }) => isArabicText(r.name_ar) ? r.name_ar : (ar.get((r.name || '').trim()) ?? null);
 
@@ -31,13 +34,14 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
     <div className="space-y-4">
       <CjAdminNav current="imported" />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold text-primary">البضائع المستوردة (تخزين وسيط — غير معروضة للعامة): {importedList.length}</h1>
+        <h1 className="text-xl font-extrabold text-primary">البضائع المستوردة (تخزين وسيط — غير معروضة للعامة): {catalog.total}</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/suppliers/cj/browse" className={ghost}>تصفّح واستيراد ←</Link>
           <Link href="/admin/suppliers/cj/showcase" className={ghost}>السلع المعروضة ←</Link>
           <AccessBoundary module="products" action="edit"><form action={translateAllCj}><input type="hidden" name="back" value={BACK} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة تلقائية للكل</SubmitButton></form></AccessBoundary>
         </div>
       </div>
+      <CjAdminCatalogControls path={BACK} catalog={catalog} categories={categories} />
       {typeof sp.edited === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم الحفظ.</p>}
       {typeof sp.translated === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تمّت ترجمة {sp.translated} سلعة تلقائياً.</p>}
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}

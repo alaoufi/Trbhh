@@ -172,12 +172,17 @@ for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
     continue
   fi
   printf '%s\n' "$media_path" > "$backup/$label.path"
+  substep=archive_media_${label}
   docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
+  substep=verify_media_archive_${label}
   gzip -t "$backup/$label.tar.gz"
+  substep=prepare_media_restore_${label}
   mkdir -m 700 "$backup/$label-extracted"
+  substep=extract_media_${label}
   docker run --rm -i --network none --user 0 --read-only --memory=768m --cpus=1 --pids-limit=64 \
     --mount "type=bind,src=$backup/$label-extracted,dst=/restore" \
     --entrypoint tar "$current_image" -xzf - -C /restore --no-same-owner --keep-old-files < "$backup/$label.tar.gz"
+  substep=snapshot_archived_media_${label}
   node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
 done
 # MEDIA_ARCHIVES_END

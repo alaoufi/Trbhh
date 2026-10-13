@@ -1,5 +1,5 @@
 'use strict';
-// Fixed failed run only. No live application command, file write or raw log
+// Allowlisted failed runs only. No live application command, file write or raw log
 // output is permitted; diagnostics are reduced to enumerated codes and states.
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const RUN='35932588551';
@@ -8,11 +8,11 @@ const DEPLOY_STAGES=new Set(['preflight','identity','backup','runtime_preflight'
 const CODES=['compose_identity','compose_source','runtime_environment','runtime_network','finance_media_reference_invalid','merchant_media_reference_invalid','backup_capacity_invalid','ENOENT','ENOSPC','EACCES','EROFS','ETIMEDOUT'];
 function summarizeLogs(deploy,operations){
   const logs=deploy+'\n'+operations,backupStages=[],deploymentStages=[],codes=[];
-  for(const match of logs.matchAll(/Finance backup failed at stage ([a-z_]+);/g))if(BACKUP_STAGES.has(match[1])&&!backupStages.includes(match[1]))backupStages.push(match[1]);
-  for(const match of logs.matchAll(/Finance deployment failed at stage ([a-z_]+);/g))if(DEPLOY_STAGES.has(match[1])&&!deploymentStages.includes(match[1]))deploymentStages.push(match[1]);
+  for(const match of logs.matchAll(/Finance backup failed at stage ([a-z_]+)(?: substep [a-z_]+)?;/g))if(BACKUP_STAGES.has(match[1])&&!backupStages.includes(match[1]))backupStages.push(match[1]);
+  for(const match of logs.matchAll(/Finance deployment failed at stage ([a-z_]+)(?: substep [a-z_]+)?;/g))if(DEPLOY_STAGES.has(match[1])&&!deploymentStages.includes(match[1]))deploymentStages.push(match[1]);
   for(const code of CODES)if(new RegExp('\\b'+code+'\\b').test(logs))codes.push(code);
   for(const match of logs.matchAll(/ERROR (1045|1049|1064|1142|1146|1227|2002|2003|2013)\b/g)){const code='mysql_'+match[1];if(!codes.includes(code))codes.push(code);}
-  for(const [pattern,code] of [[/No such container/i,'docker_container_missing'],[/invalid reference format/i,'docker_reference_invalid'],[/command not found/i,'command_unavailable'],[/Finance retained media verification failed/,'retained_media_rejected'],[/Database proof failed/,'database_proof_rejected'],[/Media proof failed/,'media_proof_rejected'],[/Live database dump failed/,'database_dump_failed']])if(pattern.test(logs))codes.push(code);
+  for(const [pattern,code] of [[/Cannot stat|can't stat/i,'tar_source_stat_failed'],[/Cannot hard link|Cannot hardlink|can't create hardlink/i,'tar_hardlink_failed'],[/Cannot open|can't open/i,'tar_open_failed'],[/Cannot mkdir|can't create directory|can't make directory/i,'tar_directory_failed'],[/Cannot utime|can't restore times/i,'tar_time_restore_failed'],[/Read-only file system/i,'archive_read_only'],[/File exists/i,'archive_path_collision'],[/Permission denied/i,'archive_permission_denied'],[/No such file or directory/i,'archive_target_missing'],[/can't create symlink|Cannot symlink/i,'archive_symlink_error'],[/file changed as we read it/i,'tar_source_changed'],[/file removed before we read it/i,'tar_source_removed'],[/Unexpected EOF in archive|This does not look like a tar archive/i,'tar_archive_invalid'],[/exiting with failure status due to previous errors/i,'tar_prior_error'],[/Killed|Terminated/i,'process_terminated'],[/invalid compressed data|crc error|length error/i,'gzip_invalid_data'],[/unexpected end of file/i,'gzip_truncated'],[/No space left on device/i,'ENOSPC'],[/No such container/i,'docker_container_missing'],[/invalid reference format/i,'docker_reference_invalid'],[/command not found/i,'command_unavailable'],[/Finance retained media verification failed/,'retained_media_rejected'],[/Database proof failed/,'database_proof_rejected'],[/Media proof failed/,'media_proof_rejected'],[/Live database dump failed/,'database_dump_failed']])if(pattern.test(logs))codes.push(code);
   return {backupStages,deploymentStages,codes};
 }
 function summarizeMedia(before,current){
@@ -35,8 +35,41 @@ function summarizeMedia(before,current){
   for(const key of b.entries.keys())if(!a.entries.has(key))added++;
   return {before:a.summary,current:b.summary,comparison:{compared:a.entries.size,removed,changed,added,exact:removed===0&&changed===0&&added===0}};
 }
-function collect({root='/root',run=spawnSync}={}){
-  const prod=path.join(root,'trbhh'),backup=path.join(root,'trbhh-release-backups/finance-'+RUN),tools=path.join(root,'trbhh-release-tools/'+RUN);
+function inspectArchive(file,run=spawnSync){
+  try{
+    const stat=fs.lstatSync(file);
+    if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||fs.realpathSync(file)!==file||fs.realpathSync(path.dirname(file))!==path.dirname(file))return {available:false};
+    const code=`import sys,tarfile,posixpath,json,resource
+resource.setrlimit(resource.RLIMIT_AS,(384*1024*1024,384*1024*1024))
+resource.setrlimit(resource.RLIMIT_CPU,(90,90))
+r=dict(members=0,directories=0,symlinks=0,hardlinks=0,duplicates=0,unsafePaths=0,symlinkDescendants=0,missingHardlinkTargets=0)
+seen=set();links=set()
+with tarfile.open(sys.argv[1],mode='r|gz') as archive:
+ for item in archive:
+  r['members']+=1
+  if r['members']>200000: raise ValueError('member_limit')
+  p=posixpath.normpath(item.name)
+  if p in seen:r['duplicates']+=1
+  if p.startswith('/') or p=='..' or p.startswith('../'):r['unsafePaths']+=1
+  parts=p.split('/')
+  if any('/'.join(parts[:i]) in links for i in range(1,len(parts))):r['symlinkDescendants']+=1
+  if item.isdir():r['directories']+=1
+  if item.issym():r['symlinks']+=1;links.add(p)
+  if item.islnk():
+   r['hardlinks']+=1
+   if posixpath.normpath(item.linkname) not in seen:r['missingHardlinkTargets']+=1
+  seen.add(p)
+print(json.dumps(r))`;
+    const result=run('python3',['-c',code,file],{encoding:'utf8',timeout:120000,maxBuffer:65536});
+    if(result.error||result.status!==0)return {available:false};
+    const data=JSON.parse(result.stdout),keys=['members','directories','symlinks','hardlinks','duplicates','unsafePaths','symlinkDescendants','missingHardlinkTargets'];
+    if(!keys.every(key=>Number.isSafeInteger(data[key])&&data[key]>=0&&data[key]<=200000))return {available:false};
+    return {available:true,...Object.fromEntries(keys.map(key=>[key,data[key]]))};
+  }catch{return {available:false};}
+}
+function collect({root='/root',run=spawnSync,runId=RUN}={}){
+  if(!['35932588551','38392214806'].includes(runId))throw Error('diagnostic_run');
+  const prod=path.join(root,'trbhh'),backup=path.join(root,'trbhh-release-backups/finance-'+runId),tools=path.join(root,'trbhh-release-tools/'+runId);
   const canonical=value=>{try{return fs.realpathSync(value)===value&&fs.lstatSync(value).isDirectory()&&!fs.lstatSync(value).isSymbolicLink();}catch{return false;}};
   if(!canonical(root)||!canonical(prod))throw Error('diagnostic_root');
   function info(file){try{const s=fs.lstatSync(file);return {exists:true,regular:s.isFile()&&!s.isSymbolicLink()&&s.nlink===1,bytes:s.size};}catch{return {exists:false};}}
@@ -55,9 +88,9 @@ function collect({root='/root',run=spawnSync}={}){
       app.composeSourceClasses=sources.map(value=>value.startsWith(prod+'/')?'project':value.startsWith(path.join(root,'trbhh-release-backups')+'/')?'retained-backups':value.startsWith(path.join(root,'trbhh-release-tools')+'/')?'release-tools':'other');
     }catch{app.inspectAvailable=false;}
   }
-  const names=['capacity.json','media-mode.txt','FINANCE_MEDIA_REFERENCE.json','container-before.json','compose-sources.json','code.tar.gz','image.tar.gz','before.json','full-before.json','supplier-before.json','database.sql.gz','storage-current.json','legacy-current.json','full-current.json','restored.json','full-restored.json','SHA256SUMS','VERIFIED','WATCHDOG_FIRED','CUTOVER_READY','ROLLED_BACK','DEPLOYMENT_VERIFIED'];
+  const names=['capacity.json','media-mode.txt','FINANCE_MEDIA_REFERENCE.json','container-before.json','compose-sources.json','code.tar.gz','image.tar.gz','storage.tar.gz','legacy.tar.gz','storage-before.json','legacy-before.json','storage-extracted','legacy-extracted','operations.log','before.json','full-before.json','supplier-before.json','database.sql.gz','storage-current.json','legacy-current.json','full-current.json','restored.json','full-restored.json','SHA256SUMS','VERIFIED','WATCHDOG_FIRED','CUTOVER_READY','ROLLED_BACK','DEPLOYMENT_VERIFIED'];
   const files=Object.fromEntries(names.map(name=>[name,canonical(backup)?info(path.join(backup,name)):{exists:false}]));
-  const timer=command('systemctl',['is-active','trbhh-finance-resume-'+RUN+'.timer']);
+  const timer=command('systemctl',['is-active','trbhh-finance-resume-'+runId+'.timer']);
   const media={};
   for(const label of ['storage','legacy']){try{const before=JSON.parse(read(path.join(backup,label+'-before.json'),64*1024*1024)),current=read(path.join(backup,label+'-current.json'),64*1024*1024);media[label]=summarizeMedia(before,current?JSON.parse(current):null);}catch{media[label]={available:false};}}
   let capacityMeasurement=null,liveSpace=null;
@@ -66,9 +99,10 @@ function collect({root='/root',run=spawnSync}={}){
   if(df.length===3&&df.every(value=>/^\d{1,24}$/.test(value)))liveSpace={totalBytes:df[0],usedBytes:df[1],availableBytes:df[2]};
   const logSummary=summarizeLogs(read(path.join(tools,'deploy.log')),read(path.join(backup,'operations.log')));
   if(Object.values(media).some(value=>value.comparison&&!value.comparison.exact))logSummary.codes.push('media_manifest_mismatch');
-  return {runId:RUN,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,...logSummary};
+  const archiveMetadata=runId==='38392214806'&&files['legacy.tar.gz'].regular?inspectArchive(path.join(backup,'legacy.tar.gz'),run):null;
+  return {runId,archiveMetadata,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,...logSummary};
 }
 if(require.main===module||(process.argv[1]==='-'&&module.id==='[stdin]')){
-  try{if(process.argv.slice(2).length)throw Error('arguments');process.stdout.write(JSON.stringify(collect())+'\n');}catch{process.stderr.write('Finance backup diagnostic unavailable; private details withheld.\n');process.exitCode=1;}
+  try{if(process.argv.slice(2).length>1)throw Error('arguments');process.stdout.write(JSON.stringify(collect({runId:process.argv[2]||RUN}))+'\n');}catch{process.stderr.write('Finance backup diagnostic unavailable; private details withheld.\n');process.exitCode=1;}
 }
-module.exports={summarizeLogs,summarizeMedia,collect};
+module.exports={summarizeLogs,summarizeMedia,inspectArchive,collect};

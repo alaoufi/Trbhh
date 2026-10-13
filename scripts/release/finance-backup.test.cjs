@@ -173,3 +173,12 @@ ${fragment[1]}
     const deploy=fs.readFileSync(path.join(__dirname,'finance-deploy.sh'),'utf8');assert.match(deploy,/verified-parent\|fresh-storage-retained-legacy\) node .*finance-media-reference.cjs" verify/);
   }finally{fs.rmSync(backup,{recursive:true,force:true});}
 });
+
+test('failed media extraction reports its actual media substep before any snapshot proof',()=>{
+ const os=require('node:os'),root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'finance-media-stage-')));
+ try{
+  const loop=read().match(/# MEDIA_ARCHIVES_BEGIN\n([\s\S]*?)# MEDIA_ARCHIVES_END/)[1];
+  const script=`set -Eeuo pipefail\nstage=archives;substep=verify_archives\ntrap 'printf "FAILED_SUBSTEP=%s\\n" "$substep" >&2' ERR\nbackup="$1";reader=fixture;current_image=fixture;tools_dir=fixture;media_capacity=fresh\ndocker(){ if [[ "$1" == exec && "$3" == node ]]; then printf /app/storage; elif [[ "$1" == exec ]]; then printf ARCHIVE; elif [[ "$1" == run ]]; then return 17; fi; }\ngzip(){ return 0; }\nmkdir(){ return 0; }\nnode(){ echo UNEXPECTED_SNAPSHOT; }\n${loop}`;
+  const result=spawnSync(bash,['-c',script,'fixture',root.split(String.fromCharCode(92)).join('/')],{encoding:'utf8'});assert.equal(result.status,17,result.stderr);assert.match(result.stderr,/FAILED_SUBSTEP=extract_media_storage/);assert.doesNotMatch(result.stdout,/UNEXPECTED_SNAPSHOT/);
+ }finally{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true});}
+});

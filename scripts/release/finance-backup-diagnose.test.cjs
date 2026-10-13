@@ -27,5 +27,45 @@ test('media differences expose counts and byte totals only with both-direction s
   assert.equal(helper().summarizeMedia(before,before).comparison.exact,true);assert.equal(helper().summarizeMedia(before,null).current,null);
 });
 test('diagnostic workflow is explicit and leaves cache and deploy operations separate',()=>{
-  const source=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(source,/options: \[inspect, diagnose-backup, cache-audit, cache-cleanup\]/);assert.match(source,/PHASE" == diagnose-backup/);assert.match(source,/finance-backup-diagnose.cjs/);
+  const source=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(source,/options: \[inspect, diagnose-backup, replay-backup-media, cache-audit, cache-cleanup\]/);assert.match(source,/PHASE" == diagnose-backup/);assert.match(source,/finance-backup-diagnose.cjs/);
+});
+
+test('current CJ release diagnosis identifies archive corruption and substep without private logs',()=>{
+ const report=helper().summarizeLogs('Finance deployment failed at stage backup; rollbackHealthy=false.','Finance backup failed at stage archives substep verify_archives; no release verification was issued.\ngzip: /private/SECRET/image.tar.gz: invalid compressed data--format violated\n');
+ assert.deepEqual(report.backupStages,['archives']);assert(report.codes.includes('gzip_invalid_data'));assert.doesNotMatch(JSON.stringify(report),/SECRET|private|image.tar/);
+});
+test('only approved failed runs can be inspected and current run is selected exactly',()=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cj-backup-diag-')));
+ try{
+  fs.mkdirSync(path.join(root,'trbhh'));const backup=path.join(root,'trbhh-release-backups/finance-38392214806');fs.mkdirSync(backup,{recursive:true});fs.writeFileSync(path.join(backup,'image.tar.gz'),'fixture');
+  const run=(command)=>command==='git'?{stdout:'a'.repeat(40)}:{stdout:''};
+  const report=helper().collect({root,run,runId:'38392214806'});assert.equal(report.runId,'38392214806');assert.equal(report.backup.files['image.tar.gz'].bytes,7);
+  assert.throws(()=>helper().collect({root,run,runId:'../../private'}));
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('archive reader warnings are categorized without exposing media names',()=>{
+ const report=helper().summarizeLogs('', 'tar: ./private-customer-file: file changed as we read it\ntar: ./secret-moved-file: file removed before we read it\n');
+ assert(report.codes.includes('tar_source_changed'));assert(report.codes.includes('tar_source_removed'));assert.doesNotMatch(JSON.stringify(report),/private|secret|customer/);
+});
+
+test('tar filesystem errors report only fixed diagnostic categories',()=>{
+ for(const [message,expected] of [['Read-only file system','archive_read_only'],['File exists','archive_path_collision'],['Permission denied','archive_permission_denied'],['No such file or directory','archive_target_missing'],["can't create symlink",'archive_symlink_error']]){
+  const result=helper().summarizeLogs('', 'tar: PRIVATE_PERSON_PATH: '+message);assert(result.codes.includes(expected));assert.doesNotMatch(JSON.stringify(result),/PRIVATE_PERSON_PATH/);
+ }
+});
+
+test('tar source-stat and hardlink errors remain distinct and private',()=>{
+ const source=helper().summarizeLogs('', "tar: can't stat 'PRIVATE_SOURCE': No such file or directory");const target=helper().summarizeLogs('', 'tar: PRIVATE_TARGET: Cannot hard link: No such file or directory');
+ assert(source.codes.includes('tar_source_stat_failed'));assert(target.codes.includes('tar_hardlink_failed'));assert.doesNotMatch(JSON.stringify([source,target]),/PRIVATE_/);
+});
+
+test('archive metadata inspection exposes validated counts only and rejects symlink substitution',()=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cj-archive-meta-'))),archive=path.join(root,'legacy.tar.gz'),calls=[];fs.writeFileSync(archive,'fixture');
+ try{
+  const run=(command,args,options)=>{calls.push({command,args,options});return {status:0,stdout:JSON.stringify({members:2,directories:1,symlinks:0,hardlinks:0,duplicates:0,unsafePaths:0,symlinkDescendants:0,missingHardlinkTargets:0,SECRET_NAME:'private-customer-file'})};};
+  const report=helper().inspectArchive(archive,run);assert.equal(report.available,true);assert.equal(report.members,2);assert.doesNotMatch(JSON.stringify(report),/SECRET|private|customer/);assert.equal(calls[0].options.timeout,120000);
+  assert.equal(helper().inspectArchive(archive,()=>({status:0,stdout:'{"members":-1,"SECRET":"private"}'})).available,false);
+  fs.unlinkSync(archive);const linkedDirectory=path.join(root,'linked');fs.mkdirSync(linkedDirectory);fs.symlinkSync(linkedDirectory,archive,process.platform==='win32'?'junction':'dir');assert.equal(helper().inspectArchive(archive,()=>{throw Error('must not run');}).available,false);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

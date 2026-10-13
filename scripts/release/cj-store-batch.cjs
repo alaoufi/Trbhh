@@ -38,9 +38,18 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
    const suffix='?pid='+encodeURIComponent(row.cj_product_id);
    const product=await api('/product/query'+suffix),variants=await api('/product/variant/query'+suffix),stock=await api('/product/stock/getInventoryByPid'+suffix);
    if(!Array.isArray(variants)||!variants.length)throw Error('variants_response');
-   const routes=await api('/logistic/freightCalculate','POST',{startCountryCode:'CN',endCountryCode:'SA',zip:'11564',products:[{vid:variants[0].vid,quantity:1}]});
-   sourceEvidence={warehouses:(stock.inventories||[]).map(w=>({areaId:w.areaId,countryCode:w.countryCode})),routeCount:(Array.isArray(routes)?routes:routes?.freightList||routes?.list||[]).length};
-   const plan=buildPlan(shops,row,product,variants,stock.inventories||[],Array.isArray(routes)?routes:routes?.freightList||routes?.list||[]);
+   const warehouses=stock.inventories||[];
+   sourceEvidence={warehouses:warehouses.map(w=>({areaId:w.areaId,countryCode:w.countryCode})),quotes:[]};
+   const countries=[...new Set(warehouses.filter(w=>Number.isSafeInteger(w.areaId)&&w.areaId>0&&/^[A-Z]{2}$/.test(w.countryCode)).map(w=>w.countryCode))].sort((a,b)=>a==='CN'?-1:b==='CN'?1:0);
+   if(!countries.length)throw Error('warehouse_unverified');
+   let plan;
+   for(const country of countries){
+    const quoted=await api('/logistic/freightCalculate','POST',{startCountryCode:country,endCountryCode:'SA',zip:'11564',products:[{vid:variants[0].vid,quantity:1}]});
+    const routes=Array.isArray(quoted)?quoted:quoted?.freightList||quoted?.list||[];
+    sourceEvidence.quotes.push({sourceCountryCode:country,routeCount:routes.length});
+    try{plan=buildPlan(shops,row,product,variants,warehouses,routes,{sourceCountryCode:country});break;}catch(error){if(error.message!=='route_unverified')throw error;}
+   }
+   if(!plan)throw Error('route_unverified');
    const query='/product/conn/connection?shopId='+SHOP+'&platformProductId='+plan.product.id+'&page=1&pageSize=100';
    let connection=await api(query);if(!Array.isArray(connection?.list))throw Error('connections_response');
    let created=false;

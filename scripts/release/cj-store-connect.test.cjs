@@ -31,3 +31,10 @@ test('a retained second product keeps stable row-based IDs without changing shop
  const plan=buildPlan(...args);assert.equal(plan.product.id,'trbhh-cj-12');assert.equal(plan.connection.cjProductId,'OTHER_PID');assert.equal(plan.connection.platformProductId,'trbhh-cj-12');assert.equal(plan.batch.variants[0].id,'trbhh-cj-12-VID1');assert.equal(plan.connection.shopId,'2609231037543532300');
  args[1].id=0n;assert.throws(()=>buildPlan(...args));
 });
+test('non-China origins require an actual matching warehouse and observed freight routes',()=>{
+ const args=fixture();args[4]=[{areaId:17,countryCode:'GB'}];
+ assert.throws(()=>buildPlan(...args),/warehouse_unverified/);
+ const plan=buildPlan(...args,{sourceCountryCode:'GB'});assert.equal(plan.connection.defaultArea,17);assert.equal(plan.connection.sourceCountryCode,'GB');assert.equal(plan.connection.sourceCountry,'United Kingdom');
+ assert.throws(()=>buildPlan(...args,{sourceCountryCode:'US'}),/warehouse_unverified/);
+ args[5]=[];assert.throws(()=>buildPlan(...args,{sourceCountryCode:'GB'}),/route_unverified/);
+});

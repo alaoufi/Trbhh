@@ -6,13 +6,16 @@ function connectionIdentitiesMatch(lines,target){
 function connectionsMatch(lines,target){
  return connectionIdentitiesMatch(lines,target)&&lines.every(l=>Number(l.defaultArea)===target.defaultArea&&l.logistics===target.logistics&&l.sourceCountryCode===target.sourceCountryCode&&l.targetCountryCode===target.targetCountryCode);
 }
-function buildPlan(shops,row,product,variants,warehouses,routes){
+function buildPlan(shops,row,product,variants,warehouses,routes,{sourceCountryCode='CN'}={}){
  const shop=shops.find(s=>String(s.id)===SHOP);
  if(!shop||shop.name!=='Trbhh'||shop.status!==1||shop.type!=='api')throw Error('shop_identity');
  if(!row||row.hidden!==0||!/^[1-9]\d{0,15}$/.test(String(row.id))||!/^[A-Za-z0-9_-]{1,64}$/.test(row.cj_product_id)||String(product.pid)!==row.cj_product_id)throw Error('product_identity');
  const saved=JSON.parse(row.details_json||'{}').variants||[];
  if(!Array.isArray(variants)||!variants.length||variants.length!==saved.length||variants.some(v=>!saved.some(s=>s.vid===v.vid))||new Set(variants.map(v=>v.vid)).size!==variants.length)throw Error('variant_identity');
- const origin=warehouses.find(w=>w.countryCode==='CN'&&Number.isSafeInteger(w.areaId)&&w.areaId>0);
+ if(!/^[A-Z]{2}$/.test(sourceCountryCode))throw Error('country_unverified');
+ const sourceCountry=new Intl.DisplayNames(['en'],{type:'region'}).of(sourceCountryCode);
+ if(!sourceCountry||sourceCountry===sourceCountryCode||sourceCountryCode==='ZZ')throw Error('country_unverified');
+ const origin=warehouses.find(w=>w.countryCode===sourceCountryCode&&Number.isSafeInteger(w.areaId)&&w.areaId>0);
  const valid=routes.filter(r=>typeof r.logisticName==='string'&&r.logisticName&&/^[0-9]+(?:\.[0-9]+)?$/.test(String(r.logisticPrice))&&Number.isFinite(Number(r.logisticPrice))).sort((a,b)=>Number(a.logisticPrice)-Number(b.logisticPrice));
  if(!origin)throw Error('warehouse_unverified');
  if(!valid.length)throw Error('route_unverified');
@@ -23,7 +26,7 @@ function buildPlan(shops,row,product,variants,warehouses,routes){
   if(!/^[A-Za-z0-9_-]{1,40}$/.test(v.vid)||typeof v.variantSku!=='string'||!v.variantSku)throw Error('variant_invalid');
   return {id:productId+'-'+v.vid,productId,title:v.variantNameEn||v.variantName||v.variantSku,sku:v.variantSku,image:safeImage(v.variantImage||image)};
  });
- return {product:{id:productId,shopId:SHOP,title:product.productNameEn||product.productName,image:safeImage(image)},batch:{shopId:SHOP,variants:lines},connection:{shopId:SHOP,defaultArea:origin.areaId,logistics:valid[0].logisticName,cjProductId:row.cj_product_id,platformProductId:productId,sourceCountryCode:'CN',sourceCountry:'China',targetCountryCode:'SA',targetCountry:'Saudi Arabia',variantList:variants.map((v,i)=>({cjVariantId:v.vid,platformVariantId:lines[i].id}))}};
+ return {product:{id:productId,shopId:SHOP,title:product.productNameEn||product.productName,image:safeImage(image)},batch:{shopId:SHOP,variants:lines},connection:{shopId:SHOP,defaultArea:origin.areaId,logistics:valid[0].logisticName,cjProductId:row.cj_product_id,platformProductId:productId,sourceCountryCode,sourceCountry,targetCountryCode:'SA',targetCountry:'Saudi Arabia',variantList:variants.map((v,i)=>({cjVariantId:v.vid,platformVariantId:lines[i].id}))}};
 }
 async function main(){
  const {PrismaClient}=require('@prisma/client'),db=new PrismaClient({log:[]});let last=0;

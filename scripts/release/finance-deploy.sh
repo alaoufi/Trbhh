@@ -317,7 +317,7 @@ prove_preservation() {
 const fs=require('node:fs'),env=file=>Object.fromEntries(JSON.parse(fs.readFileSync(file))[0].Config.Env.map(v=>{const i=v.indexOf('=');return [v.slice(0,i),v.slice(i+1)];}));
 const before=env(process.argv[2]),after=env(process.argv[3]);
 for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
-  if(['CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'].includes(key)&&before[key]===undefined&&after[key]==='false')continue;
+  if(['CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED','CJ_ALLOW_LIVE_ORDERS'].includes(key)&&before[key]===undefined&&after[key]==='false')continue;
   if(key==='FINANCE_ISSUANCE_SECRET'&&before[key]===undefined&&after[key]==='')continue;
   // Legacy inert preview flags were baked into an older production image and
   // later removed from the codebase; the app never reads them. Tolerate ONLY

@@ -15,7 +15,7 @@ result=$(timeout 130s docker compose exec -T app node - 2>/dev/null <<'CJ_RUN_NO
  if(secret.length<32){report(false);return;}
  try{
   async function call(path,key){const r=await fetch('http://127.0.0.1:3000/api/internal/cj/'+path,{method:'POST',headers:{Authorization:'Bearer '+secret},redirect:'error',signal:AbortSignal.timeout(55000)});const body=await r.text();let d;try{d=JSON.parse(body);}catch{throw Error('invalid_response');}if(path==='fulfill-orders'&&r.status===503&&d.error==='cj_fulfillment_disabled')return 0;if(r.status!==200||!Number.isSafeInteger(d[key])||d[key]<0||d[key]>1)throw Error('unavailable');return d[key];}
-  const enabled=process.env.SUPPLIER_ALLOW_LIVE_ORDERS==='true'&&process.env.CJ_FULFILLMENT_WORKER_ENABLED==='true';
+  const enabled=process.env.CJ_ALLOW_LIVE_ORDERS==='true'&&process.env.CJ_FULFILLMENT_WORKER_ENABLED==='true'&&process.env.CJ_LIVE_TRIAL_ENABLED==='true';
   let dispatched=0,checked=0,ok=true;
   try{if(enabled)dispatched=await call('fulfill-orders','processed');}catch{ok=false;}
   // Existing shipment reads remain independent of a new order dispatch failure.

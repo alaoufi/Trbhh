@@ -5,7 +5,7 @@ const before = JSON.parse(fs.readFileSync(beforePath, 'utf8'))[0];
 const after = JSON.parse(fs.readFileSync(afterPath, 'utf8'))[0];
 const env = (c) => Object.fromEntries(c.Config.Env.map((v) => { const at = v.indexOf('='); return [v.slice(0, at), v.slice(at + 1)]; }));
 const first = env(before); const last = env(after);
-for (const key of ['CJ_FULFILLMENT_WORKER_ENABLED', 'CJ_LIVE_TRIAL_ENABLED']) {
+for (const key of ['CJ_FULFILLMENT_WORKER_ENABLED', 'CJ_LIVE_TRIAL_ENABLED', 'CJ_ALLOW_LIVE_ORDERS']) {
   if (first[key] !== last[key] && !(first[key] === undefined && last[key] === 'false')) {
     console.error('CJ runtime gate preservation failed; values withheld.'); process.exit(1);
   }

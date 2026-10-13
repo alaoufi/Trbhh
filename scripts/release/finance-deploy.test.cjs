@@ -19,7 +19,7 @@ test('runtime allows only a disabled issuance credential addition and preserves 
   };
   try{
     assert.equal(run(base,{...base,FINANCE_ISSUANCE_SECRET:''}),0);
-    const gates={CJ_FULFILLMENT_WORKER_ENABLED:'false',CJ_LIVE_TRIAL_ENABLED:'false'};
+    const gates={CJ_FULFILLMENT_WORKER_ENABLED:'false',CJ_LIVE_TRIAL_ENABLED:'false',CJ_ALLOW_LIVE_ORDERS:'false'};
     assert.equal(run(base,{...base,...gates}),0);
     for(const key of Object.keys(gates)){
       for(const value of ['true','','0','FALSE'])assert.notEqual(run(base,{...base,...gates,[key]:value}),0);

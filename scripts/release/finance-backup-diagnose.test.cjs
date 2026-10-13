@@ -43,3 +43,8 @@ test('only approved failed runs can be inspected and current run is selected exa
   assert.throws(()=>helper().collect({root,run,runId:'../../private'}));
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('archive reader warnings are categorized without exposing media names',()=>{
+ const report=helper().summarizeLogs('', 'tar: ./private-customer-file: file changed as we read it\ntar: ./secret-moved-file: file removed before we read it\n');
+ assert(report.codes.includes('tar_source_changed'));assert(report.codes.includes('tar_source_removed'));assert.doesNotMatch(JSON.stringify(report),/private|secret|customer/);
+});

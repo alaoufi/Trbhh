@@ -48,3 +48,9 @@ test('archive reader warnings are categorized without exposing media names',()=>
  const report=helper().summarizeLogs('', 'tar: ./private-customer-file: file changed as we read it\ntar: ./secret-moved-file: file removed before we read it\n');
  assert(report.codes.includes('tar_source_changed'));assert(report.codes.includes('tar_source_removed'));assert.doesNotMatch(JSON.stringify(report),/private|secret|customer/);
 });
+
+test('tar filesystem errors report only fixed diagnostic categories',()=>{
+ for(const [message,expected] of [['Read-only file system','archive_read_only'],['File exists','archive_path_collision'],['Permission denied','archive_permission_denied'],['No such file or directory','archive_target_missing'],["can't create symlink",'archive_symlink_error']]){
+  const result=helper().summarizeLogs('', 'tar: PRIVATE_PERSON_PATH: '+message);assert(result.codes.includes(expected));assert.doesNotMatch(JSON.stringify(result),/PRIVATE_PERSON_PATH/);
+ }
+});

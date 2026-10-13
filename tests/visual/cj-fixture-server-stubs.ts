@@ -51,3 +51,6 @@ export async function verifyCjVariantForSaudi(_pid: string, selected: {vid:strin
     shippingOptions:[{name:'شحن اختبار',priceMinor:1000,additionalMinor:0,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}], checkedAt:new Date().toISOString() };
 }
 export async function quoteCjVat(unitMinor:number,quantity:number,shippingMinor:number) { return {enabled:false,vatMinor:0,totalMinor:unitMinor*quantity+shippingMinor}; }
+
+export async function catalogStores() { return []; }
+export async function catalogStoreAdIds() { return []; }

@@ -5,6 +5,11 @@ const before = JSON.parse(fs.readFileSync(beforePath, 'utf8'))[0];
 const after = JSON.parse(fs.readFileSync(afterPath, 'utf8'))[0];
 const env = (c) => Object.fromEntries(c.Config.Env.map((v) => { const at = v.indexOf('='); return [v.slice(0, at), v.slice(at + 1)]; }));
 const first = env(before); const last = env(after);
+for (const key of ['CJ_FULFILLMENT_WORKER_ENABLED', 'CJ_LIVE_TRIAL_ENABLED']) {
+  if (first[key] !== last[key] && !(first[key] === undefined && last[key] === 'false')) {
+    console.error('CJ runtime gate preservation failed; values withheld.'); process.exit(1);
+  }
+}
 if(['merchant_oauth','merchant_headers','supplier_selection','public_home','national_day','national_day_immersive','national_day_loyalty','supplier_admin','banner_separation','onboarding_link','onboarding_template','onboarding_legacy_email','onboarding_legacy_identity','onboarding_audit_compact','catalog_management'].includes(process.argv[4])){
   const keys=['SALLA_CLIENT_ID','SALLA_CLIENT_SECRET','SALLA_WEBHOOK_SECRET','SUPPLIER_TOKEN_ENCRYPTION_KEY','SUPPLIER_RECONCILE_SECRET','SUPPLIER_PUBLIC_ORIGIN','SUPPLIER_ALLOW_LIVE_ORDERS'];
   if(keys.some(key=>!first[key]||first[key]!==last[key])||first.SUPPLIER_PUBLIC_ORIGIN!=='https://trbhh.sa'||first.SUPPLIER_ALLOW_LIVE_ORDERS!=='false'){

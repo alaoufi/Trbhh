@@ -19,6 +19,15 @@ test('runtime allows only a disabled issuance credential addition and preserves 
   };
   try{
     assert.equal(run(base,{...base,FINANCE_ISSUANCE_SECRET:''}),0);
+    const gates={CJ_FULFILLMENT_WORKER_ENABLED:'false',CJ_LIVE_TRIAL_ENABLED:'false'};
+    assert.equal(run(base,{...base,...gates}),0);
+    for(const key of Object.keys(gates)){
+      for(const value of ['true','','0','FALSE'])assert.notEqual(run(base,{...base,...gates,[key]:value}),0);
+      assert.notEqual(run({...base,...gates},{...base,...gates,[key]:'true'}),0);
+      assert.notEqual(run({...base,...gates},base),0);
+    }
+    assert.notEqual(run(base,{...base,...gates,SUPPLIER_ALLOW_LIVE_ORDERS:'true'}),0);
+    assert.notEqual(run(base,{...base,...gates,UNRELATED_NEW_FLAG:'false'}),0);
     assert.notEqual(run(base,{...base,FINANCE_ISSUANCE_SECRET:'new-active-secret'}),0);
     assert.notEqual(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:''}),0);
     assert.equal(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:'existing'}),0);
@@ -203,4 +212,32 @@ test('orchestration keeps backup, immutable revision and private proofs before f
   assert.match(y,/StrictHostKeyChecking=yes/);assert.doesNotMatch(y,/StrictHostKeyChecking=no/);
   assert(y.indexOf('node scripts/release/finance-public-verify.cjs')>y.indexOf('finance-deploy.sh\' deploy'));
   assert(y.indexOf('node scripts/release/finance-public-verify.cjs')<y.indexOf('finance-deploy.sh\' finalize'));
+});
+
+test('CJ unit recovery tolerates either partial installation and repeat rollback, but rejects foreign changes',()=>{
+  const match=read().match(/# CJ_UNITS_BEGIN\n([\s\S]*?)# CJ_UNITS_END/);assert(match);
+  const fragment=match[1].replaceAll('/etc/systemd/system','$units_dir');
+  for(const hadOriginal of [false,true])for(const installed of [0,1,2]){
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-deploy-units-')),backup=path.join(dir,'backup'),units=path.join(dir,'units');
+    fs.mkdirSync(backup);fs.mkdirSync(units);
+    try{
+      fs.writeFileSync(path.join(backup,'CJ_SNAPSHOT_READY'),'');fs.writeFileSync(path.join(backup,'CJ_UNIT_FILES_INSTALLED'),'');
+      fs.writeFileSync(path.join(backup,'cj-enabled.txt'),'0');fs.writeFileSync(path.join(backup,'cj-active.txt'),'0');
+      for(const [i,unit] of ['service','timer'].entries()){
+        fs.writeFileSync(path.join(backup,`cj-${unit}.new`),`new ${unit}\n`);
+        if(hadOriginal)fs.writeFileSync(path.join(backup,`cj-${unit}.old`),`old ${unit}\n`);
+        if(i<installed)fs.writeFileSync(path.join(units,`trbhh-cj-fulfillment.${unit}`),`new ${unit}\n`);
+        else if(hadOriginal)fs.writeFileSync(path.join(units,`trbhh-cj-fulfillment.${unit}`),`old ${unit}\n`);
+      }
+      const script=`set -euo pipefail\nbackup=$1; units_dir=$2\nsystemctl(){ return 0; }\n${fragment}\nrestore_cj_units\nrestore_cj_units`;
+      const args=['-c',script,'test',backup.replaceAll('\\','/'),units.replaceAll('\\','/')];
+      const result=spawnSync(bash,args,{encoding:'utf8'});assert.equal(result.status,0,result.stderr);
+      for(const unit of ['service','timer']){
+        const target=path.join(units,`trbhh-cj-fulfillment.${unit}`);
+        if(hadOriginal)assert.equal(fs.readFileSync(target,'utf8'),`old ${unit}\n`);else assert.equal(fs.existsSync(target),false);
+      }
+      const foreign=path.join(units,'trbhh-cj-fulfillment.timer');fs.writeFileSync(foreign,'foreign change\n');
+      assert.notEqual(spawnSync(bash,args,{encoding:'utf8'}).status,0);assert.equal(fs.readFileSync(foreign,'utf8'),'foreign change\n');
+    }finally{fs.rmSync(dir,{recursive:true,force:true});}
+  }
 });

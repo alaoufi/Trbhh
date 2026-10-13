@@ -40,6 +40,8 @@ afterEach(() => {
 });
 
 describe('CJ authentication and verified connection', () => {
+  it.each([undefined,null,'',' ',true,'0x10',-1,'invalid',1.001])('rejects invalid wallet amount %s rather than verifying zero',async(amount)=>{mock.fetch.mockResolvedValueOnce(success({amount}));const {getCjBalance}=await import('@/lib/cj/client');expect(await finish(getCjBalance())).toEqual({ok:false,error:'balance_response_invalid'});});
+  it('preserves a legitimate exact zero wallet balance',async()=>{mock.fetch.mockResolvedValueOnce(success({amount:'0.00',freezeAmount:'1.00',noWithdrawalAmount:'2.00'}));const {getCjBalance}=await import('@/lib/cj/client');expect(await finish(getCjBalance())).toEqual({ok:true,data:{amountUsd:0,bonusUsd:2,frozenUsd:1}});});
   it('authenticates with the API key payload when no token is stored', async () => {
     mock.readAuth.mockResolvedValue(null);
     mock.fetch.mockResolvedValueOnce(success({ ...tokens, accessTokenExpiryDate: EXPIRY.toISOString() }))
@@ -129,6 +131,17 @@ describe('CJ authentication and verified connection', () => {
 });
 
 describe('CJ inventory identity', () => {
+  it('reads current tracking API and selects only the requested identity', async () => {
+    mock.fetch.mockResolvedValueOnce(success([{trackingNumber:'OTHER',trackingStatus:'Delivered'}, {trackingNumber:'T1',logisticName:'CJPacket',trackingStatus:'In transit',lastMileCarrier:'Local carrier',lastTrackNumber:'LAST1'}]));
+    const {getTracking}=await import('@/lib/cj/client');
+    expect(await finish(getTracking('T1'))).toMatchObject({ok:true,data:{trackNumber:'T1',trackStatus:'In transit',lastMileCarrier:'Local carrier',lastTrackNumber:'LAST1'}});
+    expect(mock.fetch).toHaveBeenCalledWith(`${BASE}/logistic/trackInfo?trackNumber=T1`,expect.anything());
+  });
+  it('rejects unrelated tracking results instead of attributing another delivery', async () => {
+    mock.fetch.mockResolvedValueOnce(success([{trackingNumber:'OTHER',trackingStatus:'Delivered'}]));
+    const {getTracking}=await import('@/lib/cj/client');
+    expect(await finish(getTracking('T1'))).toEqual({ok:false,error:'cj_tracking_identity_unavailable'});
+  });
   it('preserves numeric and string warehouse IDs, variant association, and areaEn in PID inventory', async () => {
     mock.fetch.mockResolvedValueOnce(success({ variantInventories: [
       { vid: 'V1', inventory: [{ areaId: 1, areaEn: 'China', countryCode: 'CN', totalInventory: 12 }, { areaId: 'US-2', areaEn: 'United States', totalInventory: 3 }] },

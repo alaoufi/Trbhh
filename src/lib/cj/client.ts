@@ -110,7 +110,9 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   }).catch(() => ({ status: 0, body: null }));
   const env = (body || {}) as CjEnvelope<T>;
-  if (status !== 200 || !successfulEnvelope(env)) {
+  // This endpoint's documented successful envelope omits code/result.
+  const parentSuccess = path === '/shopping/order/saveGenerateParentOrder' && env.code === undefined && env.success === true && env.result !== false;
+  if (status !== 200 || !(successfulEnvelope(env) || parentSuccess)) {
     // سجلّ تشخيصي آمن (بلا توكن/سرّ): المسار + حالة HTTP + رمز/رسالة CJ — ليظهر السبب
     // الحقيقي في docker logs عند أخطاء مثل inventory_error/freight_error (حدّ معدّل، خيار
     // غير متوفّر، وجهة غير مدعومة…) بدل ابتلاعه. المسار بلا سلسلة الاستعلام (قد تحوي vid فقط).
@@ -251,11 +253,15 @@ export async function calculateFreightToKSA(products: { vid: string; quantity: n
 }
 
 export async function getTracking(trackNumber: string): Promise<CjResult<CjTrack>> {
-  const r = await call<Record<string, unknown>>('/logistic/getTrackInfo', { query: { trackNumber } });
+  const id=trackNumber.trim();
+  if(!id||id.length>200)return {ok:false,error:'cj_tracking_number_invalid'};
+  const r = await call<Record<string, unknown>[]>('/logistic/trackInfo', { query: { trackNumber:id } });
   if (!r.ok) return r;
-  const d = r.data || {};
+  const matches=Array.isArray(r.data)?r.data.filter(d=>d&&d.trackingNumber===id):[];
+  if(matches.length!==1)return {ok:false,error:'cj_tracking_identity_unavailable'};
+  const d=matches[0];
   const details = Array.isArray(d.tracks) ? (d.tracks as Record<string, unknown>[]).map((t) => ({ date: str(t.date), description: str(t.description) })) : [];
-  return { ok: true, data: { trackNumber, logisticName: str(d.logisticName), trackStatus: str(d.trackStatus), details } };
+  return { ok: true, data: { trackNumber:id, logisticName: str(d.logisticName), trackStatus: str(d.trackingStatus), lastMileCarrier:str(d.lastMileCarrier),lastTrackNumber:str(d.lastTrackNumber),details } };
 }
 
 /* ------------------------- استعلام حالة الطلب (قراءة فقط) ------------------------- */
@@ -279,6 +285,7 @@ export async function getCjOrderDetail(orderId: string): Promise<CjResult<CjOrde
       orderStatus: str(d.orderStatus),
       subStatus: str(d.subStatus),
       trackNumber: str(d.trackNumber),
+      proof: d,
     },
   };
 }
@@ -288,10 +295,12 @@ export async function getCjBalance(): Promise<CjResult<CjBalance>> {
   const r = await call<Record<string, unknown>>('/shopping/pay/getBalance', {});
   if (!r.ok) return r;
   const d = r.data || {};
+  const amount = d.amount === null || d.amount === undefined || typeof d.amount==='string'&&!/^\d+(?:\.\d{1,2})?$/.test(d.amount) ? null : num(d.amount);
+  if(amount === null || amount < 0 || !Number.isSafeInteger(Math.round(amount*100)) || Math.abs(amount*100-Math.round(amount*100))>0.000001) return {ok:false,error:'balance_response_invalid'};
   return {
     ok: true,
     data: {
-      amountUsd: num(d.amount) ?? 0,
+      amountUsd: amount,
       bonusUsd: num(d.noWithdrawalAmount) ?? 0,
       frozenUsd: num(d.freezeAmount) ?? 0,
     },
@@ -325,6 +334,30 @@ export async function payCjOrderBalance(_input: { orderId?: string; shipmentOrde
 }
 export async function confirmCjOrder(_orderId: string): Promise<CjResult<{ confirmed: true }>> {
   return purchaseCommitmentBlock();
+}
+
+/** Worker-only transport. A durable claim is required by the caller before each mutation. */
+export async function cjFulfillmentTransport(path: string, body?: unknown): Promise<CjResult<Record<string, unknown>>> {
+  const reads = ['/shopping/order/getOrderDetail', '/shopping/wallet/billingHistory'];
+  const writes = ['/shopping/order/createOrderV3', '/shopping/order/addCart', '/shopping/order/addCartConfirm', '/shopping/order/saveGenerateParentOrder', '/shopping/pay/payBalanceV2'];
+  if (!reads.includes(path) && !writes.includes(path)) return {ok:false,error:'unsupported_fulfillment_endpoint'};
+  if (writes.includes(path)) {
+    if (!(await liveOrdersAllowed()) || process.env.CJ_FULFILLMENT_WORKER_ENABLED !== 'true') return {ok:false,error:'cj_fulfillment_disabled'};
+    if (path.endsWith('createOrderV3') && (body as Record<string,unknown>)?.payType !== 3) return {ok:false,error:'unpaid_create_required'};
+  }
+  if (path.endsWith('getOrderDetail')) return call(path,{query:body as Record<string,string>});
+  return call(path,{method:'POST',body});
+}
+
+export async function getCjBillingHistory(orderCode: string, pageNum = 1): Promise<CjResult<Record<string,unknown>>> {
+  if (!orderCode.trim()) return {ok:false,error:'order_code_required'};
+  return cjFulfillmentTransport('/shopping/wallet/billingHistory',{orderId:orderCode,pageNum,pageSize:100,tradeTypeList:[1]});
+}
+
+/** Physical warehouse identity maps to inventory area/country; an areaId is not storageId. */
+export async function getCjWarehouseDetail(storageId:string):Promise<CjResult<Record<string,unknown>>> {
+  if(!storageId.trim())return {ok:false,error:'storage_id_required'};
+  return call('/warehouse/detail',{query:{id:storageId}});
 }
 /* ------------------------- محوّلات ------------------------- */
 

@@ -67,7 +67,7 @@ export default async function CommerceAdminPage({ searchParams }: { searchParams
   const values = new Map(settings.map(r => [r.k, r.v]));
   return <div className="space-y-4">
     <h1 className="text-xl font-extrabold text-primary">السلع المعتمدة والطلبات</h1>
-    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">العميل يشتري من تربح. تسوية المورد تتم خارج الموقع. لا شحن محفظة ولا دفع آلي للمورد. {gateway?.ready ? '' : 'الدفع المباشر محجوب حتى التحقق من عقد البنك واختبارات بيئته التجريبية.'}</p>
+    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">العميل يدفع لدى تربح عبر البنك. طلبات CJ التجريبية الخاصة تتطلب رصيد المورد والتحقق من السعر والشحن والمخزون قبل الدفع؛ ثم تظهر حالة تجهيز الشحنة والتتبع في الطلب. شحن رصيد CJ يتم في موقع CJ. {gateway?.ready ? '' : 'بوابة البنك غير جاهزة؛ لا يمكن بدء الدفع.'}</p>
     {sp.saved && <p className="text-emerald-700">تم الحفظ.</p>}
     {sp.error && <p role="alert" className="text-red-700">لم يتم الحفظ. تحقق من الحقول وجاهزية البوابة.</p>}
     {sp.delivery && <p role="status">نتيجة الإرسال: {String(sp.delivery)}. لا تؤثر على حالة الدفع.</p>}

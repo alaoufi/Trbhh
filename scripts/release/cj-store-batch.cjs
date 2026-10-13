@@ -55,6 +55,15 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
     try{plan=buildPlan(shops,row,product,variants,warehouses,routes,{sourceCountryCode:country});break;}catch(error){if(error.message!=='route_unverified')throw error;}
    }
    if(!plan)throw Error('route_unverified');
+   if(new URL(plan.product.image).hostname==='cj-product-center.oss-accelerate.aliyuncs.com'){
+    // The authenticated CJ product source supplies this exact bucket. Verify a
+    // raster response before accepting it; never send API credentials to CDN.
+    const image=await fetchApi(plan.product.image,{method:'HEAD',redirect:'error',signal:AbortSignal.timeout(12000),headers:{Referer:'https://cjdropshipping.com/'}});
+    const type=(image.headers.get('content-type')||'').split(';')[0].toLowerCase();
+    const bytes=Number(image.headers.get('content-length'));
+    if(!image.ok||image.redirected||!['image/jpeg','image/jpg','image/png','image/gif','image/webp','image/avif'].includes(type)||!Number.isSafeInteger(bytes)||bytes<=0||bytes>10*1024*1024)throw Error('image_unverified');
+    emit({event:'authenticated_cj_image_cdn_verified',id:row.id,host:'cj-product-center.oss-accelerate.aliyuncs.com',http:image.status,type,bytes});
+   }
    const query='/product/conn/connection?shopId='+SHOP+'&platformProductId='+plan.product.id+'&page=1&pageSize=100';
    let connection=await api(query);if(!Array.isArray(connection?.list))throw Error('connections_response');
    let created=false;

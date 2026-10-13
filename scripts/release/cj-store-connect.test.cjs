@@ -38,3 +38,8 @@ test('non-China origins require an actual matching warehouse and observed freigh
  assert.throws(()=>buildPlan(...args,{sourceCountryCode:'US'}),/warehouse_unverified/);
  args[5]=[];assert.throws(()=>buildPlan(...args,{sourceCountryCode:'GB'}),/route_unverified/);
 });
+test('reviewed CJ bucket is exact and cannot expand to arbitrary OSS tenants',()=>{
+ const args=fixture();args[2].productImage='https://cj-product-center.oss-accelerate.aliyuncs.com/photo.jpg';args[3][0].variantImage=args[2].productImage;
+ assert.equal(buildPlan(...args).product.image,args[2].productImage);
+ for(const host of ['attacker-bucket.oss-accelerate.aliyuncs.com','cj-product-center.oss-accelerate.aliyuncs.com.attacker.test']){args[2].productImage='https://'+host+'/photo.jpg';assert.throws(()=>buildPlan(...args),/image_invalid/);}
+});

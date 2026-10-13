@@ -20,7 +20,8 @@ function buildPlan(shops,row,product,variants,warehouses,routes,{sourceCountryCo
  if(!origin)throw Error('warehouse_unverified');
  if(!valid.length)throw Error('route_unverified');
  let image=product.productImage;try{if(typeof image==='string'&&image.startsWith('['))image=JSON.parse(image)[0];}catch{throw Error('image_invalid');}
- const safeImage=value=>{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||!/(^|\.)cjdropshipping\.com$/.test(u.hostname))throw Error('image_invalid');return u.href;};
+ const reviewedOss=new Set(['cj-product-center.oss-accelerate.aliyuncs.com','cc-west-usa.oss-us-west-1.aliyuncs.com','cc-west-eu.oss-eu-central-1.aliyuncs.com','cc-west-uk.oss-eu-west-1.aliyuncs.com']);
+ const safeImage=value=>{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||u.port||(!/(^|\.)cjdropshipping\.(com|cn)$/.test(u.hostname)&&!reviewedOss.has(u.hostname)))throw Error('image_invalid');return u.href;};
  const productId='trbhh-cj-'+String(row.id);
  const lines=variants.map(v=>{
   if(!/^[A-Za-z0-9_-]{1,40}$/.test(v.vid)||typeof v.variantSku!=='string'||!v.variantSku)throw Error('variant_invalid');

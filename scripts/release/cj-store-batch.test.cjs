@@ -14,10 +14,11 @@ async function runScenario(mode){
   const report=await main({pace:0,cooldown:0,emit:()=>{},execute:(_bin,_args,_options,callback)=>callback(null,(multiple?['12','13']:['12']).map(id=>JSON.stringify({id,cj_product_id:'PID',hidden:0,details_json:JSON.stringify({variants:[{vid:'VID'}]})})).join('\n')+'\n'),fetchApi:async(url,options)=>{
    const parsed=new URL(url),route=parsed.pathname.replace('/api2.0/v1',''),productId=parsed.searchParams.get('platformProductId')||parsed.searchParams.get('platformProductIds');const body=options.body?JSON.parse(options.body):null;calls.push({route,method:options.method,body});
    let data;
+   if(parsed.hostname==='cj-product-center.oss-accelerate.aliyuncs.com'){assert.equal(options.method,'HEAD');assert(!options.headers['CJ-Access-Token']);return{ok:true,status:200,redirected:false,headers:{get:key=>key==='content-type'?'image/jpeg':key==='content-length'?'1024':null}};}
    if(!limitedOnce&&((mode==='read_rate'&&route==='/product/query')||(mode==='metadata_rate'&&route==='/store/product/saveProduct'))){limitedOnce=true;return{ok:false,status:429,json:async()=>({code:1600200,result:false})};}
    if(route==='/authentication/getAccessToken')data={accessToken:'fake-token'};
    else if(route==='/shop/getShops')data=[{id:line.shopId,name:'Trbhh',status:1,type:'api'}];
-   else if(route==='/product/query')data={pid:'PID',productNameEn:'Source',productImage:'https://cf.cjdropshipping.com/p.jpg'};
+   else if(route==='/product/query')data={pid:'PID',productNameEn:'Source',productImage:mode==='reviewed_cdn'?'https://cj-product-center.oss-accelerate.aliyuncs.com/p.jpg':'https://cf.cjdropshipping.com/p.jpg'};
    else if(route==='/product/variant/query')data=[{vid:'VID',variantSku:'SKU',variantImage:'https://cf.cjdropshipping.com/v.jpg'}];
    else if(route==='/product/stock/getInventoryByPid')data={inventories:[{areaId:1,countryCode:'CN'}]};
    else if(route==='/logistic/freightCalculate')data=[{logisticName:'Actual route',logisticPrice:3}];
@@ -34,6 +35,9 @@ async function runScenario(mode){
 }
 test('existing exact identities cause zero metadata writes even when routing fields are absent',async()=>{
  const {report,calls}=await runScenario('existing');assert.equal(report.ok,true);assert.equal(report.results[0].created,false);assert.equal(report.results[0].routingVerified,false);assert.equal(report.writes.length,0);assert(!calls.some(c=>c.route.startsWith('/store/')));
+});
+test('new CJ product-center bucket is checked as a raster without API credentials before metadata writes',async()=>{
+ const {report,calls}=await runScenario('reviewed_cdn');assert.equal(report.ok,true);const head=calls.findIndex(c=>c.method==='HEAD'),save=calls.findIndex(c=>c.route==='/store/product/saveProduct');assert(head>=0&&save>head);
 });
 test('only a rate-limited read is retried before metadata creation',async()=>{
  const {report,calls}=await runScenario('read_rate');assert.equal(report.ok,true);assert.equal(calls.filter(c=>c.route==='/product/query').length,2);assert.equal(calls.filter(c=>c.route==='/store/product/saveProduct').length,1);

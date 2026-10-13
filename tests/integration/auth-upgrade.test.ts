@@ -247,6 +247,9 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
         table==='finance_change_requests'?[]:table==='finance_tax_policies'?['finance_tax_policies.calculation_policy']:names.map((name) => `${table}.${name}`)),
       'commerce_customer_addresses.id','commerce_customer_addresses.member_id','commerce_customer_addresses.label','commerce_customer_addresses.snapshot','commerce_customer_addresses.is_default','commerce_customer_addresses.created_at','commerce_customer_addresses.updated_at',
       'commerce_customer_carts.member_id','commerce_customer_carts.items','commerce_customer_carts.updated_at',
+      // Exact additive private CJ quote/outbox schema; historical rows remain unchanged.
+      ...['commerce_order_id','fulfillment_group','quote_hash','quote_json','created_at'].map(name=>`commerce_cj_order_quotes.${name}`),
+      ...['id','commerce_order_id','fulfillment_group','version','status','quote_json','supplier_reference','cj_order_id','shipment_order_id','pay_id','pay_expires_at','evidence_json','last_error','created_at','updated_at'].map(name=>`commerce_cj_fulfillment_outbox.${name}`),
       'cj_products.availability_json','cj_products.availability_checked_at','cj_products.source_category','cj_products.highlight_label','cj_products.category_id','cj_products.subcategory_id',
       // أعمدة الطبقة المالية لـCJ (الدفع/الموافقة/التحقق) المضافة على cj_orders.
       'cj_orders.cj_shipment_order_id','cj_orders.cj_pay_id','cj_orders.approved_cap_usd_minor','cj_orders.actual_payment_usd_minor','cj_orders.approved_at','cj_orders.approved_by','cj_orders.paid_at','cj_orders.verified_at','cj_orders.verified_source','cj_orders.is_test','cj_orders.last_polled_at','cj_orders.pay_started_at',
@@ -261,6 +264,8 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'hidden')).toMatchObject({ column_type: 'tinyint', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'agent_user_id')).toMatchObject({ column_type: 'bigint unsigned', is_nullable: 'YES', column_default: null });
     expect(added.find(c=>c.table_name==='finance_tax_policies'&&c.column_name==='calculation_policy')).toMatchObject({column_type:'json',is_nullable:'YES',column_default:null});
+    expect(added.find(c=>c.table_name==='commerce_cj_fulfillment_outbox'&&c.column_name==='status')).toMatchObject({column_type:'varchar(32)',is_nullable:'NO',column_default:'pending'});
+    expect(added.find(c=>c.table_name==='commerce_cj_order_quotes'&&c.column_name==='quote_json')).toMatchObject({column_type:'json',is_nullable:'NO'});
     expect(await db.$queryRaw`SELECT calculation_policy FROM finance_tax_policies WHERE id=701`).toEqual([{calculation_policy:null}]);
     const taxIndexes=await db.$queryRaw<{name:string;c:string;non_unique:number|bigint}[]>`SELECT INDEX_NAME AS name,COLUMN_NAME AS c,NON_UNIQUE AS non_unique FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='finance_tax_policies' ORDER BY INDEX_NAME,SEQ_IN_INDEX`;
     expect(taxIndexes.map(row=>({...row,non_unique:Number(row.non_unique)}))).toEqual([

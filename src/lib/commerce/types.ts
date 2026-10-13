@@ -10,7 +10,7 @@ export type ShippingSnapshot = {name:string;phone:string;addressLine:string;city
 export type LegacyShippingSnapshot = Pick<ShippingSnapshot,'name'|'phone'|'addressLine'|'city'|'postalCode'|'country'>;
 export type CreateOrderInput = {memberId: bigint; requestKey: string; items: readonly OrderLineInput[]; shipping: ShippingSnapshot};
 /** Trusted server configuration, NEVER browser fields. Fee must be explicit, including zero. */
-export type OrderPolicy = {shippingFeeMinor: number};
+export type OrderPolicy = {shippingFeeMinor: number;liveCjQuotes?:readonly import('@/lib/cj/live-quote').LiveCjQuote[];staffCjTrial?:true};
 export type ChosenVariantSnapshot={key:string;vid:string|null;sku:string|null;attributes:Record<string,string>};
 export type OrderItemSnapshot = {productId: bigint; title: string; quantity: number; unitPriceMinor: number; totalMinor: number;variantSnapshot:ChosenVariantSnapshot|null;listUnitPriceMinor?:number|null;discountMinor?:number};
 export type OrderSnapshot = {id: bigint; memberId: bigint; status: OrderStatus; currency: 'SAR'; subtotalMinor: number; shippingFeeMinor: number; totalMinor: number; shipping: ShippingSnapshot|LegacyShippingSnapshot; items: OrderItemSnapshot[]};

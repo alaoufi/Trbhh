@@ -1,0 +1,3 @@
+import {describe,it,expect} from 'vitest';
+import {COMMERCE_DDL} from '@/lib/commerce/schema';
+describe('CJ bank settlement durability',()=>{it('requires transactional unique order/group handoff and unique supplier reference',()=>{const ddl=COMMERCE_DDL.find(sql=>sql.includes('CREATE TABLE IF NOT EXISTS commerce_cj_fulfillment_outbox'));expect(ddl).toContain('ENGINE=InnoDB');expect(ddl).toContain('UNIQUE KEY commerce_cj_outbox_group (commerce_order_id,fulfillment_group)');expect(ddl).toContain('UNIQUE KEY commerce_cj_outbox_reference (supplier_reference)');expect(ddl).toContain('quote_json JSON NOT NULL');});});

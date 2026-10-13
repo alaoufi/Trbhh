@@ -9,6 +9,7 @@ function fixture(){
  const execute=vi.fn();const query=vi.fn(async(sql:TemplateStringsArray)=>{
   const text=sql.join('?');if(text.includes('FROM commerce_orders'))return [{id:1n,status:'awaiting_payment'}];
   if(text.includes('FROM commerce_payment_attempts'))return [row];
+  if(text.includes('FROM commerce_order_items i'))return [];
   if(text.includes('UTC_TIMESTAMP'))return [{now:clock}];throw new Error('Unexpected fixture query');
  });
  const tx={$queryRaw:query,$executeRaw:execute};return {row,execute,db:{$transaction:async<T>(run:(client:typeof tx)=>Promise<T>)=>run(tx)}};

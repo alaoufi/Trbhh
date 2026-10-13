@@ -5,6 +5,16 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { quoteCjTrialCart } from '@/lib/cj/trial-quote';
 import { createOrder } from '@/lib/cj/orders/store';
 import {getCjDestinationAddress} from '@/lib/cj/destination';
+import {prisma} from '@/lib/prisma';
+import {getCommerceConfig} from '@/lib/commerce/settings';
+import {getCommerceGateway} from '@/lib/commerce/runtime';
+import {createOrder as createCommerceOrder} from '@/lib/commerce/orders';
+import {buildLiveCjQuote} from '@/lib/cj/live-quote-builder';
+import {formatAddressLine} from '@/lib/commerce/addresses';
+import {requireAnyAdmin} from '@/lib/roles';
+import {resolveCjCheckoutRequestKey} from '@/lib/cj/checkout-renewal';
+import {canonicalCjDestination} from '@/lib/cj/live-destination';
+import {requireCjLiveTrialAuthority} from '@/lib/cj/private-trial';
 
 /**
  * جسر «إتمام الطلب» (المرحلة 1 — بلا أموال ولا شراء حقيقي):
@@ -43,6 +53,26 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
   // نفس لقطة السلة والعنوان للمستخدم تعيد الطلب نفسه عبر تفرّد internal_ref.
   const intent = JSON.stringify({uid:session.uid,items,shipName,shipPhone,shipCity,shipAddress1,shipRegion,shipAddress2});
   const internalRef = `cjt-${session.uid}-${createHash('sha256').update(intent).digest('hex').slice(0,40)}`;
+  const config=await getCommerceConfig();
+  if(config.purchasingEnabled&&process.env.SUPPLIER_ALLOW_LIVE_ORDERS==='true'){
+    if(process.env.CJ_FULFILLMENT_WORKER_ENABLED!=='true')redirect('/cj/cart?order=unavailable');
+    if(process.env.CJ_LIVE_TRIAL_ENABLED!=='true')redirect('/cj/cart?order=unavailable');
+    await requireAnyAdmin(); // restricted staff trial; public enablement is a separate decision
+    await requireCjLiveTrialAuthority(BigInt(session.uid));
+    const gateway=await getCommerceGateway();
+    if(!config.paymentsEnabled||!gateway?.ready)redirect('/cj/cart?order=unavailable');
+    const shipping={name:destination.fullName,phone:destination.phone,addressLine:formatAddressLine(destination),city:destination.city,postalCode:destination.postalCode,country:'SA' as const,region:destination.region,district:destination.district,street:destination.street,buildingNumber:destination.buildingNumber,secondaryNumber:destination.secondaryNumber,alternatePhone:destination.alternatePhone,email:destination.email,shortAddress:destination.shortAddress,deliveryNotes:destination.deliveryNotes};
+    let cjDestination:ReturnType<typeof canonicalCjDestination>;
+    try{cjDestination=canonicalCjDestination(shipping);}catch{redirect('/cj/cart?order=address');}
+    let commerceOrderId:bigint;
+    try{
+      const requestKey=await resolveCjCheckoutRequestKey(prisma,BigInt(session.uid),internalRef,new Date());
+      const liveQuotes=await Promise.all(lines.map(item=>buildLiveCjQuote({memberId:BigInt(session.uid),requestKey,item,destination:cjDestination})));
+      const order=await createCommerceOrder(prisma,{memberId:BigInt(session.uid),requestKey,shipping,items:liveQuotes.flatMap(q=>q.lines.map(line=>({productId:BigInt(line.productId),quantity:line.quantity,variantKey:line.vid})))},{shippingFeeMinor:liveQuotes.reduce((sum,q)=>sum+q.customerShippingSarMinor,0),liveCjQuotes:liveQuotes,staffCjTrial:true});
+      commerceOrderId=order.id;
+    }catch{redirect('/cj/cart?order=recheck');}
+    redirect(`/account/orders/${commerceOrderId}`);
+  }
   // بنود الإرسال للمورد: المورد يحتاج vid (وهو variantId في السلة) + الكمية، ومسار الشحن.
   const orderLines = lines
     .filter(l => l.variantId)

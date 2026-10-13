@@ -8,10 +8,10 @@ async function readCatalogDatabase(){
  const {execFile}=require('node:child_process');
  const url=new URL(process.env.DATABASE_URL);
  if(url.protocol!=='mysql:')throw Error('database_protocol');
- const sql="SELECT JSON_OBJECT('id',CAST(id AS CHAR),'cj_product_id',cj_product_id,'name_ar',name_ar,'status',status,'hidden',hidden,'margin_bps',margin_bps,'last_sync_at',last_sync_at,'details_json',details_json) FROM cj_products ORDER BY id; SELECT JSON_OBJECT('k',k,'v',v) FROM site_settings WHERE k IN ('commerce_default_margin_bps','cj_usd_to_sar_x100','commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled');";
+ const sql="SELECT JSON_OBJECT('id',CAST(id AS CHAR),'cj_product_id',cj_product_id,'name_ar',name_ar,'status',status,'hidden',hidden,'margin_bps',margin_bps,'last_sync_at',last_sync_at,'details_json',details_json,'commerce_product_id',CAST(commerce_product_id AS CHAR)) FROM cj_products ORDER BY id; SELECT JSON_OBJECT('k',k,'v',v) FROM site_settings WHERE k IN ('commerce_default_margin_bps','cj_usd_to_sar_x100','commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled'); SELECT JSON_OBJECT('cjRowId',CAST(cj.id AS CHAR),'requestedCommerceProductId',CAST(cj.commerce_product_id AS CHAR),'commerceProductId',CAST(cp.id AS CHAR),'approved',cp.approved,'visible',cp.visible,'enabled',cp.enabled,'currency',cp.currency,'priceMinor',cp.price_minor,'stockAvailable',cp.stock_available) FROM cj_products cj LEFT JOIN commerce_products cp ON cp.id=cj.commerce_product_id WHERE cj.commerce_product_id IS NOT NULL ORDER BY cj.id;";
  const output=await new Promise((resolve,reject)=>execFile('mysql',['--protocol=TCP','--host='+url.hostname,'--port='+(url.port||'3306'),'--user='+decodeURIComponent(url.username),'--database='+decodeURIComponent(url.pathname.slice(1)),'--default-character-set=utf8mb4','--batch','--raw','--skip-column-names','--connect-timeout=10','--execute='+sql],{env:{...process.env,MYSQL_PWD:decodeURIComponent(url.password)},timeout:20000,maxBuffer:16*1024*1024},(error,stdout)=>error?reject(Error('database_read_failed')):resolve(stdout)));
  const rows=output.trim()?output.trim().split('\n').map(line=>JSON.parse(line)):[];
- return {catalog:rows.filter(row=>row.id!=null),settings:rows.filter(row=>row.k!=null)};
+ return {catalog:rows.filter(row=>row.id!=null),settings:rows.filter(row=>row.k!=null),mappings:rows.filter(row=>row.cjRowId!=null)};
 }
 function successfulRead(route,data){
  if(data?.result===false||data?.success===false)return false;
@@ -26,8 +26,9 @@ async function main(){
  console.log(JSON.stringify({event:'catalog_audit_started',version:3}));
  let last=0;const calls=[];
  try{
-  const {catalog,settings}=await readCatalogDatabase();
+  const {catalog,settings,mappings}=await readCatalogDatabase();
   console.log(JSON.stringify({format:'trbhh-cj-catalog-v1',count:catalog.length,visible:catalog.filter(p=>p.hidden===0).length,products:catalog.map(({details_json,...p})=>({...p,variants:(JSON.parse(details_json||'{}').variants||[]).map(v=>({vid:v.vid,sku:v.variantSku}))}))},(_,v)=>typeof v==='bigint'?String(v):v));
+  console.log(JSON.stringify({format:'cj-commerce-mapping-audit-v1',readOnly:true,boundProducts:catalog.filter(row=>row.commerce_product_id!=null).length,missingTargets:mappings.filter(row=>row.commerceProductId==null).length,saleFlagsEnabled:mappings.filter(row=>row.approved===1&&row.visible===1&&row.enabled===1).length,mappings}));
 
   const base=(process.env.CJ_API_BASE||'https://developers.cjdropshipping.com/api2.0/v1').replace(/\/+$/,'');
   if(base!=='https://developers.cjdropshipping.com/api2.0/v1')throw Error('unexpected_destination');

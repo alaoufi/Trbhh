@@ -16,26 +16,30 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
  const rows=output.trim().split('\n').map(line=>JSON.parse(line));
  if(rows.some(r=>r.k&&!['0','false',null].includes(r.v)))throw Error('live_sales_enabled');
  const products=ids.map(id=>rows.find(r=>r.id===id));if(products.some(p=>!p||p.hidden!==0))throw Error('batch_product_unavailable');
- let token,last=0;const results=[],writes=[];
+ let token,last=0,lastResponse=null;const results=[],writes=[];
  async function api(route,method='GET',body){
   const root=route.split('?')[0];
   const reads=['/shop/getShops','/product/query','/product/variant/query','/product/stock/getInventoryByPid','/product/conn/connection','/shop/product/queryDetail'];
   const posts=['/authentication/getAccessToken','/logistic/freightCalculate','/store/product/saveProduct','/store/product/saveVariantBatch','/product/conn/connection'];
   if(!(method==='GET'?reads:posts).includes(root))throw Error('endpoint_blocked');
   const delay=pace-(Date.now()-last);if(delay>0)await new Promise(r=>setTimeout(r,delay));last=Date.now();
+  lastResponse={endpoint:root,method,http:null,code:null};
   const res=await fetchApi(BASE+route,{method,redirect:'error',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',...(token?{'CJ-Access-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{})});
-  const env=await res.json();if(!res.ok||!(env.code===200||(root==='/shop/getShops'&&env.code===0))||env.success===false||env.result===false||!(env.success===true||env.result===true))throw Error('api_rejected');
+  lastResponse.http=res.status;
+  const env=await res.json();lastResponse.code=env.code;if(!res.ok||!(env.code===200||(root==='/shop/getShops'&&env.code===0))||env.success===false||env.result===false||!(env.success===true||env.result===true))throw Error('api_rejected');
   if(method==='POST'&&(root.startsWith('/store/')||root==='/product/conn/connection')){const receipt={endpoint:root,requestId:env.requestId||null,productId:body.id||body.platformProductId||body.variants?.[0]?.productId};writes.push(receipt);emit({event:'metadata_response',...receipt});}
   return env.data;
  }
  const auth=await api('/authentication/getAccessToken','POST',{apiKey:process.env.CJ_API_KEY});token=auth?.accessToken;if(typeof token!=='string'||!token)throw Error('auth_response');
  const shops=await api('/shop/getShops');if(!Array.isArray(shops))throw Error('shops_response');
  for(const row of products){
+  let sourceEvidence=null;
   try{
    const suffix='?pid='+encodeURIComponent(row.cj_product_id);
    const product=await api('/product/query'+suffix),variants=await api('/product/variant/query'+suffix),stock=await api('/product/stock/getInventoryByPid'+suffix);
    if(!Array.isArray(variants)||!variants.length)throw Error('variants_response');
    const routes=await api('/logistic/freightCalculate','POST',{startCountryCode:'CN',endCountryCode:'SA',zip:'11564',products:[{vid:variants[0].vid,quantity:1}]});
+   sourceEvidence={warehouses:(stock.inventories||[]).map(w=>({areaId:w.areaId,countryCode:w.countryCode})),routeCount:(Array.isArray(routes)?routes:routes?.freightList||routes?.list||[]).length};
    const plan=buildPlan(shops,row,product,variants,stock.inventories||[],Array.isArray(routes)?routes:routes?.freightList||routes?.list||[]);
    const query='/product/conn/connection?shopId='+SHOP+'&platformProductId='+plan.product.id+'&page=1&pageSize=100';
    let connection=await api(query);if(!Array.isArray(connection?.list))throw Error('connections_response');
@@ -53,7 +57,7 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
    }
    if(!connectionIdentitiesMatch(connection?.list,plan.connection))throw Error('connection_readback_failed');
    const result={id:row.id,platformProductId:plan.product.id,identityVerified:true,routingVerified:connectionsMatch(connection.list,plan.connection),connectedVariants:connection.list.length,created};results.push(result);emit({event:'metadata_identity_verified',...result});
-  }catch(error){const result={id:row.id,identityVerified:false,error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed'};results.push(result);emit({event:'metadata_product_failed',...result});break;}
+  }catch(error){const result={id:row.id,identityVerified:false,error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed',lastResponse,sourceEvidence};results.push(result);emit({event:'metadata_product_failed',...result});break;}
  }
  const failed=results.some(r=>!r.identityVerified)||results.length!==ids.length;
  const report={event:'cj_batch_completed',ok:!failed,shopId:SHOP,requested:ids.length,processed:results.length,results,writes,purchasePerformed:false,customerQuoteApproved:false,routingTestZip:'11564',pricesWritten:false,inventoryWritten:false,retryPolicy:'read_existing_identifiers_before_any_write'};emit(report);if(failed)process.exitCode=1;return report;

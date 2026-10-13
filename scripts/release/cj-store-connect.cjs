@@ -14,7 +14,8 @@ function buildPlan(shops,row,product,variants,warehouses,routes){
  if(!Array.isArray(variants)||!variants.length||variants.length!==saved.length||variants.some(v=>!saved.some(s=>s.vid===v.vid))||new Set(variants.map(v=>v.vid)).size!==variants.length)throw Error('variant_identity');
  const origin=warehouses.find(w=>w.countryCode==='CN'&&Number.isSafeInteger(w.areaId)&&w.areaId>0);
  const valid=routes.filter(r=>typeof r.logisticName==='string'&&r.logisticName&&/^[0-9]+(?:\.[0-9]+)?$/.test(String(r.logisticPrice))&&Number.isFinite(Number(r.logisticPrice))).sort((a,b)=>Number(a.logisticPrice)-Number(b.logisticPrice));
- if(!origin||!valid.length)throw Error('route_unverified');
+ if(!origin)throw Error('warehouse_unverified');
+ if(!valid.length)throw Error('route_unverified');
  let image=product.productImage;try{if(typeof image==='string'&&image.startsWith('['))image=JSON.parse(image)[0];}catch{throw Error('image_invalid');}
  const safeImage=value=>{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||!/(^|\.)cjdropshipping\.com$/.test(u.hostname))throw Error('image_invalid');return u.href;};
  const productId='trbhh-cj-'+String(row.id);

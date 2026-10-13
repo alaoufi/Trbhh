@@ -33,7 +33,7 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
  const auth=await api('/authentication/getAccessToken','POST',{apiKey:process.env.CJ_API_KEY});token=auth?.accessToken;if(typeof token!=='string'||!token)throw Error('auth_response');
  const shops=await api('/shop/getShops');if(!Array.isArray(shops))throw Error('shops_response');
  for(const row of products){
-  let sourceEvidence=null;
+  let sourceEvidence=null,metadataAttempted=false;
   try{
    const suffix='?pid='+encodeURIComponent(row.cj_product_id);
    const product=await api('/product/query'+suffix),variants=await api('/product/variant/query'+suffix),stock=await api('/product/stock/getInventoryByPid'+suffix);
@@ -49,6 +49,7 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
     const detail=await api('/shop/product/queryDetail?shopId='+SHOP+'&platformProductIds='+plan.product.id);
     if(!Array.isArray(detail)||detail.length)throw Error('existing_product_requires_reconciliation');
     emit({event:'connection_intent',productId:plan.product.id,variants:variants.length,pricesOmitted:true,inventoryOmitted:true});
+    metadataAttempted=true;
     if(await api('/store/product/saveProduct','POST',plan.product)!==true)throw Error('product_save_unverified');
     const saved=await api('/store/product/saveVariantBatch','POST',plan.batch);
     if(!Array.isArray(saved)||saved.length!==plan.batch.variants.length||plan.batch.variants.some(v=>!saved.some(s=>s.id===v.id&&s.productId===v.productId&&s.saveSuccess===true)))throw Error('variant_save_unverified');
@@ -57,7 +58,7 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
    }
    if(!connectionIdentitiesMatch(connection?.list,plan.connection))throw Error('connection_readback_failed');
    const result={id:row.id,platformProductId:plan.product.id,identityVerified:true,routingVerified:connectionsMatch(connection.list,plan.connection),connectedVariants:connection.list.length,created};results.push(result);emit({event:'metadata_identity_verified',...result});
-  }catch(error){const result={id:row.id,identityVerified:false,error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed',lastResponse,sourceEvidence};results.push(result);emit({event:'metadata_product_failed',...result});break;}
+  }catch(error){const result={id:row.id,identityVerified:false,error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed',lastResponse,sourceEvidence,metadataAttempted};results.push(result);emit({event:'metadata_product_failed',...result});if(metadataAttempted)break;}
  }
  const failed=results.some(r=>!r.identityVerified)||results.length!==ids.length;
  const report={event:'cj_batch_completed',ok:!failed,shopId:SHOP,requested:ids.length,processed:results.length,results,writes,purchasePerformed:false,customerQuoteApproved:false,routingTestZip:'11564',pricesWritten:false,inventoryWritten:false,retryPolicy:'read_existing_identifiers_before_any_write'};emit(report);if(failed)process.exitCode=1;return report;

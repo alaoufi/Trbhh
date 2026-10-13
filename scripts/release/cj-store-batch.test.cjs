@@ -6,12 +6,13 @@ test('bounded explicit product IDs reject duplicates, shell input and implicit f
 });
 async function runScenario(mode){
  const original={...process.env};const originalExit=process.exitCode;
- Object.assign(process.env,{CJ_STORE_BATCH_IDS:'12',CJ_API_KEY:'fake-key',CJ_API_BASE:'https://developers.cjdropshipping.com/api2.0/v1',SUPPLIER_ALLOW_LIVE_ORDERS:'false',DATABASE_URL:'mysql://test:test@127.0.0.1/test'});
- const calls=[];let connected=mode==='existing';
+ const multiple=mode.endsWith('_then_new');
+ Object.assign(process.env,{CJ_STORE_BATCH_IDS:multiple?'12,13':'12',CJ_API_KEY:'fake-key',CJ_API_BASE:'https://developers.cjdropshipping.com/api2.0/v1',SUPPLIER_ALLOW_LIVE_ORDERS:'false',DATABASE_URL:'mysql://test:test@127.0.0.1/test'});
+ const calls=[],connected=new Set(mode==='existing'?['trbhh-cj-12']:[]);
  const line={shopId:'2609231037543532300',cjProductId:'PID',cjVariantId:'VID',platformProductId:'trbhh-cj-12',platformVariantId:'trbhh-cj-12-VID'};
  try{
-  const report=await main({pace:0,emit:()=>{},execute:(_bin,_args,_options,callback)=>callback(null,JSON.stringify({id:'12',cj_product_id:'PID',hidden:0,details_json:JSON.stringify({variants:[{vid:'VID'}]})})+'\n'),fetchApi:async(url,options)=>{
-   const route=new URL(url).pathname.replace('/api2.0/v1','');const body=options.body?JSON.parse(options.body):null;calls.push({route,method:options.method,body});
+  const report=await main({pace:0,emit:()=>{},execute:(_bin,_args,_options,callback)=>callback(null,(multiple?['12','13']:['12']).map(id=>JSON.stringify({id,cj_product_id:'PID',hidden:0,details_json:JSON.stringify({variants:[{vid:'VID'}]})})).join('\n')+'\n'),fetchApi:async(url,options)=>{
+   const parsed=new URL(url),route=parsed.pathname.replace('/api2.0/v1',''),productId=parsed.searchParams.get('platformProductId')||parsed.searchParams.get('platformProductIds');const body=options.body?JSON.parse(options.body):null;calls.push({route,method:options.method,body});
    let data;
    if(route==='/authentication/getAccessToken')data={accessToken:'fake-token'};
    else if(route==='/shop/getShops')data=[{id:line.shopId,name:'Trbhh',status:1,type:'api'}];
@@ -19,11 +20,11 @@ async function runScenario(mode){
    else if(route==='/product/variant/query')data=[{vid:'VID',variantSku:'SKU',variantImage:'https://cf.cjdropshipping.com/v.jpg'}];
    else if(route==='/product/stock/getInventoryByPid')data={inventories:[{areaId:1,countryCode:'CN'}]};
    else if(route==='/logistic/freightCalculate')data=[{logisticName:'Actual route',logisticPrice:3}];
-   else if(route==='/product/conn/connection'&&options.method==='GET')data={list:connected?[line]:[]};
-   else if(route==='/shop/product/queryDetail')data=mode==='partial'?[{id:line.platformProductId}]:[];
-   else if(route==='/store/product/saveProduct')data=true;
+   else if(route==='/product/conn/connection'&&options.method==='GET')data={list:connected.has(productId)?[{...line,platformProductId:productId,platformVariantId:productId+'-VID'}]:[]};
+   else if(route==='/shop/product/queryDetail')data=(mode==='partial'||mode==='partial_then_new')&&productId==='trbhh-cj-12'?[{id:line.platformProductId}]:[];
+   else if(route==='/store/product/saveProduct'){if(mode==='uncertain_then_new'&&body.id==='trbhh-cj-12')throw Error('network_timeout');data=true;}
    else if(route==='/store/product/saveVariantBatch')data=body.variants.map(v=>({id:v.id,productId:v.productId,saveSuccess:true}));
-   else if(route==='/product/conn/connection'&&options.method==='POST'){connected=true;data=true;}
+   else if(route==='/product/conn/connection'&&options.method==='POST'){connected.add(body.platformProductId);data=true;}
    else throw Error('unexpected_endpoint');
    return {ok:true,json:async()=>({code:200,result:true,success:true,data})};
   }});
@@ -32,6 +33,14 @@ async function runScenario(mode){
 }
 test('existing exact identities cause zero metadata writes even when routing fields are absent',async()=>{
  const {report,calls}=await runScenario('existing');assert.equal(report.ok,true);assert.equal(report.results[0].created,false);assert.equal(report.results[0].routingVerified,false);assert.equal(report.writes.length,0);assert(!calls.some(c=>c.route.startsWith('/store/')));
+});
+test('an untouched conflicting product does not block an independent later product',async()=>{
+ const {report,calls}=await runScenario('partial_then_new');assert.equal(report.ok,false);assert.equal(report.processed,2);assert.equal(report.results[0].metadataAttempted,false);assert.equal(report.results[1].identityVerified,true);assert.equal(report.writes.length,3);
+ assert.deepEqual(calls.filter(c=>c.route==='/store/product/saveProduct').map(c=>c.body.id),['trbhh-cj-13']);
+});
+test('an uncertain metadata write stops later products and is never retried blindly',async()=>{
+ const {report,calls}=await runScenario('uncertain_then_new');assert.equal(report.ok,false);assert.equal(report.processed,1);assert.equal(report.results[0].metadataAttempted,true);assert.equal(report.writes.length,0);
+ assert.deepEqual(calls.filter(c=>c.route==='/store/product/saveProduct').map(c=>c.body.id),['trbhh-cj-12']);
 });
 test('partial existing metadata stops before any save or connection retry',async()=>{
  const {report}=await runScenario('partial');assert.equal(report.ok,false);assert.equal(report.results[0].error,'existing_product_requires_reconciliation');assert.equal(report.writes.length,0);

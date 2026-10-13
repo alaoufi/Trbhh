@@ -3,15 +3,13 @@ import {getSession} from '@/lib/auth';
 import {hasAccess} from '@/lib/access-control/guards';
 import {getStorefrontCjProduct,parseCjDetails} from '@/lib/cj/mapping';
 import {verifyCjVariantForSaudi} from '@/lib/cj/availability';
-import {cjSyncSettings} from '@/lib/cj/sync';
+import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
 import {primaryOrigin} from '@/lib/public-origin';
 import {quoteCjVat} from '@/lib/cj/tax-quote';
-import {readLiveCache,writeLiveCache} from '@/lib/cj/live-cache';
+import {getCjDestinationZip} from '@/lib/cj/destination';
 
 export const runtime='nodejs';export const dynamic='force-dynamic';
-// ذاكرة قصيرة لنتيجة التحقّق الناجحة لاختيار المستخدم (تسريع تبديل الخيار وإعادة التحميل).
-// لا تمسّ المسار المالي: تسعير السلة وإنشاء الطلب يتحقّقان حيّاً بلا هذه الذاكرة.
-const VERIFY_TTL_MS=3*60*1000;
+// Every selected variant/quantity request verifies CJ again, including a return to quantity 1.
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
 const failure=(error:string,status:number)=>NextResponse.json({error},{status,headers});
 function trustedOrigin(origin:string|null,url:string):boolean{
@@ -31,20 +29,18 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     let body:Record<string,unknown>;
     try{const parsed=await request.json() as unknown;if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return failure('invalid_request',400);body=parsed as Record<string,unknown>;}catch{return failure('invalid_request',400);}
     if(Object.keys(body).sort().join(',')!=='quantity,variantId'||typeof body.variantId!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(body.variantId)||!Number.isSafeInteger(body.quantity)||Number(body.quantity)<1||Number(body.quantity)>99)return failure('invalid_request',400);
-    const cacheKey=`verify:${id}:${body.variantId}:${body.quantity}`;
-    const cached=readLiveCache<Record<string,unknown>>(cacheKey,VERIFY_TTL_MS);
-    if(cached)return NextResponse.json(cached,{headers});
     const row=await getStorefrontCjProduct(id,false);if(!row||row.hidden!==0)return failure('unavailable',404);
     const details=parseCjDetails(row),variant=details?.variants.find(item=>item.vid===body.variantId);if(!variant)return failure('variant_unavailable',404);
-    const settings=await cjSyncSettings();
-    const checked=await verifyCjVariantForSaudi(row.cj_product_id,{vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes},Number(body.quantity),{},settings.usdToSarX100,{otherCostsMinor:row.other_costs_minor,marginBps:row.margin_bps,saleOverrideMinor:row.sale_price_override_minor});
+    const settings=await readVerifiedCjPricing();
+    const destinationZip=await getCjDestinationZip(session.uid);
+    if(!destinationZip)return NextResponse.json({status:'destination_required'},{headers});
+    const checked=await verifyCjVariantForSaudi(row.cj_product_id,{vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes},Number(body.quantity),{},settings.usdToSarX100,{otherCostsMinor:row.other_costs_minor,marginBps:row.margin_bps,saleOverrideMinor:row.sale_price_override_minor},destinationZip);
     if(checked.status!=='available')return NextResponse.json({status:checked.status,checkedAt:checked.checkedAt},{headers});
     const shippingOptions=await Promise.all(checked.shippingOptions.map(async option=>{
       const tax=await quoteCjVat(checked.salePriceMinor,Number(body.quantity),option.priceMinor+option.additionalMinor);
       return {...option,vatEnabled:tax.enabled,vatMinor:tax.vatMinor,totalMinor:tax.totalMinor};
     }));
-    const payload={...checked,shippingOptions};
-    writeLiveCache(cacheKey,payload); // النجاح فقط يُخزَّن؛ الفشل يُعاد التحقّق منه فوراً
+    const payload={...checked,shippingOptions,destinationZip};
     return NextResponse.json(payload,{headers});
   }catch{
     // Provider detail and credentials never cross the server/client boundary.

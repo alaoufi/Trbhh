@@ -1,7 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({row:vi.fn(),details:vi.fn((row:{details_json?:unknown})=>row.details_json??null),verify:vi.fn()}));
 vi.mock('@/lib/cj/mapping',()=>({getStorefrontCjProduct:mock.row,parseCjDetails:mock.details}));
-vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({usdToSarX100:375})}));
+vi.mock('@/lib/cj/verified-pricing',()=>({readVerifiedCjPricing:async()=>({usdToSarX100:375,marginBps:3000})}));
 vi.mock('@/lib/cj/availability',()=>({verifyCjVariantForSaudi:mock.verify}));
 vi.mock('@/lib/cj/tax-quote',()=>({quoteCjVat:async(unit:number,quantity:number,shipping:number)=>({enabled:false,vatMinor:0,totalMinor:unit*quantity+shipping})}));
 vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:(row:{image:string})=>row.image?[row.image]:[]}));
@@ -15,7 +15,11 @@ describe('CJ trial cart server revalidation',()=>{
   it('quotes only from a second exact-Vid live check and adds shipping to the line once',async()=>{
     const result=await quoteCjTrialCart([{id:4,qty:2,variantId:'blue-s',snapshot:snapshot({verifiedQuantity:2,totalMinor:3700})}]);
     expect(result).toMatchObject({currency:'SAR',totalMinor:3700,lines:[{id:4,qty:2,variantId:'blue-s',title:'سلعة',variantName:'Color-Black-Size-XL',variantSku:'SKU-BS',variantStock:5,unitMinor:1500,shippingMinor:700,shippingName:'Saudi Standard',totalMinor:3700}]});
-    expect(mock.verify).toHaveBeenCalledExactlyOnceWith('private-pid',expect.objectContaining({vid:'blue-s'}),2,{},375,{otherCostsMinor:0,marginBps:3000,saleOverrideMinor:null});
+    expect(mock.verify).toHaveBeenCalledExactlyOnceWith('private-pid',expect.objectContaining({vid:'blue-s'}),2,{},375,{otherCostsMinor:0,marginBps:3000,saleOverrideMinor:null},undefined);
+  });
+  it('rechecks cart freight for the member destination rather than the default Saudi postcode',async()=>{
+    await quoteCjTrialCart([{id:4,qty:1,variantId:'blue-s',snapshot:snapshot()}],{destinationZip:'23455'});
+    expect(mock.verify.mock.calls[0][6]).toBe('23455');
   });
   it('returns to the original total for 1 → 2 → 1 using quantity-specific freight',async()=>{
     const totals:number[]=[];

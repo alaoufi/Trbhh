@@ -68,6 +68,7 @@ async function main() {
     const original=report.shipping[0],returned=report.quantityQuotes[1]?.options.find(row=>row.name===original?.name);
     report.checks.push({name:'quantity_2_then_1_live_recalculation',ok:report.quantityQuotes.every(row=>row.options.length>0)});
     report.sameRouteRoundtrip={name:original?.name??null,firstPriceUsd:original?.priceUsd??null,returnedPriceUsd:returned?.priceUsd??null,unchanged:!!returned&&returned.priceUsd===original.priceUsd};
+    report.checks.push({name:'same_route_quantity_1_price_restored',ok:report.sameRouteRoundtrip.unchanged});
   } catch (error) {
     // Only fixed diagnostic identifiers are emitted. Never serialize a response/auth object.
     const allowed = ['runtime_identity_unavailable', 'unexpected_cj_destination', 'cj_key_unavailable', 'cj_auth_invalid_response', 'cj_read_failed', 'product_identity_mismatch', 'inventory_shape_mismatch', 'no_valid_variant', 'variant_inventory_shape_mismatch'];

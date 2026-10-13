@@ -1,4 +1,5 @@
 import { cjDescriptionText, cjSourceLink } from '@/lib/cj/presentation';
+import {CjText} from './cj-text';
 
 export function CjProductDescription({ text }: { text: string }) {
   const clean = cjDescriptionText(text);
@@ -7,7 +8,7 @@ export function CjProductDescription({ text }: { text: string }) {
     {clean.split(/\n{2,}/).map((paragraph, index) => <p key={index} className="whitespace-pre-line">
       {paragraph.split(/(https?:\/\/[^\s<>]+)/g).map((part, partIndex) => {
         const link = /^https?:\/\//.test(part) ? cjSourceLink(part) : null;
-        return link ? <a key={partIndex} href={link.href} rel="noopener noreferrer nofollow" target="_blank" className="inline-block max-w-full rounded bg-slate-100 px-2 text-primary underline">{link.label}</a> : part;
+        return link ? <a key={partIndex} href={link.href} rel="noopener noreferrer nofollow" target="_blank" className="inline-block max-w-full rounded bg-slate-100 px-2 text-primary underline">{link.label}</a> : part.length<=2000?<CjText key={partIndex} original={part}/>:part;
       })}
     </p>)}
   </div>;

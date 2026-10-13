@@ -4,6 +4,7 @@ const mocks=vi.hoisted(()=>({session:vi.fn(),access:vi.fn(),quote:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSession:mocks.session}));
 vi.mock('@/lib/access-control/guards',()=>({hasAccess:mocks.access}));
 vi.mock('@/lib/cj/trial-quote',()=>({quoteCjTrialCart:mocks.quote}));
+vi.mock('@/lib/cj/destination',()=>({getCjDestinationZip:async()=> '23455'}));
 import {POST} from '@/app/api/cj/trial-cart/route';
 
 const origin='https://trbhh.sa';
@@ -25,12 +26,12 @@ describe('CJ trial cart HTTP trust boundary',()=>{
     expect(response.status).toBe(200);expect(await response.json()).toEqual(quote);
     expect(response.headers.get('cache-control')).toContain('private');expect(response.headers.get('cache-control')).toContain('no-store');
     expect(mocks.session).toHaveBeenCalledOnce();expect(mocks.access).toHaveBeenCalledWith(9,'products','view');
-    expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:1,qty:2}]);
+    expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:1,qty:2}],{destinationZip:'23455'});
   });
   it('accepts a selected CJ variant but forwards no client-supplied price',async()=>{
     const selected={currency:'SAR',lines:[],totalMinor:0,rejected:[]};mocks.quote.mockResolvedValue(selected);
     const response=await POST(request({items:[{id:4,qty:2,variantId:'blue-s'}]}));
-    expect(response.status).toBe(200);expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:4,qty:2,variantId:'blue-s'}]);
+    expect(response.status).toBe(200);expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:4,qty:2,variantId:'blue-s'}],{destinationZip:'23455'});
   });
   it('requires authentication even when a cart contains valid product IDs',async()=>{
     mocks.session.mockResolvedValue(null);await denied(request(),401,'unauthorized');expect(mocks.access).not.toHaveBeenCalled();
@@ -53,7 +54,7 @@ describe('CJ trial cart HTTP trust boundary',()=>{
   it('accepts the canonical browser origin behind the production standalone bind host',async()=>{
     const req=new Request('https://0.0.0.0:3000/api/cj/trial-cart',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
     expect((await POST(req)).status).toBe(200);
-    expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:1,qty:2}]);
+    expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:1,qty:2}],{destinationZip:'23455'});
   });
   it('rejects an attacker origin even when request and spoofed proxy headers appear to match',async()=>{
     const req=new Request('https://attacker.example/api/cj/trial-cart',{method:'POST',headers:{Origin:'https://attacker.example',Host:'trbhh.sa','X-Forwarded-Host':'trbhh.sa','X-Forwarded-Proto':'https','Sec-Fetch-Site':'same-origin','Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
@@ -93,7 +94,7 @@ describe('CJ trial cart HTTP trust boundary',()=>{
   ])('rejects malformed or spoofed cart %# before quote resolution',async body=>{await denied(request(body),400,'invalid_cart');});
   it('accepts an empty cart after the final item is removed',async()=>{
     const empty={currency:'SAR',lines:[],totalMinor:0,rejected:[]};mocks.quote.mockResolvedValue(empty);
-    const response=await POST(request({items:[]}));expect(response.status).toBe(200);expect(await response.json()).toEqual(empty);expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([]);
+    const response=await POST(request({items:[]}));expect(response.status).toBe(200);expect(await response.json()).toEqual(empty);expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([],{destinationZip:'23455'});
   });
   it('rejects an oversized declared length before reading a small body',async()=>{
     await denied(request(undefined,{'Content-Length':String(256*1024+1)}),413,'body_too_large');

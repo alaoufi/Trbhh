@@ -4,6 +4,7 @@ import {hasAccess} from '@/lib/access-control/guards';
 import {validateTrialCart} from '@/lib/cj/trial-cart';
 import {quoteCjTrialCart} from '@/lib/cj/trial-quote';
 import {primaryOrigin} from '@/lib/public-origin';
+import {getCjDestinationZip} from '@/lib/cj/destination';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -41,6 +42,8 @@ export async function POST(request:Request){
       if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).join(',')!=='items')throw Error('invalid_cart');
       items=validateTrialCart((body as {items:unknown}).items);
     }catch(cause){return cause instanceof Error&&cause.message==='body_too_large'?error('body_too_large',413):error('invalid_cart',400);}
-    return NextResponse.json(await quoteCjTrialCart(items),{headers});
+    const destinationZip=await getCjDestinationZip(session.uid);
+    if(!destinationZip)return error('destination_required',422);
+    return NextResponse.json(await quoteCjTrialCart(items,{destinationZip}),{headers});
   }catch(cause){return cause instanceof Error&&cause.message==='invalid_total'?error('invalid_total',422):error('unavailable',503);}
 }

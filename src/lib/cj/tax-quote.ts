@@ -6,8 +6,11 @@ import {calculateFiscalLinesV2,effectiveFiscalVatBps} from '@/lib/finance/fiscal
 /** Preview-only VAT from the current approved central finance policy; absence means VAT off. */
 export async function quoteCjVat(productUnitMinor:number,quantity:number,shippingMinor:number):Promise<{enabled:boolean;vatMinor:number;totalMinor:number}>{
   const base=productUnitMinor*quantity+shippingMinor;
-  if(!Number.isSafeInteger(base)||base<0)throw new Error('invalid_cj_quote');
-  const policy=await readApprovedFiscalPolicy(prisma,new Date()).catch(()=>null);
+  if(!Number.isSafeInteger(productUnitMinor)||productUnitMinor<0||!Number.isSafeInteger(quantity)||quantity<1||!Number.isSafeInteger(shippingMinor)||shippingMinor<0||!Number.isSafeInteger(base)||base<0)throw new Error('invalid_cj_quote');
+  const policy=await readApprovedFiscalPolicy(prisma,new Date()).catch(error=>{
+    if(error instanceof Error&&error.message==='finance_issuance_not_approved')return null;
+    throw error;
+  });
   if(!policy)return {enabled:false,vatMinor:0,totalMinor:base};
   const calculation=policy.calculationPolicy;
   const itemRate=effectiveFiscalVatBps(policy,'product'),shippingRate=effectiveFiscalVatBps(policy,'shipping');

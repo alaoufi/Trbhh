@@ -4,11 +4,13 @@ import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck, ChevronDown } from
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
-import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, cjArabicName, cjArabicDescription } from '@/lib/cj/mapping';
+import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { CjProductGallery } from '@/components/cj/product-gallery';
+import {CjText} from '@/components/cj/cj-text';
+import {translateManyForDisplay} from '@/lib/cj/translate';
 import { CjProductDescription } from '@/components/cj/product-description';
 import { CjProductCard } from '@/components/cj/product-card';
 import { CategoryRefPicker } from '@/components/cj/category-ref-picker';
@@ -16,8 +18,8 @@ import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
 import { SubmitButton } from '@/components/cj/submit-button';
 import { cleanCjDisplayDescription } from '@/lib/cj/variant-display';
-import { cjProductDisplayTitle, cjDescriptionText, cjPriceLabel } from '@/lib/cj/presentation';
-import { PriceText } from '@/components/price-text';
+import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
+
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
 import { getCategories, getSubCategories } from '@/lib/data';
@@ -38,7 +40,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
   // صفحة السلعة خاصة (تجربة CJ): يفتحها الموظّف، أو وكيل السلعة النشط لإدارة سلعته
   // (يختارها/يعدّلها/يتابع شحنها/تصله رسائل الشراء) حتى لو لم يكن موظّفاً. غيرهما ممنوع.
-  if (!view.isStaff && !capabilities.agent) notFound();
+  if (!view.isStaff) notFound();
   const canManage = capabilities.edit || capabilities.suspend || capabilities.delete;
   // عدد عمليات الشراء الحقيقية من طلبات CJ — بيانات تتراكم من النشاط الفعلي (تبدأ من صفر، بلا تزييف).
   const soldCount = await cjProductOrderCount(p.cj_product_id).catch(() => 0);
@@ -47,9 +49,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const agentContact = productAgent?.active === 1 ? agentContactLinks(productAgent) : null;
   // ترجمة فورية عند التحميل بلا أزرار: العنوان والوصف يُعرضان بالعربية متى كان المترجم شغّالاً
   // (يُحفظان دائماً بعد أول ترجمة). إن كان name_ar إنجليزياً من محاولة سابقة يُصحَّح هنا.
-  const arabicName = await cjArabicName(p, true);
+  const sourceDescription=cjDescriptionText(p.source_description??'');
+  const cachedTranslations=await translateManyForDisplay([p.name,sourceDescription],0);
+  const arabicName=p.name_ar||cachedTranslations.get(p.name)||p.name;
   const title = cjProductDisplayTitle(arabicName);
-  const descriptionAr = await cjArabicDescription(p, true);
+  const descriptionAr=p.display_description_ar||cachedTranslations.get(sourceDescription)||sourceDescription;
   const gallery = cjProductImages(p).map(cjImg);
   const details = parseCjDetails(p);
   const verifiedVariants = getVerifiedCjVariants(p);
@@ -70,7 +74,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
   // (لون/مقاس) داخل لوحة الشراء ويُحفظ مع الطلب؛ لا قائمة عرض منفصلة غير قابلة للاختيار.
-  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })));
+  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })),0);
   const variantRows = displayVariants.map(v => ({ key: v.vid, label: translatedVariants[v.vid]?.label || '—', weight: v.weight })).slice(0, 60);
   const panelLabels = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.label]));
   const panelOptions = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.options]));
@@ -85,12 +89,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <CjProductGallery key={id} images={gallery} title={title} />
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-2.5">
         {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
-        <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl">{title}</h1>
+        <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl"><CjText original={p.name} ar={title}/></h1>
         {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) — يُخفى إن لم تُسعّر السلعة بعد. */}
-        {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <PriceText size="detail">{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText>
-          <span className="text-xs text-slate-500">شامل الضريبة عند تطبيقها · يُضاف الشحن حسب الوجهة</span>
-        </div>}
+
         {/* عدد عمليات الشراء الحقيقية — يظهر فقط من أول عملية فعلية (بلا تزييف). */}
         {soldCount > 0 && <p className="text-xs text-slate-500">عمليات شراء مؤكّدة: <b className="text-slate-700">{soldCount.toLocaleString('en')}</b></p>}
         {/* السلة والشراء مُفعّلان للإدارة (تجربة): يُعرض محرّك الشراء لكل السلع ذات الخيارات،
@@ -115,7 +116,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             الشحن إلى السعودية
             <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open/s:rotate-180" />
           </summary>
-          <div className="pb-4"><CjLiveNumbers pid={p.cj_product_id} priceMinor={p.sale_price_override_minor ?? p.sale_price_minor} /></div>
+          <div className="pb-4"><CjLiveNumbers pid={p.cj_product_id} productId={id} /></div>
         </details>
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
@@ -187,7 +188,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     {view.isStaff && session && displayVariants.length > 0 && <div className="fixed inset-x-0 bottom-[4.5rem] z-30 border-t border-slate-200 bg-white/95 px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0">
       {/* مسافة يسارية (pe في RTL) تترك ركن ختم «متجر موثّق» العائم حرّاً فلا يُغطّي الزر. */}
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 pe-24 md:pe-0">
-        {(p.sale_price_override_minor ?? p.sale_price_minor) > 0 && <div className="min-w-0"><span className="block text-[10px] text-slate-500">السعر</span><PriceText>{cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency)}</PriceText></div>}
         <a href="#cj-buy" className="inline-flex min-h-12 w-1/2 max-w-xs items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-white">اختر وأضف إلى السلة</a>
       </div>
     </div>}

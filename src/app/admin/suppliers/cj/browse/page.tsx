@@ -9,8 +9,8 @@ import { translateArabicCjSearch } from '@/lib/cj/search';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
 import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
-import { cjSyncSettings } from '@/lib/cj/sync';
-import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
+import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
+import {getCjDestinationZip} from '@/lib/cj/destination';
 import { getCachedArabic, translateManyForDisplay, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
@@ -40,7 +40,7 @@ const translationFeedback = {
 };
 
 export default async function CjBrowsePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAccess('products', 'view');
+  const session=await requireAccess('products', 'view');
   const sp = await searchParams;
   const translationNotice = typeof sp.page_translation === 'string' && Object.hasOwn(translationFeedback, sp.page_translation) ? translationFeedback[sp.page_translation as keyof typeof translationFeedback] : null;
   const q = typeof sp.q === 'string' ? sp.q.slice(0, 100) : '';
@@ -53,7 +53,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
-  const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
+  const catsRes=await getCategories();
   const [deeplKeySet, memEmail, libreUrl] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''), getSetting('cj_libretranslate_url', DEFAULT_LIBRETRANSLATE_URL)]);
   const categories = catsRes.ok ? catsRes.data : [];
   // CJ indexes product names in its source language, while admins commonly
@@ -122,11 +122,12 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         .filter((v) => typeof v.priceUsd === 'number' && v.priceUsd! > 0 && /^[A-Za-z0-9_-]{1,64}$/.test(v.vid))
         .sort((a, b) => (stockByVid.get(b.vid) ?? 0) - (stockByVid.get(a.vid) ?? 0) || (b.stock ?? 0) - (a.stock ?? 0))[0] ?? null
     : null;
-  const detailLive = detail && detail.ok && liveVariant
-    ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, { getVariants: detailReads.getVariants }, settings.usdToSarX100, { marginBps }).catch(() => null)
+  const destinationZip=detailPid?await getCjDestinationZip(session.uid).catch(()=>undefined):undefined;
+  const pricing=detailPid&&destinationZip?await readVerifiedCjPricing().catch(()=>null):null;
+  const detailLive = detail && detail.ok && liveVariant&&destinationZip&&pricing
+    ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, { getVariants: detailReads.getVariants }, pricing.usdToSarX100, { marginBps:pricing.marginBps },destinationZip).catch(() => null)
     : null;
   const liveShip = detailLive?.status === 'available' ? [...detailLive.shippingOptions].sort((a, b) => (a.priceMinor + a.additionalMinor) - (b.priceMinor + b.additionalMinor))[0] : null;
-  const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
   const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
   const backHref = `/admin/suppliers/cj/browse?page=${page}${keep}`;
@@ -157,7 +158,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       </div></AccessBoundary>
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
         عرض مباشر من CJ API (قراءة فقط). <b>لا يُستورد أو يُنشر أي منتج تلقائياً</b> — الاستيراد للمنتجات المختارة فقط،
-        وتبقى في التخزين الوسيط ولا تظهر للعامة حتى ربطها واعتمادها. سعر البيع أدناه تقديري (تكلفة×صرف {(settings.usdToSarX100 / 100).toFixed(2)} + شحن {sar(settings.shippingMinor)} + هامش {(marginBps / 100).toFixed(0)}٪).
+        التجربة للإدارة فقط. لا تُعرض أرقام البيع والشحن إلا بعد التحقق من CJ إلى عنوان الشحن المحفوظ؛ لا تُعرض قيم تقديرية.
       </p>
 
       {/* تنبيهات */}
@@ -213,7 +214,6 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               <span>PID: <span dir="ltr">{p.pid}</span></span>
               <span>SKU: <span dir="ltr">{p.productSku || '—'}</span></span>
               <span>القسم: {p.categoryName ? <CjText original={p.categoryName} ar={gridAr.get(p.categoryName.trim()) ?? catAr.get(p.categoryName.trim())} /> : '—'}</span>
-              <span>سعر CJ: {usd(p.sellPrice)}</span>
             </div>
             {/* الأرقام الحقيقية الحيّة تُجلب لحظياً عند تحميل الصفحة (بلا تخزين مسبق) — تدريجياً لكل بطاقة. */}
             <CjLiveNumbers pid={p.pid} />
@@ -269,7 +269,6 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               ) : (
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر CJ</div><div className="font-bold" dir="ltr">{usd(detail.data.priceUsd)}</div></div>
                     <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">القسم الجديد</div><div className="font-bold" dir="auto">{arOf(detail.data.category)}</div></div>
                   </div>
                   <p className="rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">تعذّر جلب الشحن/المخزون الحيّ الآن{detailLive ? ` (${detailLive.status})` : ''} — قد يكون الخيار غير متوفّر أو لا شحن للسعودية، أو حدّ طلبات CJ. أعد فتح التفاصيل بعد لحظات.</p>
@@ -283,9 +282,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                     <div key={v.vid} className="rounded-lg border border-slate-200 bg-white p-2 text-xs">
                       <div className="font-semibold" dir="auto">{v.name ? <CjText original={v.name} ar={detailVariantAr.get(v.name.trim())} /> : '—'}</div>
                       <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
-                        <span>سعر البيع: <b className="text-primary">{sar(salePreview(v.priceUsd))}</b></span>
                         <span>الوزن: <b>{v.weight != null ? `${v.weight} غ` : '—'}</b></span>
-                        <span>المخزون (عيّنة): <b>{v.stock ?? '—'}</b></span>
                       </div>
                     </div>
                   ))}

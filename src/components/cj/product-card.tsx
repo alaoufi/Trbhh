@@ -2,10 +2,9 @@ import Link from 'next/link';
 import { BadgeCheck, ChevronDown } from 'lucide-react';
 import type { CjProductRow } from '@/lib/cj/mapping';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { cjPriceLabel } from '@/lib/cj/presentation';
 import { compactAdTitle } from '@/lib/ad-presentation';
 import { CjProductImage } from './product-image';
-import { PriceText } from '@/components/price-text';
+import {CjLiveNumbers} from './cj-live-numbers';
 import { parseHighlightValue } from '@/lib/cj/highlight';
 
 /**
@@ -17,7 +16,6 @@ import { parseHighlightValue } from '@/lib/cj/highlight';
 export function CjProductCard({ product }: { product: CjProductRow }) {
   const title = product.name_ar || 'منتج بانتظار ترجمة الاسم';
   const source = cjProductImages(product)[0];
-  const finalMinor = product.sale_price_override_minor ?? product.sale_price_minor;
   const highlight = parseHighlightValue(product.highlight_label);
   return <div className="marketplace-card group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
     <Link href={`/cj/${product.id}`} className="flex min-w-0 flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
@@ -29,10 +27,10 @@ export function CjProductCard({ product }: { product: CjProductRow }) {
         </div>}
       </div>
       <div className="flex min-w-0 flex-col gap-1 p-2.5 pb-1.5 sm:p-3 sm:pb-1.5">
-        <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={finalMinor <= 0}>{cjPriceLabel(finalMinor, product.currency)}</PriceText></div>
         <h3 className="line-clamp-2 min-h-9 break-words text-[13px] font-bold leading-[1.35] text-slate-800">{compactAdTitle(title)}</h3>
       </div>
     </Link>
+    <div className="px-2.5 pb-2"><CjLiveNumbers pid={product.cj_product_id} productId={Number(product.id)}/></div>
     {/* التفاصيل (القسم) مطويّة افتراضياً لتوفير المساحة — سهم يتمدّد/ينكمش. */}
     {product.trbhh_category && <details className="cj-card-details group/d border-t border-slate-100 px-2.5 sm:px-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-1 py-1.5 text-[11px] font-bold text-slate-500 [&::-webkit-details-marker]:hidden">

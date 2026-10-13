@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { requireAccess } from '@/lib/access-control/guards';
 import { quoteCjTrialCart } from '@/lib/cj/trial-quote';
 import { createOrder } from '@/lib/cj/orders/store';
+import {getCjDestinationAddress} from '@/lib/cj/destination';
 
 /**
  * جسر «إتمام الطلب» (المرحلة 1 — بلا أموال ولا شراء حقيقي):
@@ -17,17 +18,21 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
   let items: unknown;
   try { items = JSON.parse(String(form.get('items') || '[]')); } catch { redirect('/cj/cart?order=invalid'); }
 
-  const quote = await quoteCjTrialCart(items).catch(() => null);
-  if (!quote || quote.rejected.length || !quote.lines.length || !(quote.totalMinor > 0)) {
-    redirect('/cj/cart?order=recheck');
-  }
+  const destination=await getCjDestinationAddress(session.uid).catch(()=>null);
+  if(!destination)redirect('/cj/cart?order=address');
 
-  const s = (v: FormDataEntryValue | null, max: number) => String(v ?? '').trim().slice(0, max);
-  const shipName = s(form.get('shipName'), 160);
-  const shipPhone = s(form.get('shipPhone'), 40);
-  const shipCity = s(form.get('shipCity'), 120);
-  const shipAddress1 = s(form.get('shipAddress1'), 400);
+  // The quoted postcode and order destination come from the same owned snapshot.
+  const shipName = destination.fullName.trim().slice(0,160);
+  const shipPhone = destination.phone.trim().slice(0,40);
+  const shipCity = destination.city.trim().slice(0,120);
+  const shipAddress1 = [destination.district,destination.street,destination.buildingNumber].filter(Boolean).join('، ').slice(0,400);
+  const shipRegion=destination.region.trim().slice(0,120);
+  const shipAddress2=`الرمز البريدي ${destination.postalCode}`;
   if (!shipName || !shipPhone || !shipCity || !shipAddress1) redirect('/cj/cart?order=address');
+  const submitted={shipName,shipPhone,shipCity,shipRegion,shipAddress1,shipAddress2};
+  if(Object.entries(submitted).some(([key,value])=>String(form.get(key)??'').trim()!==value))redirect('/cj/cart?order=address');
+  const quote=await quoteCjTrialCart(items,{destinationZip:destination.postalCode}).catch(()=>null);
+  if(!quote||quote.rejected.length||!quote.lines.length||!(quote.totalMinor>0))redirect('/cj/cart?order=recheck');
 
   const lines = quote!.lines;
   const itemsTotalMinor = lines.reduce((sum, l) => sum + l.unitMinor * (l.qty || 1), 0);
@@ -36,7 +41,7 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
   const shippingTotalMinor = Math.max(0, grandTotalMinor - itemsTotalMinor - taxTotalMinor);
   const productName = lines.length > 1 ? `طلب (${lines.length} أصناف)` : lines[0].title;
   // نفس لقطة السلة والعنوان للمستخدم تعيد الطلب نفسه عبر تفرّد internal_ref.
-  const intent = JSON.stringify({uid:session.uid,items,shipName,shipPhone,shipCity,shipAddress1,shipRegion:s(form.get('shipRegion'),120),shipAddress2:s(form.get('shipAddress2'),400)});
+  const intent = JSON.stringify({uid:session.uid,items,shipName,shipPhone,shipCity,shipAddress1,shipRegion,shipAddress2});
   const internalRef = `cjt-${session.uid}-${createHash('sha256').update(intent).digest('hex').slice(0,40)}`;
   // بنود الإرسال للمورد: المورد يحتاج vid (وهو variantId في السلة) + الكمية، ومسار الشحن.
   const orderLines = lines
@@ -54,7 +59,7 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
     grandTotalMinor,
     currency: 'SAR',
     lines: orderLines,
-    ship: { name: shipName, phone: shipPhone, country: 'SA', city: shipCity, region: s(form.get('shipRegion'), 120), address1: shipAddress1, address2: s(form.get('shipAddress2'), 400) },
+    ship: { name: shipName, phone: shipPhone, country: 'SA', city: shipCity, region: shipRegion, address1: shipAddress1, address2: shipAddress2,zip:destination.postalCode },
   }, session.uid);
 
   redirect(`/admin/suppliers/cj/orders/${id}?created=1`);

@@ -12,7 +12,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [inspect, diagnose-backup, cache-audit, cache-cleanup]
+        options: [inspect, diagnose-backup, replay-backup-media, cache-audit, cache-cleanup]
         default: inspect
         required: true
       backup_run_id:
@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   operate:
-    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/cj-completion-20261013' && inputs.phase == 'diagnose-backup')
+    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/cj-completion-20261013' && (inputs.phase == 'diagnose-backup' || inputs.phase == 'replay-backup-media'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
       - name: Verify bounded cache operation tools
         run: |
-          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs
+          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs scripts/release/cj-media-replay.test.cjs
           bash -n scripts/release/finance-cache.sh
       - name: Inspect production or run the selected guarded cache operation
         env:
@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          [[ "$PHASE" =~ ^(inspect|diagnose-backup|cache-audit|cache-cleanup)$ ]]
+          [[ "$PHASE" =~ ^(inspect|diagnose-backup|replay-backup-media|cache-audit|cache-cleanup)$ ]]
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
           if [[ "$PHASE" == cache-* ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
           test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
@@ -66,6 +66,10 @@ jobs:
           port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
+          if [[ "$PHASE" == replay-backup-media ]]; then
+            "${SSH[@]}" "$target" "bash -s -- '$GITHUB_RUN_ID'" < scripts/release/cj-media-replay.sh
+            exit 0
+          fi
           if [[ "$PHASE" == diagnose-backup ]]; then
             [[ "$BACKUP_RUN_ID" == 35932588551 || "$BACKUP_RUN_ID" == 38392214806 ]]
             "${SSH[@]}" "$target" "node - '$BACKUP_RUN_ID'" < scripts/release/finance-backup-diagnose.cjs

@@ -129,6 +129,14 @@ jobs:
         run: |
           test -s "$RUNNER_TEMP/cj-discovery.log"
           grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"
+      - name: Preserve bounded CJ discovery readout
+        if: always() && inputs.phase == 'cj-store-discovery'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cj-discovery-readout
+          path: ${{ runner.temp }}/cj-discovery.log
+          if-no-files-found: error
+          retention-days: 3
       - name: Remove runner SSH credential
         if: always()
         run: rm -f -- "$HOME/.ssh/finance_key"

@@ -1,0 +1,28 @@
+'use strict';
+// Read-only discovery. Credentials stay inside the existing production container.
+const {PrismaClient}=require('@prisma/client');
+const fs=require('node:fs');
+async function main(){
+ const db=new PrismaClient({log:[]});
+ let last=0;const calls=[];
+ try{
+  const base=(process.env.CJ_API_BASE||'https://developers.cjdropshipping.com/api2.0/v1').replace(/\/+$/,'');
+  if(base!=='https://developers.cjdropshipping.com/api2.0/v1')throw Error('unexpected_destination');
+  const key=process.env.CJ_API_KEY;if(!key)throw Error('missing_api_key');
+  async function request(route,method='GET',body,token){
+   const delay=1200-(Date.now()-last);if(delay>0)await new Promise(r=>setTimeout(r,delay));last=Date.now();
+   const res=await fetch(base+route,{method,redirect:'error',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',...(token?{'CJ-Access-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{})});
+   const data=await res.json();calls.push({route,http:res.status,code:data.code});
+   if(!res.ok||data.code!==200||data.result===false||data.success===false||!(data.result===true||data.success===true))throw Error('cj_discovery_failed');
+   return data.data;
+  }
+  const auth=await request('/authentication/getAccessToken','POST',{apiKey:key});
+  if(typeof auth?.accessToken!=='string')throw Error('invalid_authentication');
+  const shops=await request('/shop/getShops','GET',undefined,auth.accessToken);
+  if(!Array.isArray(shops))throw Error('invalid_shop_list');
+  const row=await db.cj_products.findUnique({where:{id:247}});
+  const settings=await db.site_settings.findMany({where:{k:{in:['commerce_default_margin_bps','cj_usd_to_sar_x100','commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled']}},select:{k:true,v:true}});
+  console.log(JSON.stringify({format:'cj-store-discovery-v1',commit:fs.readFileSync('/app/RELEASE_COMMIT','utf8').trim(),authenticatedUserId:auth.userId==null?null:String(auth.userId),shops:shops.map(s=>({id:String(s.id),name:s.name,status:s.status,type:s.type})),product:row?{id:row.id,cjProductId:row.cj_product_id,hidden:row.hidden,variantCount:(JSON.parse(row.details_json||'{}').variants||[]).length}:null,settings,calls},(_,v)=>typeof v==='bigint'?String(v):v));
+ }catch(error){console.error(JSON.stringify({ok:false,error:['unexpected_destination','missing_api_key','invalid_authentication','invalid_shop_list'].includes(error.message)?error.message:'discovery_failed',calls}));process.exitCode=1;}finally{await db.$disconnect();}
+}
+void main();

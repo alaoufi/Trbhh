@@ -71,8 +71,10 @@ jobs:
             exit 0
           fi
           if [[ "$PHASE" == cj-store-discovery ]]; then
-            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/cj-store-discovery.cjs | tee "$RUNNER_TEMP/cj-discovery.log"
-            grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"
+            echo 'cj_operator_transport_started'
+            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app sh -c '\''p=$(mktemp /tmp/cj-audit.XXXXXX.cjs); cat > "$p"; node "$p"; result=$?; rm -f "$p"; exit "$result"'\''' < scripts/release/cj-store-discovery.cjs | tee "$RUNNER_TEMP/cj-discovery.log"
+            echo 'cj_operator_transport_returned'
+            if ! grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"; then echo 'cj_operator_completion_marker_missing'; exit 23; fi
             exit 0
           fi
           if [[ "$PHASE" == replay-backup-media ]]; then

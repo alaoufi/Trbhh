@@ -84,7 +84,7 @@ describe('dispatchOrderToCj — الحارس الأمني', () => {
   it('idempotent: طلب أُرسل سابقاً لا يُرسَل ثانية', async () => {
     mock.getOrderById.mockResolvedValue({ ...baseOrder, cj_order_id: 'CJ-OLD' });
     const r = await dispatchOrderToCj(7n);
-    expect(r).toEqual({ ok: true, cjOrderId: 'CJ-OLD' });
+    expect(r).toEqual({ ok: false, reason: 'blocked', detail: 'cj_purchase_commitment_unverified' });
     expect(mock.createCjOrder).not.toHaveBeenCalled();
   });
 

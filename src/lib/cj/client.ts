@@ -10,7 +10,7 @@ import type {
 /**
  * عميل CJdropshipping — مرجع: https://developers.cjdropshipping.com/en/api/introduction.html
  * قراءة فقط في هذه المرحلة (منتجات/تفاصيل/متغيّرات/مخزون/مستودعات/شحن/تتبّع).
- * إنشاء الطلب مُقفل بحارسين: مفتاح الشراء المركزي + SUPPLIER_ALLOW_LIVE_ORDERS،
+ * إنشاء الطلب والدفع والتأكيد محظورة بحصار P0 مستقل بالإضافة إلى حارسي التفعيل،
  * فلا يُرسَل أي طلب حقيقي إلى CJ في الإنتاج قبل التفعيل اليدوي من الإدارة.
  */
 
@@ -308,63 +308,24 @@ async function liveOrdersAllowed(): Promise<boolean> {
 }
 
 /**
- * إنشاء طلب لدى CJ بـ payType=3 (إنشاء بلا دفع) — تفصل الإنشاء عن الدفع فصلاً تاماً
- * ليمرّ الطلب عبر بوابة موافقة الإدارة ثم يُدفع صراحةً عبر payBalance. لا يُنفَّذ إطلاقاً
- * إلا بحارسين: commerce_purchasing_enabled + SUPPLIER_ALLOW_LIVE_ORDERS='true'، وإلا
- * يُرفض فوراً بلا أي اتصال شبكي. يُعيد orderId وshipmentOrderId والمبلغ الفعلي للتحقق من السقف.
+ * P0 blockade for createOrderV3, wallet payment and confirmation.
+ * No supplier mutation until atomic amount protection, reconciliation,
+ * acceptance and inventory allocation are documented and verified.
+ * Configuration alone cannot remove this safeguard. See docs/cj-purchase-commitment.md.
  */
-export async function createCjOrder(input: Record<string, unknown>): Promise<CjResult<CjCreatedOrder>> {
+async function purchaseCommitmentBlock(): Promise<{ ok: false; error: string }> {
   if (!(await liveOrdersAllowed())) return { ok: false, error: 'cj_purchasing_disabled' };
-  // payType=3: إنشاء الطلب فقط بلا دفع ولا إضافة للسلة ولا تأكيد (الدفع خطوة منفصلة).
-  const body = { payType: 3, ...input };
-  const r = await call<Record<string, unknown>>('/shopping/order/createOrderV2', { method: 'POST', body });
-  if (!r.ok) return r;
-  const d = r.data || {};
-  return {
-    ok: true,
-    data: {
-      orderId: String(d.orderId || ''),
-      orderNumber: str(d.orderNumber),
-      shipmentOrderId: str(d.shipmentOrderId),
-      actualPaymentUsd: num(d.actualPayment),
-      orderStatus: str(d.orderStatus),
-    },
-  };
+  return { ok: false, error: 'cj_purchase_commitment_unverified' };
 }
-
-/**
- * دفع طلب CJ من رصيد المحفظة (payBalance) — الخطوة المالية الوحيدة التي تخصم فعلياً.
- * محميّة بالحارسين نفسيهما. تتعامل مع الطلب الواحد عبر orderId، وعند تعدّد الطلبات الفرعية
- * تستخدم payBalanceV2 مع shipmentOrderId وpayId (مفتاح تفرّد الدفع لمنع الخصم المكرّر).
- * المنطق الأعلى (payment.ts) يتولّى التحقق من السقف وإعادة التحقق ومنع التكرار قبل الاستدعاء.
- */
-export async function payCjOrderBalance(input: { orderId?: string; shipmentOrderId?: string; payId?: string }): Promise<CjResult<{ paid: true }>> {
-  if (!(await liveOrdersAllowed())) return { ok: false, error: 'cj_purchasing_disabled' };
-  const shipmentOrderId = String(input.shipmentOrderId || '').trim();
-  const orderId = String(input.orderId || '').trim();
-  if (shipmentOrderId) {
-    const body: Record<string, string> = { shipmentOrderId };
-    if (input.payId) body.payId = String(input.payId).slice(0, 200);
-    const r = await call<unknown>('/shopping/pay/payBalanceV2', { method: 'POST', body });
-    if (!r.ok) return r;
-    return { ok: true, data: { paid: true } };
-  }
-  if (!orderId) return { ok: false, error: 'order_id_required' };
-  const r = await call<unknown>('/shopping/pay/payBalance', { method: 'POST', body: { orderId } });
-  if (!r.ok) return r;
-  return { ok: true, data: { paid: true } };
+export async function createCjOrder(_input: Record<string, unknown>): Promise<CjResult<CjCreatedOrder>> {
+  return purchaseCommitmentBlock();
 }
-
-/** تأكيد الطلب لدى CJ (confirmOrder, PATCH) — عند الحاجة قبل الدفع في بعض المسارات. محميّ بالحارسين. */
-export async function confirmCjOrder(orderId: string): Promise<CjResult<{ confirmed: true }>> {
-  if (!(await liveOrdersAllowed())) return { ok: false, error: 'cj_purchasing_disabled' };
-  const id = String(orderId || '').trim();
-  if (!id) return { ok: false, error: 'order_id_required' };
-  const r = await call<unknown>('/shopping/order/confirmOrder', { method: 'PATCH', body: { orderId: id } });
-  if (!r.ok) return r;
-  return { ok: true, data: { confirmed: true } };
+export async function payCjOrderBalance(_input: { orderId?: string; shipmentOrderId?: string; payId?: string }): Promise<CjResult<{ paid: true }>> {
+  return purchaseCommitmentBlock();
 }
-
+export async function confirmCjOrder(_orderId: string): Promise<CjResult<{ confirmed: true }>> {
+  return purchaseCommitmentBlock();
+}
 /* ------------------------- محوّلات ------------------------- */
 
 function str(v: unknown): string | null { return typeof v === 'string' && v.trim() ? v : null; }

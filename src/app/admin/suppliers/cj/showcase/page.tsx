@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { CjAdminNav } from '@/components/cj/admin-nav';
 import { CjProductImage } from '@/components/cj/product-image';
+import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
+import { CjText } from '@/components/cj/cj-text';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listVisibleCjProducts } from '@/lib/cj/mapping';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
@@ -9,7 +11,6 @@ import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'معاينة سلع CJ المختارة', robots: { index: false, follow: false } };
 
-const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
 
 /**
  * صفحة معاينة داخلية (غير معلنة، غير عامة) تعرض السلع المختارة فعلياً من CJ
@@ -51,7 +52,6 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
           <p className="text-sm text-muted-foreground">عدد السلع المعروضة: <b className="text-primary">{items.length}</b></p>
           <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {items.map((r) => {
-              const priceMinor = r.sale_price_override_minor ?? r.sale_price_minor;
               const saved = isArabicText(r.name_ar) ? r.name_ar : translations.get(r.name.trim());
               // لا نعرض «الترجمة غير متاحة» كحالة نهائية: نُظهر «بانتظار الترجمة» (حالة
               // مؤقتة تكملها مهمة الترجمة الدورية تلقائياً)، والنص الأصلي يبقى ظاهراً أدناه.
@@ -60,9 +60,9 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
                 <div key={r.id} className="card-3d flex flex-col overflow-hidden rounded-xl">
                   <CjProductImage src={cjImg(cjProductImages(r)[0])} alt={title} className="aspect-square w-full object-cover" />
                   <div className="flex flex-1 flex-col gap-1 p-3">
-                    <div className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-5">{title}</div>
+                    <div className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-5"><CjText original={r.name} ar={saved}/></div>
                     <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{r.name}</p></details>
-                    <div className="mt-auto text-base font-extrabold text-primary">{sar(priceMinor)}</div>
+                    <div className="mt-auto"><CjLiveNumbers pid={r.cj_product_id} productId={r.id}/></div>
                     {!isArabicText(saved) && <span className="w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">بلا عنوان عربي</span>}
                   </div>
                 </div>

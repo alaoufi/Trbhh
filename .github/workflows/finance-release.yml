@@ -24,6 +24,10 @@ on:
         description: Exact serving checkout SHA required for cache operations
         type: string
         default: ''
+      audit_catalog:
+        description: Read-only fresh CJ identities for every retained catalog product
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -47,6 +51,7 @@ jobs:
           PHASE: ${{ inputs.phase || 'inspect' }}
           BACKUP_RUN_ID: ${{ inputs.backup_run_id || '35932588551' }}
           BASELINE_SHA: ${{ inputs.baseline_sha }}
+          AUDIT_CATALOG: ${{ inputs.audit_catalog && 'true' || 'false' }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -71,8 +76,9 @@ jobs:
             exit 0
           fi
           if [[ "$PHASE" == cj-store-discovery ]]; then
+            audit_env=''; if [[ "$AUDIT_CATALOG" == true ]]; then audit_env='-e CJ_CATALOG_AUDIT=true'; fi
             echo 'cj_operator_transport_started'
-            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app sh -c '\''p=$(mktemp /tmp/cj-audit.XXXXXX.cjs); cat > "$p"; node "$p"; result=$?; rm -f "$p"; exit "$result"'\''' < scripts/release/cj-store-discovery.cjs | tee "$RUNNER_TEMP/cj-discovery.log"
+            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T '"$audit_env"' app sh -c '\''p=$(mktemp /tmp/cj-audit.XXXXXX.cjs); cat > "$p"; node "$p"; result=$?; rm -f "$p"; exit "$result"'\''' < scripts/release/cj-store-discovery.cjs | tee "$RUNNER_TEMP/cj-discovery.log"
             echo 'cj_operator_transport_returned'
             if ! grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"; then echo 'cj_operator_completion_marker_missing'; exit 23; fi
             exit 0

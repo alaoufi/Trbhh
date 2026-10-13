@@ -1,7 +1,10 @@
 'use strict';
 const SHOP='2609231037543532300',PID='2610090314401607200',ROW=247n;
+function connectionIdentitiesMatch(lines,target){
+ return Array.isArray(lines)&&lines.length===target.variantList.length&&new Set(lines.map(l=>l.platformVariantId)).size===lines.length&&target.variantList.every(v=>lines.some(l=>String(l.shopId)===target.shopId&&l.platformProductId===target.platformProductId&&l.platformVariantId===v.platformVariantId&&l.cjVariantId===v.cjVariantId&&l.cjProductId===target.cjProductId));
+}
 function connectionsMatch(lines,target){
- return Array.isArray(lines)&&lines.length===target.variantList.length&&target.variantList.every(v=>lines.some(l=>String(l.shopId)===target.shopId&&l.platformProductId===target.platformProductId&&l.platformVariantId===v.platformVariantId&&l.cjVariantId===v.cjVariantId&&l.cjProductId===target.cjProductId&&Number(l.defaultArea)===target.defaultArea&&l.logistics===target.logistics&&l.sourceCountryCode===target.sourceCountryCode&&l.targetCountryCode===target.targetCountryCode));
+ return connectionIdentitiesMatch(lines,target)&&lines.every(l=>Number(l.defaultArea)===target.defaultArea&&l.logistics===target.logistics&&l.sourceCountryCode===target.sourceCountryCode&&l.targetCountryCode===target.targetCountryCode);
 }
 function buildPlan(shops,row,product,variants,warehouses,routes){
  const shop=shops.find(s=>String(s.id)===SHOP);
@@ -52,6 +55,10 @@ async function main(){
   function match(data){if(!Array.isArray(data?.list))throw Error('connections_response');return data.list;}
   function exact(lines){return connectionsMatch(lines,plan.connection);}
   let connections=match(await api(query));
+  if(connectionIdentitiesMatch(connections,plan.connection)&&!exact(connections)){
+   console.log(JSON.stringify({...report,verified:false,identityVerified:true,routingVerified:false,connectedVariants:connections.length,retryPolicy:'existing_identity_preserved_no_metadata_write'}));
+   process.exitCode=1;return;
+  }
   if(connections.length&&!exact(connections))throw Error('existing_connection_conflict');
   if(!exact(connections)){
    const detail=await api('/shop/product/queryDetail?shopId='+SHOP+'&platformProductIds='+plan.product.id);
@@ -68,5 +75,5 @@ async function main(){
   console.log(JSON.stringify({...report,verified:true,connectedVariants:connections.length,logistics:plan.connection.logistics}));
  }catch(error){console.error(JSON.stringify({...report,verified:false,error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed',retryPolicy:'query_and_reconcile_before_any_retry'}));process.exitCode=1;}finally{await db.$disconnect();}
 }
-module.exports={buildPlan,connectionsMatch};
+module.exports={buildPlan,connectionsMatch,connectionIdentitiesMatch};
 if(require.main===module||(module.id==='[stdin]'&&process.argv[1]==='-'))void main();

@@ -2,8 +2,8 @@
 // Read-only discovery. Credentials stay inside the existing production container.
 
 const fs=require('node:fs');
-// Runtime images contain mysql. Read-only CLI avoids the native Prisma engine
-// silently ending an operator process before its awaited query returns.
+// Runtime images contain mysql. Keep operator reads bounded and independent of
+// the application's generated Prisma model, and emit complete JSON evidence.
 async function readCatalogDatabase(){
  const {execFile}=require('node:child_process');
  const url=new URL(process.env.DATABASE_URL);
@@ -43,6 +43,21 @@ async function main(){
   if(typeof auth?.accessToken!=='string')throw Error('invalid_authentication');
   const shops=await request('/shop/getShops','GET',undefined,auth.accessToken);
   if(!Array.isArray(shops))throw Error('invalid_shop_list');
+  if(process.env.CJ_CATALOG_AUDIT==='true'){
+   const audit=[];
+   for(const row of catalog){
+    try{
+     const product=await request('/product/query?pid='+encodeURIComponent(row.cj_product_id),'GET',undefined,auth.accessToken);
+     const variants=await request('/product/variant/query?pid='+encodeURIComponent(row.cj_product_id),'GET',undefined,auth.accessToken);
+     const saved=JSON.parse(row.details_json||'{}').variants||[];
+     const valid=String(product?.pid)===row.cj_product_id&&Array.isArray(variants)&&variants.length>0&&saved.length===variants.length&&new Set(variants.map(v=>v.vid)).size===variants.length&&saved.every(s=>variants.some(v=>v.vid===s.vid));
+     const result={id:row.id,pid:row.cj_product_id,hidden:row.hidden,status:row.status,identityVerified:valid,localVariants:saved.length,sourceVariants:Array.isArray(variants)?variants.length:null,platformProductId:'trbhh-cj-'+row.id};
+     audit.push(result);console.log(JSON.stringify({event:'catalog_product_audited',...result}));
+    }catch{const result={id:row.id,pid:row.cj_product_id,identityVerified:false,error:'source_read_failed'};audit.push(result);console.log(JSON.stringify({event:'catalog_product_audited',...result}));}
+   }
+   const failed=audit.filter(row=>!row.identityVerified).length;
+   console.log(JSON.stringify({format:'cj-catalog-source-audit-v1',readOnly:true,count:audit.length,identityVerified:audit.length-failed,failed,products:audit}));
+  }
   const connections=await request('/product/conn/connection?shopId=2609231037543532300&platformProductId=trbhh-cj-247&page=1&pageSize=100','GET',undefined,auth.accessToken);
   console.log(JSON.stringify({format:'cj-connection-readback-v1',total:connections?.total,list:connections?.list?.map(l=>({shopId:l.shopId,platformProductId:l.platformProductId,platformVariantId:l.platformVariantId,cjProductId:l.cjProductId,cjVariantId:l.cjVariantId,defaultArea:l.defaultArea,logistics:l.logistics,sourceCountryCode:l.sourceCountryCode,targetCountryCode:l.targetCountryCode,keys:Object.keys(l)}))}));
   const row=catalog.find(p=>p.id==='247');

@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {buildPlan,connectionsMatch}=require('./cj-store-connect.cjs');
+const {buildPlan,connectionsMatch,connectionIdentitiesMatch}=require('./cj-store-connect.cjs');
 function fixture(){return [[{id:'2609231037543532300',name:'Trbhh',status:1,type:'api'}],{id:247n,hidden:0,cj_product_id:'2610090314401607200',details_json:JSON.stringify({variants:[{vid:'VID1'}]})},{pid:'2610090314401607200',productNameEn:'Source name',productImage:'["https://cf.cjdropshipping.com/product.jpg"]'},[{vid:'VID1',variantSku:'SKU1',variantNameEn:'Source option',variantImage:'https://cf.cjdropshipping.com/variant.jpg'}],[{areaId:1,countryCode:'CN'}],[{logisticName:'Observed route',logisticPrice:8.5}]];}
 test('plan uses owned explicit shop and exact source variants without invented prices or inventory',()=>{
  const plan=buildPlan(...fixture());assert.equal(plan.connection.shopId,'2609231037543532300');assert.equal(plan.connection.variantList[0].cjVariantId,'VID1');assert.equal(plan.batch.variants[0].id,plan.connection.variantList[0].platformVariantId);assert(!Object.hasOwn(plan.product,'priceMin'));assert(!Object.hasOwn(plan.batch.variants[0],'shopPrice'));assert(!Object.hasOwn(plan.batch.variants[0],'oldInventoryQuantity'));
@@ -17,4 +17,12 @@ test('complete variant identifiers with conflicting logistics or countries are n
  for(const [key,value] of [['defaultArea',2],['logistics','Other route'],['sourceCountryCode','US'],['targetCountryCode','US']])assert.equal(connectionsMatch([{...line,[key]:value}],target),false);
  const missing={...line};delete missing.logistics;assert.equal(connectionsMatch([missing],target),false);
  assert.equal(connectionsMatch([],target),false);
+});
+test('identity readback is distinct from unreturned routing and rejects duplicate variant lines',()=>{
+ const target=buildPlan(...fixture()).connection;
+ const line={shopId:target.shopId,platformProductId:target.platformProductId,cjProductId:target.cjProductId,...target.variantList[0]};
+ assert.equal(connectionIdentitiesMatch([line],target),true);
+ assert.equal(connectionsMatch([line],target),false);
+ assert.equal(connectionIdentitiesMatch([{...line,cjProductId:'other'}],target),false);
+ assert.equal(connectionIdentitiesMatch([line,line],{...target,variantList:[target.variantList[0],{cjVariantId:'VID2',platformVariantId:'other'}]}),false);
 });

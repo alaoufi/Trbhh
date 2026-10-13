@@ -71,7 +71,8 @@ jobs:
             exit 0
           fi
           if [[ "$PHASE" == cj-store-discovery ]]; then
-            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/cj-store-discovery.cjs
+            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/cj-store-discovery.cjs | tee "$RUNNER_TEMP/cj-discovery.log"
+            grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"
             exit 0
           fi
           if [[ "$PHASE" == replay-backup-media ]]; then

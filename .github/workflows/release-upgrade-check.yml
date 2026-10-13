@@ -16,13 +16,13 @@ jobs:
           MYSQL_USER: upgrade
           MYSQL_PASSWORD: isolated_upgrade_only
           MYSQL_ROOT_PASSWORD: isolated_upgrade_root_only
-        ports: ['3306:3306']
+        ports: ['33309:3306']
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uupgrade -pisolated_upgrade_only"
           --health-interval=10s --health-timeout=5s --health-retries=10
     env:
-      DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:3306/trbhh_upgrade_test
-      UPGRADE_TEST_DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:3306/trbhh_upgrade_test
+      DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:33309/trbhh_upgrade_test
+      UPGRADE_TEST_DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:33309/trbhh_upgrade_test
       UPGRADE_DB_TESTS: '1'
       AUTH_SECRET: isolated_upgrade_test_only_0123456789abcdef0123456789abcdef
     steps:
@@ -65,4 +65,4 @@ jobs:
         run: pnpm exec vitest run --config vitest.commerce.config.ts -t 'keeps a CJ handoff idempotent'
         env:
           COMMERCE_DB_TESTS: '1'
-          COMMERCE_TEST_DATABASE_URL: mysql://root:isolated_upgrade_root_only@127.0.0.1:3306/trbhh_commerce_test
+          COMMERCE_TEST_DATABASE_URL: mysql://root:isolated_upgrade_root_only@127.0.0.1:33309/trbhh_commerce_test

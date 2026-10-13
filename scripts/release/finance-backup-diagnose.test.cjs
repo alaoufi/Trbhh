@@ -54,3 +54,8 @@ test('tar filesystem errors report only fixed diagnostic categories',()=>{
   const result=helper().summarizeLogs('', 'tar: PRIVATE_PERSON_PATH: '+message);assert(result.codes.includes(expected));assert.doesNotMatch(JSON.stringify(result),/PRIVATE_PERSON_PATH/);
  }
 });
+
+test('tar source-stat and hardlink errors remain distinct and private',()=>{
+ const source=helper().summarizeLogs('', "tar: can't stat 'PRIVATE_SOURCE': No such file or directory");const target=helper().summarizeLogs('', 'tar: PRIVATE_TARGET: Cannot hard link: No such file or directory');
+ assert(source.codes.includes('tar_source_stat_failed'));assert(target.codes.includes('tar_hardlink_failed'));assert.doesNotMatch(JSON.stringify([source,target]),/PRIVATE_/);
+});

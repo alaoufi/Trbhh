@@ -56,7 +56,7 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
   }catch(error){const result={id:row.id,identityVerified:false,error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed'};results.push(result);emit({event:'metadata_product_failed',...result});break;}
  }
  const failed=results.some(r=>!r.identityVerified)||results.length!==ids.length;
- const report={event:'cj_batch_completed',ok:!failed,shopId:SHOP,requested:ids.length,processed:results.length,results,writes,purchasePerformed:false,pricesWritten:false,inventoryWritten:false,retryPolicy:'read_existing_identifiers_before_any_write'};emit(report);if(failed)process.exitCode=1;return report;
+ const report={event:'cj_batch_completed',ok:!failed,shopId:SHOP,requested:ids.length,processed:results.length,results,writes,purchasePerformed:false,customerQuoteApproved:false,routingTestZip:'11564',pricesWritten:false,inventoryWritten:false,retryPolicy:'read_existing_identifiers_before_any_write'};emit(report);if(failed)process.exitCode=1;return report;
 }
 module.exports={parseBatchIds,main};
 if(require.main===module)main().catch(error=>{console.error(JSON.stringify({event:'cj_batch_failed',error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed'}));process.exitCode=1;});

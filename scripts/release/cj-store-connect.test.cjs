@@ -26,3 +26,8 @@ test('identity readback is distinct from unreturned routing and rejects duplicat
  assert.equal(connectionIdentitiesMatch([{...line,cjProductId:'other'}],target),false);
  assert.equal(connectionIdentitiesMatch([line,line],{...target,variantList:[target.variantList[0],{cjVariantId:'VID2',platformVariantId:'other'}]}),false);
 });
+test('a retained second product keeps stable row-based IDs without changing shop ownership',()=>{
+ const args=fixture();args[1].id=12n;args[1].cj_product_id='OTHER_PID';args[2].pid='OTHER_PID';
+ const plan=buildPlan(...args);assert.equal(plan.product.id,'trbhh-cj-12');assert.equal(plan.connection.cjProductId,'OTHER_PID');assert.equal(plan.connection.platformProductId,'trbhh-cj-12');assert.equal(plan.batch.variants[0].id,'trbhh-cj-12-VID1');assert.equal(plan.connection.shopId,'2609231037543532300');
+ args[1].id=0n;assert.throws(()=>buildPlan(...args));
+});

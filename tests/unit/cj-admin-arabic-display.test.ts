@@ -29,6 +29,11 @@ vi.mock('@/lib/cj/mapping',()=>{
   const row=()=>({id:1,cj_product_id:'PID-1',cj_sku:'SKU-1',name:state.sourceName,name_ar:state.nameAr,trbhh_category:state.category,image:'',sale_price_minor:5525,sale_price_override_minor:null,supplier_cost_minor:3750,shipping_cost_minor:500,hidden:0,status:'draft',source_description:null,display_description_ar:null});
   return {importedCjPids:async()=>new Set(),listCjProducts:async()=>[row()],listVisibleCjProducts:async()=>[row()],getCjProductById:async()=>row(),parseCjAvailability:()=>null};
 });
+vi.mock('@/lib/cj/admin-catalog',()=>({loadAdminCjCatalog:async(_query:unknown,visibleOnly:boolean)=>{
+  const mapping=await import('@/lib/cj/mapping');
+  const items=visibleOnly?await mapping.listVisibleCjProducts():await mapping.listCjProducts();
+  return {items,total:items.length,ready:items.filter(row=>row.status==='ready').length,page:1,pageCount:1,cat:0};
+}}));
 vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:()=>['https://example.test/saved-gallery.jpg'],cjStorefrontPublic:async()=>false}));
 vi.mock('@/lib/data', async (io) => ({ ...(await io<typeof import('@/lib/data')>()), getCategories: async () => [], getSubCategories: async () => [] }));
 vi.mock('@/lib/settings',()=>({getSetting:async(_k:string,fallback='')=>fallback}));

@@ -3,6 +3,8 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const state=vi.hoisted(()=>({allowed:true, cached:vi.fn(), blocking:vi.fn(), rows:[{id:42,cj_product_id:'CJ-TEST',name:'Test source',name_ar:'',trbhh_category:'Category',status:'draft',hidden:0,images:null,image:'',supplier_cost_minor:12345,shipping_cost_minor:1111,sale_price_minor:98765,sale_price_override_minor:null}]}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:async()=>{if(!state.allowed)throw Error('denied');}}));
 vi.mock('@/lib/cj/mapping',()=>({listCjProducts:async()=>state.rows,listVisibleCjProducts:async()=>state.rows}));
+vi.mock('@/lib/cj/admin-catalog',()=>({loadAdminCjCatalog:async()=>({items:state.rows,total:state.rows.length,ready:0,page:1,pageCount:1,cat:0})}));
+vi.mock('@/lib/data',()=>({getCategories:async()=>[]}));
 vi.mock('@/lib/cj/translate',()=>({getCachedArabic:state.cached,translateManyForDisplay:state.blocking,isArabicText:(text:string|undefined)=>Boolean(text&&/[\u0600-\u06ff]/.test(text))}));
 vi.mock('@/lib/cj/storefront',()=>({cjImg:()=>'',cjProductImages:()=>[]}));
 vi.mock('@/components/cj/product-image',()=>({CjProductImage:()=>null}));

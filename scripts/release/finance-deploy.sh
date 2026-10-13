@@ -66,6 +66,34 @@ restore_capture_units() {
 # CAPTURE_UNITS_END
 
 # CJ_UNITS_BEGIN
+cj_unit_target_owned() {
+  local unit=$1 target
+  [[ "$unit" == service || "$unit" == timer ]] || return 1
+  target="/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+  [[ ! -L "$target" ]] || return 1
+  if [[ -f "$backup/cj-$unit.old" ]] && cmp --silent "$target" "$backup/cj-$unit.old"; then return 0; fi
+  if [[ ! -e "$target" && ! -f "$backup/cj-$unit.old" ]]; then return 0; fi
+  if [[ -f "$backup/cj-$unit.new" ]] && cmp --silent "$target" "$backup/cj-$unit.new"; then return 0; fi
+  return 1
+}
+
+replace_cj_unit() (
+  local unit=$1 source=$2 target temporary
+  [[ "$unit" == service || "$unit" == timer ]] || return 1
+  [[ "$source" == "$backup/cj-$unit.old" || "$source" == "$backup/cj-$unit.new" ]] || return 1
+  [[ -f "$source" && ! -L "$source" ]] || return 1
+  target="/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+  cj_unit_target_owned "$unit" || return 1
+  temporary=$(mktemp "$target.release.XXXXXX") || return 1
+  trap 'rm -f -- "$temporary"' EXIT
+  # A failed copy may truncate only the staging file. The active unit remains
+  # complete until a same-directory rename publishes the verified replacement.
+  install -m 644 "$source" "$temporary" || return 1
+  cmp --silent "$source" "$temporary" || return 1
+  cj_unit_target_owned "$unit" || return 1
+  mv -fT -- "$temporary" "$target" || return 1
+)
+
 restore_cj_units() {
   [[ -f "$backup/CJ_SNAPSHOT_READY" ]] || return 0
   systemctl stop trbhh-cj-fulfillment.timer trbhh-cj-fulfillment.service >/dev/null 2>&1 || true
@@ -79,7 +107,7 @@ restore_cj_units() {
       if [[ ! -e "$target" && ! -f "$backup/cj-$unit.old" ]]; then continue; fi
       cmp --silent "$target" "$backup/cj-$unit.new" || return 1
       if [[ -f "$backup/cj-$unit.old" ]]; then
-        install -m 644 "$backup/cj-$unit.old" "$target" || return 1
+        replace_cj_unit "$unit" "$backup/cj-$unit.old" || return 1
       else
         rm -f -- "$target" || return 1
       fi
@@ -529,8 +557,7 @@ UNIT
 touch "$backup/CJ_UNIT_FILES_INSTALLED"
 substep=install_cj_units
 for unit in service timer; do
-  [[ ! -L "/etc/systemd/system/trbhh-cj-fulfillment.$unit" ]]
-  install -m 644 "$backup/cj-$unit.new" "/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+  replace_cj_unit "$unit" "$backup/cj-$unit.new"
 done
 systemctl daemon-reload
 substep=enable_cj_timer

@@ -7,7 +7,7 @@ function parseBatchIds(requested){
  const ids=requested.split(',');if(new Set(ids).size!==ids.length)throw Error('batch_duplicate_ids');
  return ids;
 }
-async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSON.stringify(value)),pace=1200}={}){
+async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSON.stringify(value)),pace=1200,cooldown=2400}={}){
  const ids=parseBatchIds(process.env.CJ_STORE_BATCH_IDS||'');
  if(process.env.SUPPLIER_ALLOW_LIVE_ORDERS!=='false'||(process.env.CJ_API_BASE||BASE).replace(/\/+$/,'')!==BASE||!process.env.CJ_API_KEY)throw Error('configuration');
  const url=new URL(process.env.DATABASE_URL);if(url.protocol!=='mysql:')throw Error('database_protocol');
@@ -22,13 +22,17 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
   const reads=['/shop/getShops','/product/query','/product/variant/query','/product/stock/getInventoryByPid','/product/conn/connection','/shop/product/queryDetail'];
   const posts=['/authentication/getAccessToken','/logistic/freightCalculate','/store/product/saveProduct','/store/product/saveVariantBatch','/product/conn/connection'];
   if(!(method==='GET'?reads:posts).includes(root))throw Error('endpoint_blocked');
+  for(let attempt=0;attempt<3;attempt++){
   const delay=pace-(Date.now()-last);if(delay>0)await new Promise(r=>setTimeout(r,delay));last=Date.now();
   lastResponse={endpoint:root,method,http:null,code:null};
   const res=await fetchApi(BASE+route,{method,redirect:'error',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',...(token?{'CJ-Access-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{})});
   lastResponse.http=res.status;
-  const env=await res.json();lastResponse.code=env.code;if(!res.ok||!(env.code===200||(root==='/shop/getShops'&&env.code===0))||env.success===false||env.result===false||!(env.success===true||env.result===true))throw Error('api_rejected');
+  const env=await res.json();lastResponse.code=env.code;
+  if((res.status===429||env.code===1600200)&&(method==='GET'||root==='/logistic/freightCalculate')&&attempt<2){emit({event:'readonly_rate_limit_retry',endpoint:root,attempt:attempt+1});await new Promise(r=>setTimeout(r,cooldown*2**attempt));continue;}
+  if(!res.ok||!(env.code===200||(root==='/shop/getShops'&&env.code===0))||env.success===false||env.result===false||!(env.success===true||env.result===true))throw Error('api_rejected');
   if(method==='POST'&&(root.startsWith('/store/')||root==='/product/conn/connection')){const receipt={endpoint:root,requestId:env.requestId||null,productId:body.id||body.platformProductId||body.variants?.[0]?.productId};writes.push(receipt);emit({event:'metadata_response',...receipt});}
   return env.data;
+  }
  }
  const auth=await api('/authentication/getAccessToken','POST',{apiKey:process.env.CJ_API_KEY});token=auth?.accessToken;if(typeof token!=='string'||!token)throw Error('auth_response');
  const shops=await api('/shop/getShops');if(!Array.isArray(shops))throw Error('shops_response');
@@ -39,7 +43,8 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
    const product=await api('/product/query'+suffix),variants=await api('/product/variant/query'+suffix),stock=await api('/product/stock/getInventoryByPid'+suffix);
    if(!Array.isArray(variants)||!variants.length)throw Error('variants_response');
    const warehouses=stock.inventories||[];
-   sourceEvidence={warehouses:warehouses.map(w=>({areaId:w.areaId,countryCode:w.countryCode})),quotes:[]};
+   const imageOrigin=value=>{try{if(typeof value==='string'&&value.startsWith('['))value=JSON.parse(value)[0];const image=new URL(value);return {protocol:image.protocol,host:image.hostname,credentials:Boolean(image.username||image.password)};}catch{return {validURL:false};}};
+   sourceEvidence={warehouses:warehouses.map(w=>({areaId:w.areaId,countryCode:w.countryCode})),quotes:[],productImageOrigin:imageOrigin(product.productImage),variantImageOrigins:[...new Map(variants.map(v=>{const origin=imageOrigin(v.variantImage);return[JSON.stringify(origin),origin];})).values()]};
    const countries=[...new Set(warehouses.filter(w=>Number.isSafeInteger(w.areaId)&&w.areaId>0&&/^[A-Z]{2}$/.test(w.countryCode)).map(w=>w.countryCode))].sort((a,b)=>a==='CN'?-1:b==='CN'?1:0);
    if(!countries.length)throw Error('warehouse_unverified');
    let plan;

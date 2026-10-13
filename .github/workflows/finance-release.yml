@@ -28,6 +28,10 @@ on:
         description: Read-only fresh CJ identities for every retained catalog product
         type: boolean
         default: false
+      catalog_ids:
+        description: Up to 24 explicit retained product IDs for metadata-only CJ connection
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -44,7 +48,7 @@ jobs:
           persist-credentials: false
       - name: Verify bounded cache operation tools
         run: |
-          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs scripts/release/cj-media-replay.test.cjs scripts/release/cj-store-discovery.test.cjs scripts/release/cj-store-connect.test.cjs
+          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs scripts/release/cj-media-replay.test.cjs scripts/release/cj-store-discovery.test.cjs scripts/release/cj-store-connect.test.cjs scripts/release/cj-store-batch.test.cjs
           bash -n scripts/release/finance-cache.sh
       - name: Inspect production or run the selected guarded cache operation
         env:
@@ -52,6 +56,7 @@ jobs:
           BACKUP_RUN_ID: ${{ inputs.backup_run_id || '35932588551' }}
           BASELINE_SHA: ${{ inputs.baseline_sha }}
           AUDIT_CATALOG: ${{ inputs.audit_catalog && 'true' || 'false' }}
+          CATALOG_IDS: ${{ inputs.catalog_ids }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -72,7 +77,8 @@ jobs:
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
           if [[ "$PHASE" == cj-store-connect ]]; then
-            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/cj-store-connect.cjs
+            [[ "$CATALOG_IDS" =~ ^[1-9][0-9]{0,15}(,[1-9][0-9]{0,15}){0,23}$ ]]
+            tar -cf - scripts/release/cj-store-connect.cjs scripts/release/cj-store-batch.cjs | "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T -e CJ_STORE_BATCH_IDS='"$CATALOG_IDS"' app sh -c '\''p=$(mktemp -d /tmp/cj-batch.XXXXXX); tar -xf - -C "$p" --strip-components=2; node "$p/cj-store-batch.cjs"; result=$?; rm -f "$p/cj-store-connect.cjs" "$p/cj-store-batch.cjs"; rmdir "$p"; exit "$result"'\''' | tee "$RUNNER_TEMP/cj-batch.log"
             exit 0
           fi
           if [[ "$PHASE" == cj-store-discovery ]]; then
@@ -141,6 +147,19 @@ jobs:
         with:
           name: cj-discovery-readout
           path: ${{ runner.temp }}/cj-discovery.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require completed CJ metadata batch evidence
+        if: inputs.phase == 'cj-store-connect'
+        run: |
+          test -s "$RUNNER_TEMP/cj-batch.log"
+          grep -Eq '^\{"event":"cj_batch_completed","ok":true,' "$RUNNER_TEMP/cj-batch.log"
+      - name: Preserve CJ metadata batch readout
+        if: always() && inputs.phase == 'cj-store-connect'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cj-metadata-batch-readout
+          path: ${{ runner.temp }}/cj-batch.log
           if-no-files-found: error
           retention-days: 3
       - name: Remove runner SSH credential

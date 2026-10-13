@@ -9,7 +9,7 @@ function connectionsMatch(lines,target){
 function buildPlan(shops,row,product,variants,warehouses,routes){
  const shop=shops.find(s=>String(s.id)===SHOP);
  if(!shop||shop.name!=='Trbhh'||shop.status!==1||shop.type!=='api')throw Error('shop_identity');
- if(!row||row.hidden!==0||String(row.id)!=='247'||row.cj_product_id!==PID||String(product.pid)!==PID)throw Error('product_identity');
+ if(!row||row.hidden!==0||!/^[1-9]\d{0,15}$/.test(String(row.id))||!/^[A-Za-z0-9_-]{1,64}$/.test(row.cj_product_id)||String(product.pid)!==row.cj_product_id)throw Error('product_identity');
  const saved=JSON.parse(row.details_json||'{}').variants||[];
  if(!Array.isArray(variants)||!variants.length||variants.length!==saved.length||variants.some(v=>!saved.some(s=>s.vid===v.vid))||new Set(variants.map(v=>v.vid)).size!==variants.length)throw Error('variant_identity');
  const origin=warehouses.find(w=>w.countryCode==='CN'&&Number.isSafeInteger(w.areaId)&&w.areaId>0);
@@ -17,12 +17,12 @@ function buildPlan(shops,row,product,variants,warehouses,routes){
  if(!origin||!valid.length)throw Error('route_unverified');
  let image=product.productImage;try{if(typeof image==='string'&&image.startsWith('['))image=JSON.parse(image)[0];}catch{throw Error('image_invalid');}
  const safeImage=value=>{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||!/(^|\.)cjdropshipping\.com$/.test(u.hostname))throw Error('image_invalid');return u.href;};
- const productId='trbhh-cj-247';
+ const productId='trbhh-cj-'+String(row.id);
  const lines=variants.map(v=>{
   if(!/^[A-Za-z0-9_-]{1,40}$/.test(v.vid)||typeof v.variantSku!=='string'||!v.variantSku)throw Error('variant_invalid');
   return {id:productId+'-'+v.vid,productId,title:v.variantNameEn||v.variantName||v.variantSku,sku:v.variantSku,image:safeImage(v.variantImage||image)};
  });
- return {product:{id:productId,shopId:SHOP,title:product.productNameEn||product.productName,image:safeImage(image)},batch:{shopId:SHOP,variants:lines},connection:{shopId:SHOP,defaultArea:origin.areaId,logistics:valid[0].logisticName,cjProductId:PID,platformProductId:productId,sourceCountryCode:'CN',sourceCountry:'China',targetCountryCode:'SA',targetCountry:'Saudi Arabia',variantList:variants.map((v,i)=>({cjVariantId:v.vid,platformVariantId:lines[i].id}))}};
+ return {product:{id:productId,shopId:SHOP,title:product.productNameEn||product.productName,image:safeImage(image)},batch:{shopId:SHOP,variants:lines},connection:{shopId:SHOP,defaultArea:origin.areaId,logistics:valid[0].logisticName,cjProductId:row.cj_product_id,platformProductId:productId,sourceCountryCode:'CN',sourceCountry:'China',targetCountryCode:'SA',targetCountry:'Saudi Arabia',variantList:variants.map((v,i)=>({cjVariantId:v.vid,platformVariantId:lines[i].id}))}};
 }
 async function main(){
  const {PrismaClient}=require('@prisma/client'),db=new PrismaClient({log:[]});let last=0;

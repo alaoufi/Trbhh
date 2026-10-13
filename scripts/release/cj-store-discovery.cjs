@@ -27,6 +27,8 @@ async function main(){
   if(typeof auth?.accessToken!=='string')throw Error('invalid_authentication');
   const shops=await request('/shop/getShops','GET',undefined,auth.accessToken);
   if(!Array.isArray(shops))throw Error('invalid_shop_list');
+  const connections=await request('/product/conn/connection?shopId=2609231037543532300&platformProductId=trbhh-cj-247&page=1&pageSize=100','GET',undefined,auth.accessToken);
+  console.log(JSON.stringify({format:'cj-connection-readback-v1',total:connections?.total,list:connections?.list?.map(l=>({shopId:l.shopId,platformProductId:l.platformProductId,platformVariantId:l.platformVariantId,cjProductId:l.cjProductId,cjVariantId:l.cjVariantId,defaultArea:l.defaultArea,logistics:l.logistics,sourceCountryCode:l.sourceCountryCode,targetCountryCode:l.targetCountryCode,keys:Object.keys(l)}))}));
   const row=await db.cj_products.findUnique({where:{id:247n}});
   if(!row||row.hidden!==0)throw Error('product_unavailable');
   const product=await request('/product/query?pid='+encodeURIComponent(row.cj_product_id),'GET',undefined,auth.accessToken);

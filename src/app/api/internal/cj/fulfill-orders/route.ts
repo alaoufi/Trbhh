@@ -2,6 +2,7 @@ import {NextResponse} from 'next/server';
 import {constantSecret} from '@/lib/suppliers/crypto';
 import {prisma} from '@/lib/prisma';
 import {processCjFulfillment} from '@/lib/cj/fulfillment';
+import {cjPrivateFinancialOperationsAllowed} from '@/lib/cj/live-gates';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -13,7 +14,7 @@ export async function POST(request:Request){
  if(secret.length<32)return fail('not_configured',503);
  const auth=request.headers.get('authorization')||'';
  if(auth.length>1024||!auth.startsWith('Bearer ')||!constantSecret(auth.slice(7),secret))return fail('unauthorized',401);
- if(process.env.SUPPLIER_ALLOW_LIVE_ORDERS!=='true'||process.env.CJ_FULFILLMENT_WORKER_ENABLED!=='true')return fail('cj_fulfillment_disabled',503);
+ if(!(await cjPrivateFinancialOperationsAllowed()))return fail('cj_fulfillment_disabled',503);
  try{
   const rows=await prisma.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_cj_fulfillment_outbox WHERE status IN ('pending','creating','created','create_uncertain','parent_claimed','payment_ready','debit_claimed','debit_uncertain') ORDER BY updated_at ASC,id ASC LIMIT 1`;
   if(!rows.length)return NextResponse.json({processed:0},{headers});

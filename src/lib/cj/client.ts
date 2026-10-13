@@ -2,6 +2,7 @@ import 'server-only';
 import { cjConfig, type CjConfig } from './config';
 import { readCjAuth, writeCjAuth } from './store';
 import { getCommerceConfig } from '@/lib/commerce/settings';
+import {cjPrivateFinancialOperationsAllowed} from './live-gates';
 import type {
   CjResult, CjProductSummary, CjProductDetail, CjVariant, CjInventory, CjWarehouse, CjFreightOption, CjTrack,
   CjCategory, CjProductPage, CjBalance, CjCreatedOrder, CjOrderDetail,
@@ -342,7 +343,7 @@ export async function cjFulfillmentTransport(path: string, body?: unknown): Prom
   const writes = ['/shopping/order/createOrderV3', '/shopping/order/addCart', '/shopping/order/addCartConfirm', '/shopping/order/saveGenerateParentOrder', '/shopping/pay/payBalanceV2'];
   if (!reads.includes(path) && !writes.includes(path)) return {ok:false,error:'unsupported_fulfillment_endpoint'};
   if (writes.includes(path)) {
-    if (!(await liveOrdersAllowed()) || process.env.CJ_FULFILLMENT_WORKER_ENABLED !== 'true') return {ok:false,error:'cj_fulfillment_disabled'};
+    if (!(await cjPrivateFinancialOperationsAllowed())) return {ok:false,error:'cj_fulfillment_disabled'};
     if (path.endsWith('createOrderV3') && (body as Record<string,unknown>)?.payType !== 3) return {ok:false,error:'unpaid_create_required'};
   }
   if (path.endsWith('getOrderDetail')) return call(path,{query:body as Record<string,string>});

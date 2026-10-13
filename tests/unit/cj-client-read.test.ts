@@ -36,10 +36,19 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
 describe('CJ authentication and verified connection', () => {
+  it('routes only the new private CJ unpaid transport through dedicated gates with shared supplier gate off',async()=>{
+    vi.stubEnv('SUPPLIER_ALLOW_LIVE_ORDERS','false');for(const key of ['CJ_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'])vi.stubEnv(key,'true');
+    const {getCommerceConfig}=await import('@/lib/commerce/settings');vi.mocked(getCommerceConfig).mockResolvedValue({purchasingEnabled:true} as never);mock.fetch.mockResolvedValueOnce(success({orderId:'fixture-unpaid'}));
+    const client=await import('@/lib/cj/client');expect(await finish(client.cjFulfillmentTransport('/shopping/order/createOrderV3',{payType:3,orderNumber:'fixture-unpaid'}))).toEqual({ok:true,data:{orderId:'fixture-unpaid'}});expect(mock.fetch).toHaveBeenCalledTimes(1);expect(await client.createCjOrder({})).toEqual({ok:false,error:'cj_purchasing_disabled'});expect(mock.fetch).toHaveBeenCalledTimes(1);expect(process.env.SUPPLIER_ALLOW_LIVE_ORDERS).toBe('false');
+  });
+  it('cannot enable new CJ financial transport through the shared supplier gate alone',async()=>{
+    vi.stubEnv('SUPPLIER_ALLOW_LIVE_ORDERS','true');vi.stubEnv('CJ_ALLOW_LIVE_ORDERS','false');vi.stubEnv('CJ_FULFILLMENT_WORKER_ENABLED','true');vi.stubEnv('CJ_LIVE_TRIAL_ENABLED','true');const {getCommerceConfig}=await import('@/lib/commerce/settings');vi.mocked(getCommerceConfig).mockResolvedValue({purchasingEnabled:true} as never);const {cjFulfillmentTransport}=await import('@/lib/cj/client');expect(await cjFulfillmentTransport('/shopping/order/createOrderV3',{payType:3})).toEqual({ok:false,error:'cj_fulfillment_disabled'});expect(mock.fetch).not.toHaveBeenCalled();
+  });
   it.each([undefined,null,'',' ',true,'0x10',-1,'invalid',1.001])('rejects invalid wallet amount %s rather than verifying zero',async(amount)=>{mock.fetch.mockResolvedValueOnce(success({amount}));const {getCjBalance}=await import('@/lib/cj/client');expect(await finish(getCjBalance())).toEqual({ok:false,error:'balance_response_invalid'});});
   it('preserves a legitimate exact zero wallet balance',async()=>{mock.fetch.mockResolvedValueOnce(success({amount:'0.00',freezeAmount:'1.00',noWithdrawalAmount:'2.00'}));const {getCjBalance}=await import('@/lib/cj/client');expect(await finish(getCjBalance())).toEqual({ok:true,data:{amountUsd:0,bonusUsd:2,frozenUsd:1}});});
   it('authenticates with the API key payload when no token is stored', async () => {

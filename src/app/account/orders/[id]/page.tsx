@@ -13,6 +13,7 @@ import {OrderVariantDetails} from '@/components/commerce/order-variant-details';
 import {memberCjOrderTracking} from '@/lib/cj/fulfillment/status';
 import type {MemberTracking} from '@/lib/suppliers/tracking';
 import {isOwnedCjLiveTrial} from '@/lib/cj/private-trial';
+import {cjPrivateRuntimeEnabled} from '@/lib/cj/live-gates';
 
 export const dynamic = 'force-dynamic';
 export default async function MemberOrder({ params, searchParams }: {
@@ -54,7 +55,7 @@ export default async function MemberOrder({ params, searchParams }: {
   let canPay = order.status === 'awaiting_payment' && (!attempt || attempt.status === 'pending')
     && (config.enabled||privateTrial) && config.paymentsEnabled && gateway?.ready;
   let cjPaymentUnavailable=false;
-  if(canPay&&(process.env.SUPPLIER_ALLOW_LIVE_ORDERS!=='true'||process.env.CJ_FULFILLMENT_WORKER_ENABLED!=='true')){
+  if(canPay&&!cjPrivateRuntimeEnabled()){
     const quotes=await prisma.$queryRaw<{cj:number}[]>`SELECT 1 AS cj FROM commerce_cj_order_quotes q JOIN commerce_orders o ON o.id=q.commerce_order_id WHERE o.id=${order.id} AND o.member_id=${BigInt(session.uid)} LIMIT 1`;
     if(quotes.length){canPay=false;cjPaymentUnavailable=true;}
   }

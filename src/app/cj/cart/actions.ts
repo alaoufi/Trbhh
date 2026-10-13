@@ -15,6 +15,7 @@ import {requireAnyAdmin} from '@/lib/roles';
 import {resolveCjCheckoutRequestKey} from '@/lib/cj/checkout-renewal';
 import {canonicalCjDestination} from '@/lib/cj/live-destination';
 import {requireCjLiveTrialAuthority} from '@/lib/cj/private-trial';
+import {cjPrivateRuntimeEnabled} from '@/lib/cj/live-gates';
 
 /**
  * جسر «إتمام الطلب» (المرحلة 1 — بلا أموال ولا شراء حقيقي):
@@ -54,9 +55,8 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
   const intent = JSON.stringify({uid:session.uid,items,shipName,shipPhone,shipCity,shipAddress1,shipRegion,shipAddress2});
   const internalRef = `cjt-${session.uid}-${createHash('sha256').update(intent).digest('hex').slice(0,40)}`;
   const config=await getCommerceConfig();
-  if(config.purchasingEnabled&&process.env.SUPPLIER_ALLOW_LIVE_ORDERS==='true'){
-    if(process.env.CJ_FULFILLMENT_WORKER_ENABLED!=='true')redirect('/cj/cart?order=unavailable');
-    if(process.env.CJ_LIVE_TRIAL_ENABLED!=='true')redirect('/cj/cart?order=unavailable');
+  if(config.purchasingEnabled&&process.env.CJ_ALLOW_LIVE_ORDERS==='true'){
+    if(!cjPrivateRuntimeEnabled())redirect('/cj/cart?order=unavailable');
     await requireAnyAdmin(); // restricted staff trial; public enablement is a separate decision
     await requireCjLiveTrialAuthority(BigInt(session.uid));
     const gateway=await getCommerceGateway();

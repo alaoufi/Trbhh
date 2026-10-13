@@ -8,7 +8,7 @@ import { SubmitButton } from '@/components/cj/submit-button';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listCjProducts } from '@/lib/cj/mapping';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { translateManyForDisplay, isArabicText } from '@/lib/cj/translate';
+import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 import { saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, removeCjProduct } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -18,15 +18,13 @@ const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white disabled:opacity-40';
 const ghost = 'rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary';
 const input = 'min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm';
-const sar = (m: number | null) => (m == null ? '—' : `${(m / 100).toFixed(2)} ر.س`);
 const BACK = '/admin/suppliers/cj/imported';
 
 export default async function CjImportedPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('products', 'view');
   const sp = await searchParams;
   const importedList = await listCjProducts(200);
-  // ترجمة فورية عند التحميل لأسماء السلع غير العربية عبر المترجم المحلي ثم تُخزَّن.
-  const ar = await translateManyForDisplay(importedList.flatMap((r) => [r.name, r.trbhh_category]), 120);
+  const ar = await getCachedArabic(importedList.flatMap((r) => [r.name, r.trbhh_category]));
   const nameOf = (r: { name: string; name_ar: string }) => isArabicText(r.name_ar) ? r.name_ar : (ar.get((r.name || '').trim()) ?? null);
 
   return (
@@ -47,7 +45,6 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
       {!importedList.length ? <p className={`${card} text-sm text-muted-foreground`}>لم تستورد أي منتج بعد. استورد من صفحة «تصفّح واستيراد».</p> : (
         <div className="grid gap-3 sm:grid-cols-2">
           {importedList.map((r) => {
-            const finalMinor = r.sale_price_override_minor ?? r.sale_price_minor;
             return (
               <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${r.hidden ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-primary/20'}`}>
                 <div className="flex gap-3">
@@ -55,15 +52,14 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="truncate text-sm font-bold">{isArabicText(r.name_ar) ? r.name_ar : <CjText original={r.name} ar={nameOf(r)} />}</div>
                     <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{r.name}</p><p dir="auto">{r.trbhh_category}</p></details>
-                    <div className="text-[11px] text-muted-foreground"><span dir="ltr">PID {r.cj_product_id}</span> · التكلفة {sar(r.supplier_cost_minor + r.shipping_cost_minor)}</div>
-                    <div className="text-sm font-extrabold text-primary">السعر: {sar(finalMinor)}{r.sale_price_override_minor != null && <span className="ms-1 text-[10px] font-normal text-amber-700">(معدّل يدوياً)</span>}</div>
+                    <div className="text-[11px] text-muted-foreground"><span dir="ltr">PID {r.cj_product_id}</span></div>
                     <div className="flex flex-wrap items-center gap-1 text-[10px]">
                       {r.trbhh_category && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary">{r.trbhh_category}</span>}
                       <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
                       {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                     </div>
                     {/* الأرقام الحقيقية الحيّة تُجلب لحظياً عند تحميل الصفحة (بلا تخزين مسبق). */}
-                    <CjLiveNumbers pid={r.cj_product_id} priceMinor={finalMinor} />
+                    <CjLiveNumbers pid={r.cj_product_id} productId={r.id} />
                   </div>
                 </div>
                 <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">
@@ -76,7 +72,7 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
                   <AccessBoundary module="products" action="edit"><form action={refreshCjImportedAvailability}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={BACK} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الصور والمخزون والشحن</SubmitButton></form></AccessBoundary>
                   <AccessBoundary module="products" action="edit"><form action={saveCjPrice} className="flex items-center gap-1">
                     <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={BACK} />
-                    <input className={`${input} w-24`} name="priceSar" inputMode="decimal" defaultValue={r.sale_price_override_minor != null ? (r.sale_price_override_minor / 100).toString() : ''} placeholder={(r.sale_price_minor / 100).toString()} aria-label="سعر البيع بالريال" />
+                    <input className={`${input} w-24`} name="priceSar" inputMode="decimal" defaultValue={r.sale_price_override_minor != null ? (r.sale_price_override_minor / 100).toString() : ''} placeholder="سعر معتمد" aria-label="سعر البيع المعتمد بالريال" />
                     <SubmitButton className={ghost} pendingText="جارٍ…">سعر</SubmitButton>
                   </form></AccessBoundary>
                   <AccessBoundary module="products" action="edit"><form action={translateCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={BACK} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة</SubmitButton></form></AccessBoundary>

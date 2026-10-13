@@ -158,12 +158,17 @@ docker exec "$reader" sh -c 'command -v mysqldump || command -v mariadb-dump' >/
 restore_database=$(docker exec "$reader" node -e 'process.stdout.write(decodeURIComponent(new URL(process.env.DATABASE_URL).pathname.slice(1)))')
 [[ "$restore_database" =~ ^[A-Za-z0-9_]+$ ]]
 
-# Archive media while live, then prove exact current bytes under the pause.
+# Archive legacy media while live, then prove exact bytes under the pause.
+# Storage receives live uploads: archive it only after the guarded app pause.
 # Extract only in a networkless, read-only container with one scratch mount;
 # archive symlinks can never escape to the host or production mounts.
 # MEDIA_ARCHIVES_BEGIN
+archive_media_phase() {
+local phase=$1 label env_name fallback media_path spec
 for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
   IFS=: read -r label env_name fallback <<< "$spec"
+  if [[ "$label" == storage && "$phase" != frozen ]]; then continue; fi
+  if [[ "$label" == legacy && "$phase" != live ]]; then continue; fi
   media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
   if [[ -z "$media_path" ]]; then [[ ! -e "$backup/$label.path" ]]; continue; fi
   [[ "$media_path" == "/app/$label" ]]
@@ -185,6 +190,8 @@ for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
   substep=snapshot_archived_media_${label}
   node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
 done
+}
+archive_media_phase live
 # MEDIA_ARCHIVES_END
 
 stage=snapshot; substep=snapshot_arm_watchdog
@@ -195,6 +202,7 @@ substep=snapshot_pause_app
 docker pause "$container" >/dev/null
 substep=snapshot_verify_paused
 [[ "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]]
+archive_media_phase frozen
 substep=snapshot_protected_database
 docker exec -i "$reader" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/before.json"
 substep=snapshot_full_database

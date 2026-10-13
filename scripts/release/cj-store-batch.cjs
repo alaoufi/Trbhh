@@ -3,7 +3,7 @@ const {buildPlan,connectionIdentitiesMatch,connectionsMatch}=require('./cj-store
 const {execFile}=require('node:child_process');
 const SHOP='2609231037543532300',BASE='https://developers.cjdropshipping.com/api2.0/v1';
 function parseBatchIds(requested){
- if(!/^[1-9]\d{0,15}(?:,[1-9]\d{0,15}){0,23}$/.test(requested))throw Error('batch_ids');
+ if(!/^[1-9]\d{0,15}(?:,[1-9]\d{0,15}){0,47}$/.test(requested))throw Error('batch_ids');
  const ids=requested.split(',');if(new Set(ids).size!==ids.length)throw Error('batch_duplicate_ids');
  return ids;
 }
@@ -88,3 +88,4 @@ async function main({execute=execFile,fetchApi=fetch,emit=value=>console.log(JSO
 }
 module.exports={parseBatchIds,main};
 if(require.main===module)main().catch(error=>{console.error(JSON.stringify({event:'cj_batch_failed',error:/^[a-z_]+$/.test(error.message)?error.message:'operation_failed'}));process.exitCode=1;});
+

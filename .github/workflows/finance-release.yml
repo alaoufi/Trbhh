@@ -77,7 +77,7 @@ jobs:
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
           if [[ "$PHASE" == cj-store-connect ]]; then
-            [[ "$CATALOG_IDS" =~ ^[1-9][0-9]{0,15}(,[1-9][0-9]{0,15}){0,23}$ ]]
+            [[ "$CATALOG_IDS" =~ ^[1-9][0-9]{0,15}(,[1-9][0-9]{0,15}){0,47}$ ]]
             tar -cf - scripts/release/cj-store-connect.cjs scripts/release/cj-store-batch.cjs | "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T -e CJ_STORE_BATCH_IDS='"$CATALOG_IDS"' app sh -c '\''p=$(mktemp -d /tmp/cj-batch.XXXXXX); tar -xf - -C "$p" --strip-components=2; node "$p/cj-store-batch.cjs"; result=$?; rm -f "$p/cj-store-connect.cjs" "$p/cj-store-batch.cjs"; rmdir "$p"; exit "$result"'\''' | tee "$RUNNER_TEMP/cj-batch.log"
             exit 0
           fi
@@ -165,3 +165,4 @@ jobs:
       - name: Remove runner SSH credential
         if: always()
         run: rm -f -- "$HOME/.ssh/finance_key"
+

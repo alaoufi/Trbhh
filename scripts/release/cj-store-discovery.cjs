@@ -8,10 +8,19 @@ async function readCatalogDatabase(){
  const {execFile}=require('node:child_process');
  const url=new URL(process.env.DATABASE_URL);
  if(url.protocol!=='mysql:')throw Error('database_protocol');
- const sql="SELECT JSON_OBJECT('id',CAST(id AS CHAR),'cj_product_id',cj_product_id,'name_ar',name_ar,'status',status,'hidden',hidden,'margin_bps',margin_bps,'last_sync_at',last_sync_at,'details_json',details_json,'commerce_product_id',CAST(commerce_product_id AS CHAR)) FROM cj_products ORDER BY id; SELECT JSON_OBJECT('k',k,'v',v) FROM site_settings WHERE k IN ('commerce_default_margin_bps','cj_usd_to_sar_x100','commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled'); SELECT JSON_OBJECT('cjRowId',CAST(cj.id AS CHAR),'requestedCommerceProductId',CAST(cj.commerce_product_id AS CHAR),'commerceProductId',CAST(cp.id AS CHAR),'approved',cp.approved,'visible',cp.visible,'enabled',cp.enabled,'currency',cp.currency,'priceMinor',cp.price_minor,'stockAvailable',cp.stock_available) FROM cj_products cj LEFT JOIN commerce_products cp ON cp.id=cj.commerce_product_id WHERE cj.commerce_product_id IS NOT NULL ORDER BY cj.id;";
+ const sql="SELECT JSON_OBJECT('id',CAST(id AS CHAR),'cj_product_id',cj_product_id,'name_ar',name_ar,'status',status,'hidden',hidden,'margin_bps',margin_bps,'last_sync_at',last_sync_at,'details_json',details_json,'commerce_product_id',CAST(commerce_product_id AS CHAR)) FROM cj_products ORDER BY id; SELECT JSON_OBJECT('k',k,'v',v) FROM site_settings WHERE k IN ('commerce_default_margin_bps','cj_usd_to_sar_x100','commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled','commerce_gateway_enabled','cj_storefront_public','pay_mode','pay_provider','payment_electronic_enabled','payment_transfer_enabled'); SELECT JSON_OBJECT('cjRowId',CAST(cj.id AS CHAR),'requestedCommerceProductId',CAST(cj.commerce_product_id AS CHAR),'commerceProductId',CAST(cp.id AS CHAR),'approved',cp.approved,'visible',cp.visible,'enabled',cp.enabled,'currency',cp.currency,'priceMinor',cp.price_minor,'stockAvailable',cp.stock_available) FROM cj_products cj LEFT JOIN commerce_products cp ON cp.id=cj.commerce_product_id WHERE cj.commerce_product_id IS NOT NULL ORDER BY cj.id;";
  const output=await new Promise((resolve,reject)=>execFile('mysql',['--protocol=TCP','--host='+url.hostname,'--port='+(url.port||'3306'),'--user='+decodeURIComponent(url.username),'--database='+decodeURIComponent(url.pathname.slice(1)),'--default-character-set=utf8mb4','--batch','--raw','--skip-column-names','--connect-timeout=10','--execute='+sql],{env:{...process.env,MYSQL_PWD:decodeURIComponent(url.password)},timeout:20000,maxBuffer:16*1024*1024},(error,stdout)=>error?reject(Error('database_read_failed')):resolve(stdout)));
  const rows=output.trim()?output.trim().split('\n').map(line=>JSON.parse(line)):[];
  return {catalog:rows.filter(row=>row.id!=null),settings:rows.filter(row=>row.k!=null),mappings:rows.filter(row=>row.cjRowId!=null)};
+}
+function readinessReport(settings,env=process.env){
+ const values=new Map(settings.map(row=>[row.k,row.v]));
+ const flags=['commerce_enabled','commerce_payments_enabled','commerce_purchasing_enabled','commerce_gateway_enabled','cj_storefront_public','payment_electronic_enabled','payment_transfer_enabled'];
+ const required=['ALRAJHI_TERMINAL_ID','ALRAJHI_TERMINAL_NAME','ALRAJHI_MERCHANT_ID','ALRAJHI_TERMINAL_ALIAS_NAME','ALRAJHI_TRANPORTAL_ID','ALRAJHI_TRANPORTAL_PASSWORD','ALRAJHI_TERMINAL_RESOURCE_KEY','ALRAJHI_PAYMENT_GATEWAY_URL','ALRAJHI_TRANPORTAL_GATEWAY_URL','DATABASE_PAYMENT_SECRET'];
+ const fields=required.map(key=>({key,present:Boolean(env[key]?.trim())}));
+ const mode=['sandbox','production'].includes(env.ALRAJHI_ENVIRONMENT)?env.ALRAJHI_ENVIRONMENT:'absent_or_invalid';
+ const margin=values.get('commerce_default_margin_bps');
+ return {format:'cj-readiness-audit-v1',readOnly:true,marginBps:/^\d{1,6}$/.test(margin||'')?Number(margin):null,settings:Object.fromEntries(flags.map(key=>[key,values.get(key)==='1'])),paymentMode:['test','live'].includes(values.get('pay_mode'))?values.get('pay_mode'):'absent_or_invalid',paymentProvider:/^[a-z_]{1,30}$/.test(values.get('pay_provider')||'')?values.get('pay_provider'):null,bank:{mode,fields,configured:mode!=='absent_or_invalid'&&fields.every(field=>field.present)},environment:Object.fromEntries(['SUPPLIER_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'].map(key=>[key,env[key]==='true']))};
 }
 function successfulRead(route,data){
  if(data?.result===false||data?.success===false)return false;
@@ -27,6 +36,7 @@ async function main(){
  let last=0;const calls=[];
  try{
   const {catalog,settings,mappings}=await readCatalogDatabase();
+  console.log(JSON.stringify(readinessReport(settings)));
   console.log(JSON.stringify({format:'trbhh-cj-catalog-v1',count:catalog.length,visible:catalog.filter(p=>p.hidden===0).length,products:catalog.map(({details_json,...p})=>({...p,variants:(JSON.parse(details_json||'{}').variants||[]).map(v=>({vid:v.vid,sku:v.variantSku}))}))},(_,v)=>typeof v==='bigint'?String(v):v));
   console.log(JSON.stringify({format:'cj-commerce-mapping-audit-v1',readOnly:true,boundProducts:catalog.filter(row=>row.commerce_product_id!=null).length,missingTargets:mappings.filter(row=>row.commerceProductId==null).length,saleFlagsEnabled:mappings.filter(row=>row.approved===1&&row.visible===1&&row.enabled===1).length,mappings}));
 
@@ -74,5 +84,5 @@ async function main(){
   completed=true;console.log(JSON.stringify({event:'cj_discovery_completed',ok:true,catalogCount:catalog.length}));
  }catch(error){console.error(JSON.stringify({ok:false,error:['unexpected_destination','missing_api_key','invalid_authentication','invalid_shop_list','database_read_failed'].includes(error.message)?error.message:'discovery_failed',calls}));process.exitCode=1;}finally{clearInterval(keepAlive);}
 }
-module.exports={successfulRead};
+module.exports={successfulRead,readinessReport};
 if(require.main===module||(module.id==='[stdin]'&&process.argv[1]==='-'))void main();

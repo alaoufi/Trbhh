@@ -6,6 +6,7 @@ vi.mock('@/lib/auth', () => ({ getSession: async () => ({ uid: 1 }) }));
 vi.mock('@/lib/cj/storefront', () => ({ cjStorefrontView: async () => ({ isStaff: state.staff }), cjProductImages: () => [], cjImg: (url: string) => url }));
 vi.mock('@/lib/cj/catalog-feed', () => ({ CJ_CATALOG_TABS: [{ id: 'all', label: 'الكل' }, { id: 'imported', label: 'السلع المستوردة' }, { id: 'members', label: 'اعلانات الاعضاء' }, { id: 'verified', label: 'اعلانات موثقة' }, { id: 'trbhh', label: 'اعلانات تربح' }], loadCjCatalog: state.feed }));
 vi.mock('@/lib/cj/approved-catalog', () => ({ getApprovedPreview: state.preview }));
+vi.mock('@/lib/cj/catalog-stores', () => ({ catalogStores: async () => [{ id: 7, name: 'متجر الاختبار' }] }));
 vi.mock('@/lib/data', () => ({ getCategories: async () => [] }));
 vi.mock('@/components/ad-card', () => ({ AdCardMarketplace: () => null }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw Error('not_found'); } }));
@@ -27,6 +28,14 @@ describe('private catalog navigation and approved preview', () => {
     expect(html).toContain('/cj?tab=verified&amp;page=1'); expect(html).toContain('/cj?tab=verified&amp;page=3');
     expect(html).toContain('التوثيق يخص حساب البائع');
     expect(state.feed).toHaveBeenCalledWith({ tab: 'verified', page: '2' });
+  });
+  it('keeps the actual store selection through search, tabs and pagination', async () => {
+    state.feed.mockResolvedValue({ tab: 'members', page: 2, pageCount: 3, total: 60, items: [], store: 7, cat: 4, q: 'shoe' });
+    const html = renderToStaticMarkup(await Catalog());
+    expect(html).toContain('name="store" value="7"');
+    expect(html).toContain('/cj?tab=members&amp;page=3&amp;q=shoe&amp;cat=4&amp;store=7');
+    expect(html).toContain('/cj?tab=verified&amp;q=shoe&amp;cat=4&amp;store=7');
+    expect(html).toContain('متجر الاختبار');
   });
   it('approved details are informational, with no checkout form, payment route or purchase control', async () => {
     const html = renderToStaticMarkup(await ApprovedPage({ params: Promise.resolve({ id: '12' }) }));

@@ -3,6 +3,7 @@ import { platformAdPublicWhere } from '@/lib/platform-ad-visibility';
 import { searchCardVisibility } from '@/lib/search-card-visibility';
 
 const state = vi.hoisted(() => ({ staff: true, products: [] as Record<string, unknown>[], ads: [] as Record<string, unknown>[], commerce: [] as { id: string; key: string; imported: boolean }[], linked: [] as bigint[], reads: vi.fn(), trusted: [1n] }));
+vi.mock('@/lib/cj/catalog-stores', () => ({ catalogStoreAdIds: async (store: number) => store === 7 ? [2n, 3n] : [] }));
 vi.mock('@/lib/cj/approved-catalog', () => ({
   countApprovedCatalog: async (scope: string) => state.commerce.filter(row => scope !== 'imported' || row.imported).length,
   listApprovedCatalog: async (scope: string, take: number, skip: number) => state.commerce.filter(row => scope !== 'imported' || row.imported).slice(skip, skip + take),
@@ -48,16 +49,21 @@ const ad = (id: number, changes = {}) => ({ id: BigInt(id), user_id: 2n, title: 
 beforeEach(() => { state.staff = true; state.products = []; state.ads = []; state.commerce = []; state.linked = []; state.reads.mockClear(); });
 
 describe('private CJ mixed catalog', () => {
+  it('uses actual store membership and retains publication gates without owner inference', async () => {
+    state.products = [product(1)]; state.ads = [ad(1), ad(2), ad(3, { paused_by_owner: 1 })];
+    expect((await loadCjCatalog({ store: '7' })).items.map(item => item.key)).toEqual(['ad:2']);
+    expect((await loadCjCatalog({ store: '999' })).total).toBe(0);
+  });
   it('rejects nonstaff before catalog reads even when the legacy public flag is on', async () => {
     state.staff = false;
     await expect(loadCjCatalog({})).rejects.toThrow('cj_catalog_access_denied');
     expect(state.reads).not.toHaveBeenCalled();
   });
   it.each([{}, { tab: 'unknown', page: '-3' }, { tab: ['imported'], page: ['2'] }, { page: '1e8' }, { page: '0' }])('normalizes invalid URL input %j', query => {
-    expect(parseCjCatalogQuery(query)).toEqual({ tab: 'all', page: 1, q: '', cat: 0 });
+    expect(parseCjCatalogQuery(query)).toEqual({ tab: 'all', page: 1, q: '', cat: 0, store: 0 });
   });
   it('accepts only named tabs and positive bounded integer pages', () => {
-    expect(parseCjCatalogQuery({ tab: 'verified', page: '4' })).toEqual({ tab: 'verified', page: 4, q: '', cat: 0 });
+    expect(parseCjCatalogQuery({ tab: 'verified', page: '4' })).toEqual({ tab: 'verified', page: 4, q: '', cat: 0, store: 0 });
   });
   it('pages beyond the former sixty-product cap with no duplicates or skipped eligible rows', async () => {
     state.products = Array.from({ length: 65 }, (_, i) => product(i + 1));

@@ -1,6 +1,19 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const helper=()=>require('./finance-backup-diagnose.cjs');
+test('latest failed release can be diagnosed without executing mutations',()=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cj-latest-diag-'))),calls=[];
+ fs.mkdirSync(path.join(root,'trbhh'));
+ fs.mkdirSync(path.join(root,'trbhh-release-backups/finance-38435790758'),{recursive:true});
+ try{
+  const run=(command,args)=>{calls.push([command,args]);return {status:1,stdout:''};};
+  const report=helper().collect({root,run,runId:'38435790758'});
+  assert.equal(report.runId,'38435790758');assert.equal(report.backup.files.VERIFIED.exists,false);
+  assert(calls.every(([command])=>['git','docker','systemctl','df'].includes(command)));
+  assert(!calls.some(([,args])=>args.some(arg=>['exec','rm','stop','start','restart','unpause'].includes(arg))));
+  assert.throws(()=>helper().collect({root,run,runId:'38435790759'}));
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
 test('private log summaries expose only enumerated stages and diagnostic codes',()=>{
   const report=helper().summarizeLogs('Finance backup failed at stage snapshot; no release verification was issued.\nFinance deployment failed at stage backup; rollbackHealthy=false. Database was not restored.\nmysql://private:secret@private-host/db\nError: unknown-secret-value','Error: compose_source\nERROR 1045 (28000): private-password\nENOSPC\n');
   assert.deepEqual(report.backupStages,['snapshot']);assert.deepEqual(report.deploymentStages,['backup']);assert(report.codes.includes('compose_source'));assert(report.codes.includes('mysql_1045'));assert(report.codes.includes('ENOSPC'));

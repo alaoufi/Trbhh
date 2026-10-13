@@ -18,7 +18,7 @@ on:
       backup_run_id:
         description: Allowlisted failed run for read-only diagnosis
         type: choice
-        options: ['35932588551', '38392214806']
+        options: ['35932588551', '38392214806', '38435790758']
         default: '35932588551'
       baseline_sha:
         description: Exact serving checkout SHA required for cache operations
@@ -71,7 +71,7 @@ jobs:
             exit 0
           fi
           if [[ "$PHASE" == diagnose-backup ]]; then
-            [[ "$BACKUP_RUN_ID" == 35932588551 || "$BACKUP_RUN_ID" == 38392214806 ]]
+            [[ "$BACKUP_RUN_ID" == 35932588551 || "$BACKUP_RUN_ID" == 38392214806 || "$BACKUP_RUN_ID" == 38435790758 ]]
             "${SSH[@]}" "$target" "node - '$BACKUP_RUN_ID'" < scripts/release/finance-backup-diagnose.cjs
             exit 0
           fi

@@ -68,7 +68,7 @@ print(json.dumps(r))`;
   }catch{return {available:false};}
 }
 function collect({root='/root',run=spawnSync,runId=RUN}={}){
-  if(!['35932588551','38392214806'].includes(runId))throw Error('diagnostic_run');
+  if(!['35932588551','38392214806','38435790758'].includes(runId))throw Error('diagnostic_run');
   const prod=path.join(root,'trbhh'),backup=path.join(root,'trbhh-release-backups/finance-'+runId),tools=path.join(root,'trbhh-release-tools/'+runId);
   const canonical=value=>{try{return fs.realpathSync(value)===value&&fs.lstatSync(value).isDirectory()&&!fs.lstatSync(value).isSymbolicLink();}catch{return false;}};
   if(!canonical(root)||!canonical(prod))throw Error('diagnostic_root');

@@ -10,6 +10,17 @@ const file=path.join(__dirname,'finance-backup.sh');
 const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'/bin/bash';
 const read=()=>fs.existsSync(file)?fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n'):'';
 const candidate='a'.repeat(40),baseline='b'.repeat(40);
+test('storage additions during live legacy archiving are captured only after the guarded pause',()=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(require('node:os').tmpdir(),'cj-storage-freeze-')));
+ try{
+  const source=read(),media=source.match(/# MEDIA_ARCHIVES_BEGIN\n([\s\S]*?)# MEDIA_ARCHIVES_END/)[1];
+  const frozen=source.slice(source.indexOf('substep=snapshot_verify_paused'),source.indexOf('substep=snapshot_protected_database'));
+  const script=`set -euo pipefail\nbackup="$1";reader=reader;container=production;tools_dir=/tools;current_image=old;media_capacity=fresh;late=0;paused=0\ndocker(){ case "$*" in *'STORAGE_DIR /app/storage') printf /app/storage;; *'LEGACY_LOCAL_DIR '*) return 0;; *'tar -czf - -C /app/storage .') printf 'late=%s;paused=%s' "$late" "$paused";; 'run --rm -i --network none '*) cat >/dev/null;; *'inspect -f {{.State.Paused}} '*) printf true;; *) return 91;; esac; }\ngzip(){ return 0; }\nmkdir(){ command mkdir "$3"; }\nnode(){ printf manifest; }\n${media}\nlate=6;paused=1\n${frozen}\ncat "$backup/storage.tar.gz"`;
+  const result=spawnSync(bash,['-c',script,'fixture',root.replace(/\\/g,'/')],{encoding:'utf8'});
+  assert.equal(result.status,0,result.stderr);assert.equal(result.stdout,'late=6;paused=1');
+  assert(source.indexOf('--on-active=15m')<source.indexOf('docker pause "$container"'));
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
 
 test('backup entrypoint exists and parses as Bash',()=>{
   assert(fs.existsSync(file),'The standalone finance backup entrypoint must exist');
@@ -162,6 +173,7 @@ gzip(){ return 0; }
 mkdir(){ [[ "$1" == -m && "$2" == 700 ]] || return 1; command mkdir "$3"; }
 node(){ printf fresh-storage-manifest; }
 ${fragment[1]}
+archive_media_phase frozen
 `],{encoding:'utf8',env:{...process.env,FINANCE_TEST_DIRECTORY:backup.replace(/\\/g,'/')}});
     assert.equal(result.status,0,result.stderr);
     assert.equal(fs.readFileSync(path.join(backup,'storage.tar.gz'),'utf8'),'fresh-storage-archive');
@@ -178,7 +190,7 @@ test('failed media extraction reports its actual media substep before any snapsh
  const os=require('node:os'),root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'finance-media-stage-')));
  try{
   const loop=read().match(/# MEDIA_ARCHIVES_BEGIN\n([\s\S]*?)# MEDIA_ARCHIVES_END/)[1];
-  const script=`set -Eeuo pipefail\nstage=archives;substep=verify_archives\ntrap 'printf "FAILED_SUBSTEP=%s\\n" "$substep" >&2' ERR\nbackup="$1";reader=fixture;current_image=fixture;tools_dir=fixture;media_capacity=fresh\ndocker(){ if [[ "$1" == exec && "$3" == node ]]; then printf /app/storage; elif [[ "$1" == exec ]]; then printf ARCHIVE; elif [[ "$1" == run ]]; then return 17; fi; }\ngzip(){ return 0; }\nmkdir(){ return 0; }\nnode(){ echo UNEXPECTED_SNAPSHOT; }\n${loop}`;
+  const script=`set -Eeuo pipefail\nstage=archives;substep=verify_archives\ntrap 'printf "FAILED_SUBSTEP=%s\\n" "$substep" >&2' ERR\nbackup="$1";reader=fixture;current_image=fixture;tools_dir=fixture;media_capacity=fresh\ndocker(){ if [[ "$*" == *LEGACY_LOCAL_DIR* ]]; then return 0; elif [[ "$1" == exec && "$3" == node ]]; then printf /app/storage; elif [[ "$1" == exec ]]; then printf ARCHIVE; elif [[ "$1" == run ]]; then return 17; fi; }\ngzip(){ return 0; }\nmkdir(){ return 0; }\nnode(){ echo UNEXPECTED_SNAPSHOT; }\n${loop}\narchive_media_phase frozen`;
   const result=spawnSync(bash,['-c',script,'fixture',root.split(String.fromCharCode(92)).join('/')],{encoding:'utf8'});assert.equal(result.status,17,result.stderr);assert.match(result.stderr,/FAILED_SUBSTEP=extract_media_storage/);assert.doesNotMatch(result.stdout,/UNEXPECTED_SNAPSHOT/);
  }finally{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true});}
 });

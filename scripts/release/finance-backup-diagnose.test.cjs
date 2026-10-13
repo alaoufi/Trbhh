@@ -59,3 +59,13 @@ test('tar source-stat and hardlink errors remain distinct and private',()=>{
  const source=helper().summarizeLogs('', "tar: can't stat 'PRIVATE_SOURCE': No such file or directory");const target=helper().summarizeLogs('', 'tar: PRIVATE_TARGET: Cannot hard link: No such file or directory');
  assert(source.codes.includes('tar_source_stat_failed'));assert(target.codes.includes('tar_hardlink_failed'));assert.doesNotMatch(JSON.stringify([source,target]),/PRIVATE_/);
 });
+
+test('archive metadata inspection exposes validated counts only and rejects symlink substitution',()=>{
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cj-archive-meta-'))),archive=path.join(root,'legacy.tar.gz'),calls=[];fs.writeFileSync(archive,'fixture');
+ try{
+  const run=(command,args,options)=>{calls.push({command,args,options});return {status:0,stdout:JSON.stringify({members:2,directories:1,symlinks:0,hardlinks:0,duplicates:0,unsafePaths:0,symlinkDescendants:0,missingHardlinkTargets:0,SECRET_NAME:'private-customer-file'})};};
+  const report=helper().inspectArchive(archive,run);assert.equal(report.available,true);assert.equal(report.members,2);assert.doesNotMatch(JSON.stringify(report),/SECRET|private|customer/);assert.equal(calls[0].options.timeout,120000);
+  assert.equal(helper().inspectArchive(archive,()=>({status:0,stdout:'{"members":-1,"SECRET":"private"}'})).available,false);
+  fs.unlinkSync(archive);fs.symlinkSync(path.join(root,'missing'),archive);assert.equal(helper().inspectArchive(archive,()=>{throw Error('must not run');}).available,false);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});

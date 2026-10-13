@@ -35,6 +35,38 @@ function summarizeMedia(before,current){
   for(const key of b.entries.keys())if(!a.entries.has(key))added++;
   return {before:a.summary,current:b.summary,comparison:{compared:a.entries.size,removed,changed,added,exact:removed===0&&changed===0&&added===0}};
 }
+function inspectArchive(file,run=spawnSync){
+  try{
+    const stat=fs.lstatSync(file);
+    if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||fs.realpathSync(file)!==file||fs.realpathSync(path.dirname(file))!==path.dirname(file))return {available:false};
+    const code=`import sys,tarfile,posixpath,json,resource
+resource.setrlimit(resource.RLIMIT_AS,(384*1024*1024,384*1024*1024))
+resource.setrlimit(resource.RLIMIT_CPU,(90,90))
+r=dict(members=0,directories=0,symlinks=0,hardlinks=0,duplicates=0,unsafePaths=0,symlinkDescendants=0,missingHardlinkTargets=0)
+seen=set();links=set()
+with tarfile.open(sys.argv[1],mode='r|gz') as archive:
+ for item in archive:
+  r['members']+=1
+  if r['members']>200000: raise ValueError('member_limit')
+  p=posixpath.normpath(item.name)
+  if p in seen:r['duplicates']+=1
+  if p.startswith('/') or p=='..' or p.startswith('../'):r['unsafePaths']+=1
+  parts=p.split('/')
+  if any('/'.join(parts[:i]) in links for i in range(1,len(parts))):r['symlinkDescendants']+=1
+  if item.isdir():r['directories']+=1
+  if item.issym():r['symlinks']+=1;links.add(p)
+  if item.islnk():
+   r['hardlinks']+=1
+   if posixpath.normpath(item.linkname) not in seen:r['missingHardlinkTargets']+=1
+  seen.add(p)
+print(json.dumps(r))`;
+    const result=run('python3',['-c',code,file],{encoding:'utf8',timeout:120000,maxBuffer:65536});
+    if(result.error||result.status!==0)return {available:false};
+    const data=JSON.parse(result.stdout),keys=['members','directories','symlinks','hardlinks','duplicates','unsafePaths','symlinkDescendants','missingHardlinkTargets'];
+    if(!keys.every(key=>Number.isSafeInteger(data[key])&&data[key]>=0&&data[key]<=200000))return {available:false};
+    return {available:true,...Object.fromEntries(keys.map(key=>[key,data[key]]))};
+  }catch{return {available:false};}
+}
 function collect({root='/root',run=spawnSync,runId=RUN}={}){
   if(!['35932588551','38392214806'].includes(runId))throw Error('diagnostic_run');
   const prod=path.join(root,'trbhh'),backup=path.join(root,'trbhh-release-backups/finance-'+runId),tools=path.join(root,'trbhh-release-tools/'+runId);
@@ -67,9 +99,10 @@ function collect({root='/root',run=spawnSync,runId=RUN}={}){
   if(df.length===3&&df.every(value=>/^\d{1,24}$/.test(value)))liveSpace={totalBytes:df[0],usedBytes:df[1],availableBytes:df[2]};
   const logSummary=summarizeLogs(read(path.join(tools,'deploy.log')),read(path.join(backup,'operations.log')));
   if(Object.values(media).some(value=>value.comparison&&!value.comparison.exact))logSummary.codes.push('media_manifest_mismatch');
-  return {runId,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,...logSummary};
+  const archiveMetadata=runId==='38392214806'&&files['legacy.tar.gz'].regular?inspectArchive(path.join(backup,'legacy.tar.gz'),run):null;
+  return {runId,archiveMetadata,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,...logSummary};
 }
 if(require.main===module||(process.argv[1]==='-'&&module.id==='[stdin]')){
   try{if(process.argv.slice(2).length>1)throw Error('arguments');process.stdout.write(JSON.stringify(collect({runId:process.argv[2]||RUN}))+'\n');}catch{process.stderr.write('Finance backup diagnostic unavailable; private details withheld.\n');process.exitCode=1;}
 }
-module.exports={summarizeLogs,summarizeMedia,collect};
+module.exports={summarizeLogs,summarizeMedia,inspectArchive,collect};

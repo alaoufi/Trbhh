@@ -54,6 +54,14 @@ async function main(){
   if(typeof auth?.accessToken!=='string')throw Error('invalid_authentication');
   const shops=await request('/shop/getShops','GET',undefined,auth.accessToken);
   if(!Array.isArray(shops))throw Error('invalid_shop_list');
+  for(const shopId of ['2609231037543532300','2609230349243532700']){
+   if(!shops.some(shop=>String(shop.id)===shopId))throw Error('dependency_shop_unavailable');
+   const products=await request('/shop/product/queryPage?shopId='+shopId+'&pageNum=1&pageSize=10','GET',undefined,auth.accessToken);
+   const connection=await request('/product/conn/connection?shopId='+shopId+'&page=1&pageSize=100','GET',undefined,auth.accessToken);
+   if(!Number.isSafeInteger(products?.total)||products.total<0||!Array.isArray(products.list)||products.list.some(product=>String(product.shopId)!==shopId))throw Error('dependency_shop_response');
+   if(!Number.isSafeInteger(connection?.total)||connection.total<0||!Array.isArray(connection.list)||connection.list.some(row=>String(row.shopId)!==shopId))throw Error('dependency_connection_response');
+   console.log(JSON.stringify({format:'cj-shop-dependency-read-v1',readOnly:true,shopId,products:products.total,connectionVariants:connection.total,shopFilterVerified:true,ordersAudited:false,webhooksAudited:false,apiKeyBindingAudited:false,deletionSafe:false}));
+  }
   const balance=await request('/shopping/pay/getBalance','GET',undefined,auth.accessToken);
   if(!balance||!/^\d+(?:\.\d+)?$/.test(String(balance.amount)))throw Error('balance_response');
   console.log(JSON.stringify({format:'cj-wallet-read-v1',readOnly:true,currency:'USD',amount:String(balance.amount),bonus:balance.noWithdrawalAmount==null?null:String(balance.noWithdrawalAmount),frozen:balance.freezeAmount==null?null:String(balance.freezeAmount)}));

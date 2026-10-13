@@ -43,6 +43,9 @@ async function main(){
   if(typeof auth?.accessToken!=='string')throw Error('invalid_authentication');
   const shops=await request('/shop/getShops','GET',undefined,auth.accessToken);
   if(!Array.isArray(shops))throw Error('invalid_shop_list');
+  const balance=await request('/shopping/pay/getBalance','GET',undefined,auth.accessToken);
+  if(!balance||!/^\d+(?:\.\d+)?$/.test(String(balance.amount)))throw Error('balance_response');
+  console.log(JSON.stringify({format:'cj-wallet-read-v1',readOnly:true,currency:'USD',amount:String(balance.amount),bonus:balance.noWithdrawalAmount==null?null:String(balance.noWithdrawalAmount),frozen:balance.freezeAmount==null?null:String(balance.freezeAmount)}));
   if(process.env.CJ_CATALOG_AUDIT==='true'){
    const audit=[];
    for(const row of catalog){

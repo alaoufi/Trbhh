@@ -12,7 +12,7 @@ async function main(){
   async function request(route,method='GET',body,token){
    const delay=1200-(Date.now()-last);if(delay>0)await new Promise(r=>setTimeout(r,delay));last=Date.now();
    const res=await fetch(base+route,{method,redirect:'error',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',...(token?{'CJ-Access-Token':token}:{})},...(body?{body:JSON.stringify(body)}:{})});
-   const data=await res.json();calls.push({route,http:res.status,code:data.code});
+   const data=await res.json();calls.push({route,http:res.status,code:data.code,result:data.result,success:data.success,responseKeys:Object.keys(data),message:String(data.message||data.msg||" ").replace(/https?:\/\/\S+|[A-Za-z0-9_@.-]{24,}/g,"[redacted]").slice(0,160)});
    if(!res.ok||data.code!==200||data.result===false||data.success===false||!(data.result===true||data.success===true))throw Error('cj_discovery_failed');
    return data.data;
   }

@@ -83,10 +83,10 @@ image=$(docker image inspect -f '{{.Id}}' "trbhh-code:$candidate")
 [[ $(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image") == "$candidate" ]]
 node "$target/code-only-compose.cjs" "$target/config.json" "$target/before.json" "$image" "$target/candidate.json"
 docker compose --project-directory /root/trbhh --project-name "$project" -f "$target/candidate.json" config --format json > "$target/resolved-candidate.json"
-node - "$target/before.json" "$target/resolved-candidate.json" <<'NODE'
-const fs=require('node:fs');
+node - "$target/before.json" "$target/resolved-candidate.json" "$target/code-only-compose.cjs" <<'NODE'
+const fs=require('node:fs'),{runtimeMatches}=require(process.argv[4]);
 const before=JSON.parse(fs.readFileSync(process.argv[2]))[0],config=JSON.parse(fs.readFileSync(process.argv[3]));
-const valid=before.Config.Env.every(value=>{const at=value.indexOf('=');return config.services.app.environment[value.slice(0,at)]===value.slice(at+1);});
+const valid=runtimeMatches(config,before);
 if(!valid){console.error('Compose environment roundtrip failed; values withheld.');process.exit(1);}
 NODE
 [[ $(sha256sum .env | cut -d' ' -f1) == "$env_hash" ]]

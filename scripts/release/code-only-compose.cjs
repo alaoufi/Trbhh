@@ -8,5 +8,12 @@ function compose(config,container,image){
  const literal=value=>typeof value==='string'?value.replace(/\$/g,()=> '$$'):Array.isArray(value)?value.map(literal):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,literal(item)])):value;
  return literal(result);
 }
-module.exports={compose};
+function runtimeMatches(config,container){
+ return container.Config.Env.every(value=>{
+  const at=value.indexOf('='),expected=value.slice(at+1),actual=config.services.app.environment[value.slice(0,at)];
+  // `compose config` serializes literal dollars escaped for a second load.
+  return typeof actual==='string'&&(actual===expected||actual.replace(/\$\$/g,()=> '$')===expected);
+ });
+}
+module.exports={compose,runtimeMatches};
 if(require.main===module){const [config,before,image,out]=process.argv.slice(2);try{fs.writeFileSync(out,JSON.stringify(compose(JSON.parse(fs.readFileSync(config)),JSON.parse(fs.readFileSync(before))[0],image)),{mode:0o600,flag:'wx'});}catch{process.stderr.write('Runtime preparation failed; sensitive details withheld.\n');process.exitCode=1;}}

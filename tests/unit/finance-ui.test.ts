@@ -159,27 +159,22 @@ describe('finance request controls and preserved records',()=>{
  });
  it('tax settings are not assumed and cannot be changed with approve-only permission',()=>{
   const reader=workflow('tax',{canApprove:true});expect(reader).not.toContain('name="vatPercent"');
-  const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).not.toMatch(/name="vatPercent"[^>]*value="/);expect(manager).toContain('ليس إثباتًا للامتثال الضريبي');
+  const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).toContain('name="vatPercent" value="0"');expect(manager).toContain('ليس إثباتًا للامتثال الضريبي');
  });
- it('requires explicit policy selections with no defaults, including when an earlier policy exists',()=>{
+ it('provides an explicit zero VAT preset without inventing an issuer from an old incomplete policy',()=>{
   const source=data();source.taxPolicies=[{id:'1',requestId:'2',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Previous issuer',taxNumber:'300000000000003',address:'Previous address'},vatBps:1500,policyReference:'previous-policy'}];
-  const html=workflow('tax',{canManageTax:true},source),formHtml=html.slice(html.indexOf('<form'));
-  for(const field of ['priceBasis','itemScope','shippingPriceBasis','discountTreatment','rounding','policyRollover']){
-   const select=formHtml.match(new RegExp(`<select(?=[^>]*name="${field}")[^>]*>[\\s\\S]*?</select>`))?.[0];expect(select).toContain('required=""');
-   expect(select).toMatch(/<option(?=[^>]*value="")(?=[^>]*selected="")[^>]*>/);expect(select?.match(/selected=""/g)).toHaveLength(1);
-  }
-  for(const field of ['issuerName','issuerTaxNumber','issuerAddress','vatPercent','automationDelegateId']){expect(formHtml).toContain(`name="${field}"`);expect(formHtml).not.toMatch(new RegExp(`<input(?=[^>]*name="${field}")(?=[^>]*value="[^"]+")[^>]*>`));}
-  expect(formHtml).not.toContain('name="shippingVatPercent"');
-  expect(html).toContain('بيانات حساب موظف موجود');expect(html).toContain('لم تُحدد سياسة حساب للإصدار المستقبلي');
-  const reader=workflow('tax',{canApprove:true},source);expect(reader).not.toContain('name="automationDelegateId"');
+  const html=workflow('tax',{canManageTax:true,currentUserId:'9'},source),formHtml=html.slice(html.indexOf('<form'));
+  for(const field of ['priceBasis','itemScope','shippingPriceBasis','discountTreatment','rounding','policyRollover'])expect(formHtml).toContain('type="hidden" name="'+field+'"');
+  expect(formHtml).not.toContain('value="Previous issuer"');expect(formHtml).not.toContain('value="Previous address"');expect(formHtml).toContain('name="automationDelegateId" value="9"');
+  expect(html).toContain('لم تُحدد سياسة حساب للإصدار المستقبلي');expect(workflow('tax',{canApprove:true},source)).not.toContain('name="automationDelegateId"');
  });
  it('starts VAT OFF, allows a blank registration number and exposes explicit registration evidence with one central rate',()=>{
   const html=workflow('tax',{canManageTax:true});
   const select=html.match(/<select(?=[^>]*name="vatEnabled")[^>]*>[\s\S]*?<\/select>/)?.[0];
   expect(select).toMatch(/<option(?=[^>]*value="off")(?=[^>]*selected="")[^>]*>/);
   expect(html).not.toMatch(/<input(?=[^>]*name="issuerTaxNumber")(?=[^>]*required)[^>]*>/);
-  expect(html).toContain('name="registrationConfirmed"');expect(html).toContain('name="registrationEffectiveFrom"');expect(html).toContain('name="registrationThreshold"');
-  expect(html).toContain('value="375000"');expect(html).not.toContain('name="shippingVatPercent"');expect(html).toContain('لا يُفعّل التنبيه الضريبة تلقائيًا');
+  expect(html).not.toContain('name="registrationConfirmed"');expect(html).not.toContain('name="registrationEffectiveFrom"');expect(html).toContain('name="registrationThreshold"');
+  expect(html).toContain('value="375000"');expect(html).not.toContain('name="shippingVatPercent"');expect(html).toContain('الضريبة صفر على المنتجات والشحن');
  });
  it('prefills the explicit current approved policy so a threshold-only proposal preserves all other decisions',()=>{
   const source=data();source.taxPolicies=[{id:'7',requestId:'8',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Approved issuer',taxNumber:'300000000000003',address:'Approved address'},vatBps:1525,policyReference:'existing-approved-reference',calculationPolicy:{version:2,priceBasis:'exclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:1525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatControl:{enabled:true,registrationConfirmed:true,registrationEffectiveFrom:'2026-09-01',registrationThresholdMinor:41000000}}}];

@@ -1,0 +1,5 @@
+import {it,expect} from 'vitest';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {TaxPolicyFields} from '@/components/finance/tax-policy-fields';
+it('provides a complete zero VAT policy without manual tax or calculation fields',()=>{const html=renderToStaticMarkup(createElement(TaxPolicyFields,{currentUserId:'9',today:'2026-10-15'}));expect(html).toContain('name="issuerName"');expect(html).toContain('name="issuerAddress"');expect(html).toContain('name="automationDelegateId"');expect(html).toContain('value="9"');expect(html).toContain('name="effectiveFrom"');expect(html).toContain('value="2026-10-15"');expect(html).toContain('name="vatPercent" value="0"');expect(html).toContain('name="issuerTaxNumber" value=""');for(const name of ['priceBasis','itemScope','shippingPriceBasis','discountTreatment','rounding','policyRollover','policyReference'])expect(html).toContain('type="hidden" name="'+name+'"');expect(html).not.toContain('name="registrationConfirmed"');expect(html).not.toContain('name="registrationEffectiveFrom"');});

@@ -1,9 +1,11 @@
 /** Durable single-attempt supplier workflow. Provider responses alone never prove debit. */
-export type Commitment = {supplierReference:string;supplierUsdMinor:number;lines:{pid:string;vid:string;quantity:number}[];destination:Record<string,string>;originAreaId:string;originCountry:string;logisticName:string};
-export type OrderProof = Omit<Commitment,'supplierReference'|'supplierUsdMinor'> & {orderId:string;reference:string;payableUsdMinor:number|null;paymentDate:string|null;cjOrderCode:string|null;billingOrderId?:string|null;physicalStorageId?:string|null};
+import {isCjCardPaymentConfirmed} from './provider';
+export type Commitment = {supplierReference:string;supplierUsdMinor:number;supplierFreightUsdMinor?:number;supplierTaxUsdMinor?:number;lines:{pid:string;vid:string;quantity:number;supplierUnitUsdMinor?:number}[];destination:Record<string,string>;originAreaId:string;originCountry:string;logisticName:string};
+export type OrderProof = Omit<Commitment,'supplierReference'|'supplierUsdMinor'> & {orderId:string;reference:string;payableUsdMinor:number|null;paymentDate:string|null;cjOrderCode:string|null;billingOrderId?:string|null;physicalStorageId?:string|null;orderStatus?:string;currency?:string};
 export type CreateAcknowledgement={requestHash:string;requestPayload:Record<string,unknown>;orderId:string;reference:string;response:Record<string,unknown>};
 export type BillingProof = {id:string;cjOrderCode:string|null;amountUsdMinor:number|null;status:string;type:string};
-export type PaymentProof = {shipmentOrderId:string;payId:string;expiresAt:number;payableUsdMinor:number|null};
+export type PaymentProof = {shipmentOrderId:string;payId:string;expiresAt:number;payableUsdMinor:number|null;paymentUrl?:string;method?:'card'|'wallet'};
+export type FulfillmentOptions={paymentMode?:'card'|'wallet';reconcileOnly?:boolean;walletAuthorization?:{payId:string;shipmentOrderId:string;expectedUsdMinor:number}};
 export type FulfillmentRecord = {id:string;version:number;status:'pending'|'creating'|'create_uncertain'|'created'|'parent_claimed'|'parent_uncertain'|'payment_ready'|'debit_claimed'|'debit_uncertain'|'supplier_paid'|'blocked';customerPaidVerified:boolean;commitment:Commitment;cjOrderId?:string;createAcknowledgement?:CreateAcknowledgement;payment?:PaymentProof;lastError?:string;evidence?:unknown};
 export type FulfillmentStore = {read(id:string):Promise<FulfillmentRecord|null>;cas(id:string,version:number,patch:Partial<FulfillmentRecord>):Promise<boolean>};
 export type FulfillmentProvider = {createUnpaid(c:Commitment):Promise<string|{orderId:string;acknowledgement:CreateAcknowledgement}>;findByReference(reference:string):Promise<string[]>;detail(id:string):Promise<OrderProof>;preparePayment(id:string):Promise<PaymentProof>;balance():Promise<number>;debit(p:PaymentProof):Promise<void>;billing(orderCode:string):Promise<BillingProof[]>};
@@ -11,14 +13,15 @@ function sameLines(a:Commitment['lines'],b:Commitment['lines']) {return JSON.str
 export function matchesCommitment(c:Commitment,p:OrderProof) {
  return p.reference===c.supplierReference && p.originAreaId===c.originAreaId && p.originCountry===c.originCountry && p.logisticName===c.logisticName && sameLines(c.lines,p.lines) && Object.entries(c.destination).every(([k,v])=>p.destination[k]===v);
 }
-export async function runFulfillment(id:string,store:FulfillmentStore,provider:FulfillmentProvider):Promise<void> {
- let row=await store.read(id);if(!row||!row.customerPaidVerified||['blocked','supplier_paid'].includes(row.status))return;
+export async function runFulfillment(id:string,store:FulfillmentStore,provider:FulfillmentProvider,options:FulfillmentOptions={}):Promise<void> {
+ let row=await store.read(id);if(!row||!row.customerPaidVerified||row.status==='supplier_paid'||row.status==='blocked'&&row.lastError!=='payment_expired_or_missing'&&!options.reconcileOnly)return;
+ if(options.reconcileOnly&&!row.cjOrderId)return;
  const patch=async(values:Partial<FulfillmentRecord>)=>{const ok=await store.cas(id,row!.version,values);if(ok)row={...row!,...values,version:row!.version+1};return ok;};
  const block=async(reason:string)=>{await patch({status:'blocked',lastError:reason});};
  if(row.status==='parent_claimed'){await patch({status:'parent_uncertain',lastError:'parent_outcome_unknown'});return;}
  const c=row.commitment;
  if(!Number.isSafeInteger(c.supplierUsdMinor)||c.supplierUsdMinor<=0||!c.supplierReference||!c.originAreaId||!c.lines.length||c.lines.some(x=>!x.pid||!x.vid||!Number.isSafeInteger(x.quantity)||x.quantity<1))return block('invalid_commitment');
- if(row.status==='pending'){
+ if(row.status==='pending'&&!options.reconcileOnly){
   if(!await patch({status:'creating'}))return;
   try {const created=await provider.createUnpaid(c);const cjOrderId=typeof created==='string'?created:created.orderId;if(!cjOrderId)throw Error('missing_order_id');if(!await patch({status:'created',cjOrderId,...(typeof created==='object'?{createAcknowledgement:created.acknowledgement}:{})}))return;}
   catch {await patch({status:'create_uncertain',lastError:'create_outcome_unknown'});return;}
@@ -40,6 +43,13 @@ export async function runFulfillment(id:string,store:FulfillmentStore,provider:F
   else await patch({status:'debit_uncertain',lastError:'payment_proof_incomplete'});
   return;
  }
+ // External card receipts are proved by authenticated CJ order reads, not by
+ // wallet history or an administrator's browser return. Identity is checked above.
+ if(order.payableUsdMinor===c.supplierUsdMinor&&isCjCardPaymentConfirmed({paymentDate:order.paymentDate,orderStatus:order.orderStatus,currency:order.currency})){
+  await patch({status:'supplier_paid',evidence:{method:'card',order,payment:row.payment},lastError:undefined});return;
+ }
+ if(order.paymentDate||order.orderStatus&& !['CREATED','IN_CART','UNPAID'].includes(order.orderStatus))return block('supplier_payment_or_status_requires_review');
+ if(options.reconcileOnly)return;
  // An interrupted parent/cart request is never repeated automatically.
  if(['parent_claimed','parent_uncertain'].includes(row.status))return;
  if(row.status==='created'){
@@ -51,9 +61,15 @@ export async function runFulfillment(id:string,store:FulfillmentStore,provider:F
  const p=row.payment;
  if(!p||!p.payId||!p.shipmentOrderId||!Number.isFinite(p.expiresAt)||p.expiresAt<=Date.now())return block('payment_expired_or_missing');
  if(p.payableUsdMinor!==c.supplierUsdMinor||order.payableUsdMinor!==c.supplierUsdMinor)return block('payable_mismatch');
+ // The scheduled dispatcher never authorizes a wallet charge. A staff action
+ // must bind explicit approval to this exact payment identity and USD amount.
+ const grant=options.walletAuthorization;
+ if(options.paymentMode!=='wallet'||!grant||grant.payId!==p.payId||grant.shipmentOrderId!==p.shipmentOrderId||grant.expectedUsdMinor!==c.supplierUsdMinor){
+  if(row.lastError)await patch({lastError:undefined});return;
+ }
  const balance=await provider.balance();if(!Number.isSafeInteger(balance))return block('balance_proof_invalid');
  if(balance<c.supplierUsdMinor){await patch({status:'payment_ready',lastError:'insufficient_balance'});return;}
- if(!await patch({status:'debit_claimed'}))return;
+ if(!await patch({status:'debit_claimed',payment:{...p,method:'wallet'}}))return;
  try {await provider.debit(p);}catch {/* Unknown result must be reconciled by reads. */}
  await patch({status:'debit_uncertain',lastError:'awaiting_payment_proof'});
 }

@@ -15,5 +15,5 @@ export function validateAndTransformLiveCjQuoteToCommitment(value:unknown):Commi
  const quote=raw as unknown as LiveCjQuote;
  validateLiveCjQuote(quote,quote.destination,new Date(quote.checkedAt));
  const canonical=canonicalCjDestination(quote.destination,{alreadyCanonical:true});
- return {supplierReference:quote.supplierReference,supplierUsdMinor:quote.supplierUsdMinor,originAreaId:quote.originAreaId,originCountry:quote.originCountry,logisticName:quote.logisticName,lines:quote.lines.map(({pid,vid,quantity})=>({pid,vid,quantity})),destination:canonical};
+ return {supplierReference:quote.supplierReference,supplierUsdMinor:quote.supplierUsdMinor,supplierFreightUsdMinor:quote.supplierFreightUsdMinor,supplierTaxUsdMinor:quote.supplierTaxUsdMinor,originAreaId:quote.originAreaId,originCountry:quote.originCountry,logisticName:quote.logisticName,lines:quote.lines.map(({pid,vid,quantity,supplierUnitUsdMinor})=>({pid,vid,quantity,supplierUnitUsdMinor})),destination:canonical};
 }

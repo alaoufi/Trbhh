@@ -87,7 +87,8 @@ async function purchaseStoreSubscription(userId: number, storeId: number, plan: 
   try {
     return await prisma.$transaction(async (tx) => {
       // Serialize renewals before reading the expiry; all financial writes share this transaction.
-      await tx.$queryRaw`SELECT id FROM stores WHERE id = ${BigInt(storeId)} AND user_id = ${userId} FOR UPDATE`;
+      const locked = await tx.$queryRaw<{ id: bigint }[]>`SELECT id FROM stores WHERE id = ${BigInt(storeId)} AND user_id = ${userId} FOR UPDATE`;
+      if (locked.length !== 1 || locked[0].id !== BigInt(storeId)) return { ok: false, error: 'لا يوجد متجر.' };
       const cur = await tx.stores.findUnique({ where: { id: BigInt(storeId) }, select: { user_id: true, sub_until: true, show_until: true, plus_until: true, auto_renew: true, status: true, on_trial: true, sub_plan: true } });
       if (!cur || cur.user_id !== userId) return { ok: false, error: 'لا يوجد متجر.' };
       if (options.expectedUntil && (cur.auto_renew !== 1 || cur.status !== 1 || cur.on_trial !== 0 || cur.sub_plan !== plan || cur.sub_until?.getTime() !== options.expectedUntil.getTime())) return { ok: false, skipped: true };

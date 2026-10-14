@@ -56,6 +56,15 @@ describe('store subscription atomic activation', () => {
     expect((await buyStorePlus(7, 'monthly')).ok).toBe(false);
     expect(state).toMatchObject({ balance: 100, transactions: 0 });
   });
+  it.each([[], [{ id: 99n }], [{ id: 3n }, { id: 3n }]].map((lockedRows) => ({ lockedRows })))('refuses a missing or invalid ownership lock before reading stale ownership', async ({ lockedRows }) => {
+    db.$queryRaw.mockResolvedValueOnce(lockedRows);
+    const result = await subscribeStore(7, 'monthly');
+    expect(result.ok).toBe(false);
+    expect(db.stores.findUnique).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
+    expect(db.wallet_txns.create).not.toHaveBeenCalled();
+    expect(db.stores.update).not.toHaveBeenCalled();
+  });
   it('refuses a store whose ownership changed before the locked transaction', async () => {
     db.stores.findUnique.mockResolvedValueOnce({ user_id: 99, sub_until: null, status: 1, terms_agreed: 1, national_id: '123' });
     expect((await subscribeStore(7, 'monthly')).ok).toBe(false);

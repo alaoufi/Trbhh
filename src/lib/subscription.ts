@@ -75,15 +75,40 @@ export async function subscribeStore(userId: number, plan: SubPlan): Promise<{ o
   const pricing = await getStoreSubPricing();
   const months = SUB_PLAN_MONTHS[plan];
   const price = subPlanPrice(pricing, plan);
-  const paid = await charge(userId, price, 'subscription', `اشتراك متجر (${SUB_PLAN_LABELS[plan]})`);
-  if (!paid.ok) return { ok: false, error: 'الرصيد غير كافٍ. اشحن رصيدك ثم أعد المحاولة.' };
-  const cur = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { sub_until: true } }).catch(() => null);
-  const base = cur?.sub_until && new Date(cur.sub_until).getTime() > Date.now() ? new Date(cur.sub_until) : new Date();
-  const until = new Date(base);
-  until.setMonth(until.getMonth() + months);
-  // أول دفعة تُنهي وضع التجربة المجانية — وتُحفظ الخطة ليتجدد بها تلقائياً إن فعّل التاجر ذلك
-  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { sub_until: until, on_trial: 0, sub_plan: plan } }).catch(() => {});
-  return { ok: true, until };
+  if (!pricing.enabled || !Number.isFinite(price) || price < 0 || !months) return { ok: false, error: 'خطة الاشتراك غير متاحة حالياً.' };
+  return purchaseStoreSubscription(userId, storeId, plan, price);
+}
+
+type SubscriptionPurchase = { ok: boolean; error?: string; until?: Date; skipped?: boolean };
+async function purchaseStoreSubscription(userId: number, storeId: number, plan: SubPlan, price: number, options: { plus?: boolean; expectedUntil?: Date } = {}): Promise<SubscriptionPurchase> {
+  const months = SUB_PLAN_MONTHS[plan];
+  const amount = Math.round(price);
+  if (!Number.isFinite(price) || price < 0 || !Number.isSafeInteger(amount) || (price > 0 && amount === 0) || !Number.isInteger(months) || months <= 0) return { ok: false, error: 'خطة الاشتراك غير متاحة حالياً.' };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Serialize renewals before reading the expiry; all financial writes share this transaction.
+      await tx.$queryRaw`SELECT id FROM stores WHERE id = ${BigInt(storeId)} AND user_id = ${userId} FOR UPDATE`;
+      const cur = await tx.stores.findUnique({ where: { id: BigInt(storeId) }, select: { user_id: true, sub_until: true, show_until: true, plus_until: true, auto_renew: true, status: true, on_trial: true, sub_plan: true } });
+      if (!cur || cur.user_id !== userId) return { ok: false, error: 'لا يوجد متجر.' };
+      if (options.expectedUntil && (cur.auto_renew !== 1 || cur.status !== 1 || cur.on_trial !== 0 || cur.sub_plan !== plan || cur.sub_until?.getTime() !== options.expectedUntil.getTime())) return { ok: false, skipped: true };
+      const affected = amount === 0 ? 1 : await tx.$executeRaw`UPDATE users SET balance = balance - ${amount} WHERE id = ${BigInt(userId)} AND balance - ${amount} >= reserved`;
+      if (!affected) return { ok: false, error: 'الرصيد غير كافٍ. اشحن رصيدك ثم أعد المحاولة.' };
+      const after = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+      if (amount > 0) await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -amount, balance_after: after!.balance, reason: options.plus ? 'store_plus' : 'subscription', note: `${options.plus ? 'باقة متجر Plus' : 'اشتراك متجر'} #${storeId} (${SUB_PLAN_LABELS[plan]})`.slice(0, 200), admin_id: null } });
+      const now = new Date();
+      const extend = (previous: Date | null) => {
+        const date = new Date(previous && previous > now ? previous : now);
+        date.setMonth(date.getMonth() + months);
+        return date;
+      };
+      const until = extend(cur.sub_until);
+      // Payment activates the subscription; administrative moderation remains independent.
+      await tx.stores.update({ where: { id: BigInt(storeId) }, data: { sub_until: until, on_trial: 0, sub_plan: plan, ...(options.plus ? { show_on_platform: 1, show_until: extend(cur.show_until), plus_until: extend(cur.plus_until) } : {}) }, select: { id: true } });
+      return { ok: true, until };
+    });
+  } catch {
+    return { ok: false, error: 'تعذّر تأكيد تفعيل الاشتراك. راجع حالة الاشتراك وسجل المحفظة قبل إعادة المحاولة.' };
+  }
 }
 
 /** التاجر يفعّل/يوقف التجديد التلقائي لاشتراكه (يتجدد بآخر خطة مدفوعة). */
@@ -124,16 +149,14 @@ export async function runAutoRenewals(): Promise<void> {
       if (!plan || !ownerId) continue;
       const price = subPlanPrice(pricing, plan);
       if (price <= 0) continue;
-      const paid = await charge(ownerId, price, 'subscription', `تجديد تلقائي لاشتراك المتجر (${SUB_PLAN_LABELS[plan]})`);
+      const paid = await purchaseStoreSubscription(ownerId, Number(r.id), plan, price, { expectedUntil: r.sub_until! });
+      if (paid.skipped) continue;
       const name = r.store_name || 'متجرك';
-      if (paid.ok) {
-        const base = r.sub_until && r.sub_until.getTime() > now.getTime() ? new Date(r.sub_until) : new Date();
-        const until = new Date(base);
-        until.setMonth(until.getMonth() + SUB_PLAN_MONTHS[plan]);
-        await prisma.stores.updateMany({ where: { id: r.id }, data: { sub_until: until } }).catch(() => {});
+      if (paid.ok && paid.until) {
+        const until = paid.until;
         if (adminId && adminId !== ownerId) await sendChat(adminId, ownerId, `✅ تم التجديد التلقائي لاشتراك «${name}» (${SUB_PLAN_LABELS[plan]}) وخُصم ${price} ر.س من رصيدك. الاشتراك ساري حتى ${until.toISOString().slice(0, 10)}.`).catch(() => {});
       } else if (adminId && adminId !== ownerId) {
-        await sendChat(adminId, ownerId, `⚠️ تعذّر التجديد التلقائي لاشتراك «${name}» — رصيدك غير كافٍ (المطلوب ${price} ر.س). اشحن رصيدك من «محفظتي» وسيُعاد التجديد تلقائياً.`).catch(() => {});
+        await sendChat(adminId, ownerId, `⚠️ تعذّر التجديد التلقائي لاشتراك «${name}»: ${paid.error || 'تعذّر تفعيل الاشتراك.'}`).catch(() => {});
       }
     }
   } catch { /* لا يعطّل شيئاً */ }
@@ -150,22 +173,7 @@ export async function buyStorePlus(userId: number, plan: SubPlan): Promise<{ ok:
   if (!pricing.enabled) return { ok: false, error: 'الباقة غير متاحة حالياً.' };
   const price = plusPlanPrice(pricing, plan);
   if (price <= 0) return { ok: false, error: 'الباقة غير مسعّرة لهذه المدة.' };
-  const paid = await charge(userId, price, 'store_plus', `باقة متجر Plus (${SUB_PLAN_LABELS[plan]})`);
-  if (!paid.ok) return { ok: false, error: 'الرصيد غير كافٍ.' };
-  const months = SUB_PLAN_MONTHS[plan];
-  const now = Date.now();
-  const st = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { sub_until: true, show_until: true, plus_until: true } }).catch(() => null);
-  const ext = (cur: Date | null | undefined) => {
-    const base = cur && cur.getTime() > now ? new Date(cur) : new Date();
-    const d = new Date(base);
-    d.setMonth(d.getMonth() + months);
-    return d;
-  };
-  await prisma.stores.updateMany({
-    where: { id: BigInt(storeId) },
-    data: { sub_until: ext(st?.sub_until), on_trial: 0, sub_plan: plan, show_on_platform: 1, show_until: ext(st?.show_until), plus_until: ext(st?.plus_until) },
-  }).catch(() => {});
-  return { ok: true };
+  return purchaseStoreSubscription(userId, storeId, plan, price, { plus: true });
 }
 
 /** هل المتجر على باقة Plus سارية؟ (لشارة ⭐). */

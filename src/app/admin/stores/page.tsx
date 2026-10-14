@@ -51,7 +51,7 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
   const suspensions = comms.filter((c) => c.kind === 'suspend' || c.kind === 'suspend_perm').length;
   const priorMsgs = comms.filter((c) => c.kind === 'message').slice(0, 3);
   return (
-    <div className="card-3d space-y-3 rounded-2xl p-4">
+    <div id={`store-${s.id}`} className="card-3d space-y-3 rounded-2xl p-4">
       {/* الرأس */}
       <div className="flex flex-wrap items-center gap-2">
         <Link href={`/companies/${s.id}`} className="min-w-0 flex-1">
@@ -62,6 +62,7 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
           </div>
           <div className="text-xs text-muted-foreground">التاجر: {s.ownerName} · فُتح {timeAgo(s.createdAt)}</div>
         </Link>
+        <AccessBoundary module="wallets"><AccessPage href={`/admin/users/${s.userId}`}><Link href={`/admin/users/${s.userId}#wallet`} className="text-xs font-bold text-primary underline">ميزانية العضو والمدفوعات الفعلية</Link></AccessPage></AccessBoundary>
       </div>
 
       {/* 🚫 تفاصيل إيقاف المتجر: السبب + تاريخ ووقت الإيقاف — يظهران مع كل إيقاف (مؤقت/نهائي) */}
@@ -351,7 +352,15 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
       {pending.length > 0 && (
         <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-3">
           <div className="mb-1 flex items-center gap-2 font-bold text-amber-700"><ShieldAlert className="h-5 w-5" /> بانتظار الاعتماد ({en(pending.length)})</div>
-          <p className="text-xs text-muted-foreground">راجع بيانات المتجر ونشاطه أدناه قبل الاعتماد.</p>
+          <p className="text-xs text-muted-foreground">الاعتماد مراجعة إدارية مستقلة؛ انتهاء الاشتراك لا ينشئ طلب اعتماد.</p>
+          <ul className="mt-3 space-y-3">
+            {pending.map((p) => <li key={p.id} className="rounded-xl border bg-white p-3 text-sm">
+              <div className="font-bold">{p.storeName || 'متجر'} · {p.owner}</div>
+              <p className="mt-1">السبب: {p.reason}</p><p className="mt-1">الإجراء المطلوب: {p.action}</p>
+              <Link href={`#store-${p.id}`} className="mt-2 me-2 inline-flex rounded-lg border px-3 py-2 font-bold text-primary">مراجعة واتخاذ إجراء</Link>
+              <AccessBoundary module="wallets"><AccessPage href={`/admin/users/${p.userId}`}><Link href={p.financialHref} className="mt-2 inline-flex rounded-lg border px-3 py-2 font-bold text-primary">ميزانية العضو والمدفوعات الفعلية</Link></AccessPage></AccessBoundary>
+            </li>)}
+          </ul>
         </div>
       )}
 

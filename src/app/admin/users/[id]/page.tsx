@@ -39,7 +39,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
   const { id } = await params;
   const { saved, sent, error, setpass, bal, linked, dsale, created, depositok } = await searchParams;
   const uid = Number(id);
-  const [u, adsCount, balance, txns, modLog, rawAdminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
+  const [u, adsCount, balance, txns, modLog, rawAdminLog, strikes, dupRow, linkedMembers, dependencies, financialTotals] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
     keys.has('ads:view') ? prisma.ads.count({ where: { user_id: BigInt(uid) } }).catch(() => 0) : null,
     keys.has('wallets:view') ? getBalance(uid) : null,
@@ -50,6 +50,11 @@ export default async function AdminUserDetail({ params, searchParams }: { params
     keys.has('reports:view') ? prisma.dup_attempts.findUnique({ where: { user_id: BigInt(uid) } }).catch(() => null) : null,
     linkedAccounts(uid),
     keys.has('users:delete') ? inspectMemberDependencies(uid) : null,
+    keys.has('wallets:view') ? Promise.all([
+      prisma.wallet_txns.aggregate({ where: { user_id: BigInt(uid), amount: { lt: 0 }, reason: { not: 'admin_debit' } }, _sum: { amount: true } }),
+      prisma.wallet_txns.aggregate({ where: { user_id: BigInt(uid), amount: { gt: 0 }, reason: 'topup' }, _sum: { amount: true } }),
+      prisma.wallet_txns.aggregate({ where: { user_id: BigInt(uid), amount: { lt: 0 }, reason: { in: ['subscription', 'store_plus'] } }, _sum: { amount: true } }),
+    ]) : null,
   ]);
   const adminLog = redactAdminLog(rawAdminLog, keys);
   if (!u) notFound();
@@ -267,6 +272,16 @@ export default async function AdminUserDetail({ params, searchParams }: { params
           <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Wallet className="h-4 w-4" /> رصيد العضو</div>
           <div className="text-lg font-extrabold text-primary">{balance} ر.س</div>
         </div>
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <span>الرصيد الكلي: <b>{u.balance} ر.س</b></span>
+          <span>المحجوز: <b>{u.reserved} ر.س</b></span>
+          <span>المتاح للإنفاق: <b>{Math.max(0, u.balance - u.reserved)} ر.س</b></span>
+          <span>الشحن المسجل في المحفظة: <b>{financialTotals?.[1]._sum.amount ?? 0} ر.س</b></span>
+          <span>إجمالي خصومات الخدمات (قبل الاسترداد): <b>{Math.abs(financialTotals?.[0]._sum.amount ?? 0)} ر.س</b></span>
+          <span>خصومات اشتراكات المتاجر وPlus: <b>{Math.abs(financialTotals?.[2]._sum.amount ?? 0)} ر.س</b></span>
+        </div>
+        <p className="text-xs text-muted-foreground">الإجماليات من حركات المحفظة المحفوظة. لا تشمل المدفوعات للخدمات الخصومات الإدارية، ولا يدل الرصيد أو التجربة على دفع اشتراك. خصومات الاشتراك تخص جميع متاجر العضو؛ الحركات القديمة لا تحدد المتجر دائماً.</p>
+        <AccessPage href="/admin/revenue?tab=wallets"><Link href={`/admin/revenue?tab=wallets&user=${uid}`} className="inline-flex rounded-lg border px-3 py-2 text-sm font-bold text-primary">فتح سجل المحفظة</Link></AccessPage>
         <form action={adjustUserBalanceAction} className="space-y-2">
           <input type="hidden" name="userId" value={uid} />
           <div className="flex gap-2">

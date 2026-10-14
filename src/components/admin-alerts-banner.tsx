@@ -1,3 +1,4 @@
+import { pendingStoreWhere } from '@/lib/store-admin-action-policy';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
@@ -42,8 +43,8 @@ export async function AdminAlertsBanner({keys}: {keys: ReadonlySet<string>}) {
     // البلاغات بانتظار إجراء (لم تُغلق بعد بحظر/حذف/تجاهل) — تُعالَج من صفحة البلاغات
     keys.has('reports:view') ? prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0) : 0,
     keys.has('reports:view') ? prisma.repord_ads.findFirst({ where: { status: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
-    keys.has('stores:view') ? prisma.stores.count({ where: { status: 0 } }).catch(() => 0) : 0,
-    keys.has('stores:view') ? prisma.stores.findFirst({ where: { status: 0 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
+    keys.has('stores:view') ? prisma.stores.count({ where: pendingStoreWhere }).catch(() => 0) : 0,
+    keys.has('stores:view') ? prisma.stores.findFirst({ where: pendingStoreWhere, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
     keys.has('stores:view') ? prisma.store_transfers.count({ where: { status: 1 } }).catch(() => 0) : 0,
     keys.has('stores:view') ? prisma.store_transfers.findFirst({ where: { status: 1 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
     keys.has('messages:view') ? import('@/lib/admin-inbox').then((m) => m.countAdminUnread()).catch(() => 0) : 0,

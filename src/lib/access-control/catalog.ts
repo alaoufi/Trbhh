@@ -129,11 +129,15 @@ export function pagePermission(href:string,query?:{section?:string;tab?:string})
   else if(/^\/admin\/suppliers\/cj\/(?:browse|imported|showcase|glossary|review\/[1-9]\d*)$/.test(path))pageModule='products';
   else if(path==='/admin/suppliers/cj/orders/new')return 'orders:create';
   else if(/^\/admin\/suppliers\/cj\/orders(?:\/[1-9]\d*)?$/.test(path))pageModule='orders';
-  else if(path==='/admin/suppliers/cj/payables')pageModule='orders';
+  else if(path==='/admin/suppliers/cj/purchases')pageModule='orders';
+  else if(/^\/admin\/suppliers\/cj\/(?:preparation|tracking)$/.test(path))pageModule='shipping';
+  else if(/^\/admin\/suppliers\/cj\/(?:payables|history)$/.test(path))pageModule='settlements';
   else if(path==='/admin/suppliers/cj/agents')pageModule='integrations';
   else if(Object.hasOwn(exactPages,path))pageModule=exactPages[path];
   return pageModule?`${pageModule}:view`:null;
 }
 export function canAccessPage(keys:ReadonlySet<string>,href:string):boolean {
-  const permission=pagePermission(href);return permission!==null&&keys.has(permission);
+  const permission=pagePermission(href);
+  if(href.split('?')[0]==='/admin/suppliers/cj/payables'&&(!keys.has('orders:view')||!keys.has('wallets:view')))return false;
+  return permission!==null&&keys.has(permission);
 }

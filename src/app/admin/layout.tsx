@@ -1,3 +1,4 @@
+import {AdminNavigationAccess} from '@/components/admin-navigation-access';
 import {AdminSidebar} from '@/components/admin-sidebar';
 import {Suspense} from 'react';
 import {AdminPageHeading} from '@/components/admin-page-heading';
@@ -17,12 +18,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .filter((g) => g.items.length > 0);
 
   return (
-    <div className="grid gap-4 md:grid-cols-[230px_1fr]">
+    <AdminNavigationAccess hrefs={groups.flatMap(group=>group.items.map(item=>item.href))}><div className="grid gap-4 md:grid-cols-[230px_1fr]">
       {/* على الجوال: القائمة الجانبية (الهامبرغر ☰ «قائمة الإدارة») تكفي، فلا نكرّر هذه
           القائمة ونزحم المكان — تظهر كشريط جانبي على الشاشات الكبيرة فقط. */}
       <Suspense fallback={null}><AdminSidebar allowedHrefs={groups.flatMap(group=>group.items.map(item=>item.href))} roles={access.roles.map(role=>({id:String(role.id),name:role.name}))}/></Suspense>
       <section id="admin-content" className="min-w-0 scroll-mt-20 font-bold"><Suspense fallback={null}><AdminPageHeading items={groups.flatMap(group=>group.items.map(({href,label})=>({href,label})))}/></Suspense>{children}</section>
       <ScrollTop targetId="admin-content" />
-    </div>
+    </div></AdminNavigationAccess>
   );
 }

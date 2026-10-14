@@ -11,7 +11,7 @@ import { getSetting } from '@/lib/settings';
 import { createTestCjOrder, setCjOrderCap } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'مراقبة طلبات CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'سجل طلبات CJ السابق والاختبار', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -37,7 +37,7 @@ export default async function CjOrdersPage({ searchParams }: { searchParams: Pro
     <div className="space-y-4">
       <CjAdminNav current="orders" />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold text-primary">مراقبة طلبات CJ</h1>
+        <h1 className="text-xl font-extrabold text-primary">سجل طلبات CJ السابق والاختبار</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">تصفّح/استيراد</Link>
           <AccessBoundary module={'orders'} action={'create'}>

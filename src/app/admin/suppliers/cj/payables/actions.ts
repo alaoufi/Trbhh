@@ -10,6 +10,7 @@ import {prepareSettlementPaymentLinks} from '@/lib/cj/settlements/payment-prepar
 
 const path = '/admin/suppliers/cj/payables';
 async function authorise() {
+  await requireAccess('settlements','edit');
   const session = await requireAccess('orders','view');
   await requireAccess('orders','edit');
   await requireAccess('wallets','view');
@@ -72,6 +73,7 @@ export async function refreshSettlement(form: FormData) {
 }
 /** Explicit staff authorization queues per-order wallet payments; render never grants it. */
 export async function authorizeWalletSettlement(form: FormData) {
+  await requireAccess('settlements','approve');
   const session = await authorise();
   await requireAccess('wallets','edit');
   if (form.get('confirmWalletDebit') !== '1') redirect(`${path}?error=wallet_confirmation`);

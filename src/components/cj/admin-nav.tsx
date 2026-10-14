@@ -1,3 +1,5 @@
+'use client';
+import {useAdminNavigationAccess} from '@/components/admin-navigation-access';
 import Link from 'next/link';
 import {ADMIN_NAV} from '@/components/admin-nav-def';
 
@@ -9,6 +11,10 @@ const TABS: { key: string; href: string; label: string }[] = [
   { key: 'browse', href: '/admin/suppliers/cj/browse', label: 'تصفّح واستيراد' },
   { key: 'imported', href: '/admin/suppliers/cj/imported', label: 'البضائع المستوردة' },
   { key: 'showcase', href: '/admin/suppliers/cj/showcase', label: 'السلع المعروضة' },
+  {key:'purchases',href:'/admin/suppliers/cj/purchases',label:'شراء العميل والإرسال إلى CJ'},
+  {key:'preparation',href:'/admin/suppliers/cj/preparation',label:'تأكيد سداد CJ والتجهيز'},
+  {key:'tracking',href:'/admin/suppliers/cj/tracking',label:'شحن CJ والتتبع والاستلام'},
+  {key:'history',href:'/admin/suppliers/cj/history',label:'سجل CJ المغلق والحسابات'},
   { key: 'orders', href: '/admin/suppliers/cj/orders', label: 'الطلبات' },
   { key: 'payables', href: '/admin/suppliers/cj/payables', label: 'مستحقات CJ' },
   { key: 'agents', href: '/admin/suppliers/cj/agents', label: 'الوكلاء' },
@@ -16,10 +22,11 @@ const TABS: { key: string; href: string; label: string }[] = [
   { key: 'settings', href: '/admin/suppliers/cj', label: 'الإعدادات والاختبار' },
 ];
 
-export function CjAdminNav({ current }: { current: 'browse' | 'imported' | 'showcase' | 'orders' | 'payables' | 'agents' | 'glossary' | 'settings' }) {
+export function CjAdminNav({ current }: { current: 'purchases' | 'preparation' | 'tracking' | 'history' | 'browse' | 'imported' | 'showcase' | 'orders' | 'payables' | 'agents' | 'glossary' | 'settings' }) {
+  const allowed=new Set(useAdminNavigationAccess());
   return (
     <nav aria-label="إدارة CJ" className="-mx-1 flex flex-wrap gap-1.5 border-b border-primary/15 pb-2">
-      {TABS.map(tab => {
+      {TABS.filter(tab=>allowed.has(tab.href)).map(tab => {
         const active = tab.key === current;
         return (
           <Link key={tab.key} href={tab.href} aria-current={active ? 'page' : undefined}

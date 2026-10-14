@@ -12,7 +12,7 @@ describe('CJ settlement actions authority',()=>{
   beforeEach(()=>{vi.clearAllMocks();mocks.access.mockResolvedValue({uid:7});mocks.prepare.mockResolvedValue({id:'8'});});
   it('requires order view/edit and financial view before recording batch',async()=>{
     await expect(prepareSettlement(form())).rejects.toThrow('?batch=8');
-    expect(mocks.access.mock.calls).toEqual([['orders','view'],['orders','edit'],['wallets','view']]);
+    expect(mocks.access.mock.calls).toEqual([['settlements','edit'],['orders','view'],['orders','edit'],['wallets','view']]);
     expect(mocks.prepare).toHaveBeenCalledWith(['2'],7n,'12345678-1234-4234-8234-123456789abc');
   });
   it('rejects unauthorized actions before financial reads/writes',async()=>{

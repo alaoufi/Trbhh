@@ -1,0 +1,91 @@
+name: Private CJ activation
+on:
+  push:
+    branches: [codex/cj-completion-20261013]
+    paths: ["scripts/release/cj-private-activation*", ".github/workflows/cj-private-activation.yml"]
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [inspect, enable, restore]
+        default: inspect
+        required: true
+      serving_sha:
+        type: string
+        required: true
+      activation_run_id:
+        description: Existing activation run for restore or resume; empty creates this run
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-ci-only
+          MYSQL_DATABASE: cj_activation_test
+        ports: ['33316:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pisolated-ci-only"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y default-mysql-client
+      - name: Isolated real SQL and Compose verification
+        env:
+          CJ_ACTIVATION_DB_TESTS: '1'
+          CJ_ACTIVATION_DB_HOST: 127.0.0.1
+          CJ_ACTIVATION_DB_PORT: '33316'
+          CJ_ACTIVATION_COMPOSE_TESTS: '1'
+        run: |
+          bash -n scripts/release/cj-private-activation.sh
+          node --test scripts/release/cj-private-activation.test.cjs scripts/release/cj-private-activation-host.test.cjs scripts/release/cj-private-activation-db.test.cjs
+  operate:
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/cj-completion-20261013' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb')
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Selected bounded private CJ operation
+        env:
+          MODE: ${{ inputs.mode }}
+          SHA: ${{ inputs.serving_sha }}
+          SAVED_RUN: ${{ inputs.activation_run_id }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ "$MODE" =~ ^(inspect|enable|restore)$ && "$SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          if [[ "$MODE" == restore ]]; then test -n "$SAVED_RUN"; fi
+          run=${SAVED_RUN:-$GITHUB_RUN_ID}; [[ "$run" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" == root ]]
+          port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/cj_activation_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/cj_activation_hosts
+          trap 'rm -f ~/.ssh/cj_activation_key ~/.ssh/cj_activation_hosts' EXIT
+          SSH=(ssh -i ~/.ssh/cj_activation_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/cj_activation_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
+          target="$VPS_USER@$VPS_HOST"
+          tools="/root/trbhh-cj-activation-tools-$GITHUB_RUN_ID"
+          "${SSH[@]}" "$target" "umask 077; mkdir '$tools'; chmod 700 '$tools'"
+          tar -cf - scripts/release/cj-private-activation.sh scripts/release/cj-private-activation-core.cjs scripts/release/cj-private-activation-db.cjs scripts/release/cj-private-activation-host.cjs | "${SSH[@]}" "$target" "umask 077; tar -xf - -C '$tools' --strip-components=2; chmod 600 '$tools'/*"
+          "${SSH[@]}" "$target" "bash '$tools/cj-private-activation.sh' '$MODE' '$run' '$SHA'"

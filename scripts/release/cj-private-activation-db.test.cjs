@@ -1,0 +1,15 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
+const {KEYS,casSql,canonicalStates}=require('./cj-private-activation-db.cjs');
+const before=KEYS.map(k=>({k,present:true,v:'0'})),next=KEYS.map(k=>({k,present:true,v:'1'}));
+test('SQL restricts mutations to exactly three settings and rejects foreign values',()=>{assert.throws(()=>canonicalStates([...before.slice(0,2),{k:'foreign',present:true,v:'1'}]));assert.throws(()=>canonicalStates(before.map(x=>({...x,v:'foreign'}))));const sql=casSql({expected:before,next,enable:true});assert.equal((sql.match(/INSERT INTO/g)||[]).length,3);assert.match(sql,/SERIALIZABLE/);assert.match(sql,/FOR UPDATE/);assert.match(sql,/CJ_CAS_REJECT/);});
+test('actual isolated MySQL CAS success, foreign drift and nonempty outbox rejection',{skip:process.env.CJ_ACTIVATION_DB_TESTS!=='1'},()=>{
+ assert.equal(process.env.CJ_ACTIVATION_DB_HOST,'127.0.0.1');assert.equal(process.env.CJ_ACTIVATION_DB_PORT,'33316');
+ const sql=s=>execFileSync('mysql',['--protocol=TCP','--host=127.0.0.1','--port=33316','--user=root','--database=cj_activation_test','--batch','--skip-column-names'],{input:s,encoding:'utf8',env:{...process.env,MYSQL_PWD:'isolated-ci-only'}});
+ sql("CREATE TABLE site_settings(k VARCHAR(191) PRIMARY KEY,v TEXT) ENGINE=InnoDB; CREATE TABLE commerce_cj_fulfillment_outbox(id BIGINT PRIMARY KEY) ENGINE=InnoDB; INSERT INTO site_settings VALUES ('commerce_enabled','0'),('cj_storefront_public','0'),('pay_mode','live'),('pay_provider','alrajhi_arb'),('commerce_default_margin_bps','3000'),('unrelated','preserve'),"+before.map(x=>`('${x.k}','0')`).join(',')+';');
+ assert.match(sql(casSql({expected:before,next,enable:true})),/CJ_CAS_OK/);assert.equal(sql("SELECT v FROM site_settings WHERE k='unrelated';").trim(),'preserve');
+ assert.match(sql(casSql({expected:before,next,enable:true})),/CJ_CAS_REJECT/);
+ assert.match(sql(casSql({expected:next,next:before,enable:false})),/CJ_CAS_OK/);
+ sql('INSERT INTO commerce_cj_fulfillment_outbox VALUES(1);');assert.match(sql(casSql({expected:before,next,enable:true})),/CJ_CAS_REJECT/);assert.equal(sql(`SELECT SUM(v='0') FROM site_settings WHERE k IN (${KEYS.map(k=>`'${k}'`).join(',')});`).trim(),'3');
+});
+test('actual Compose preserves literal dollar credentials',{skip:process.env.CJ_ACTIVATION_COMPOSE_TESTS!=='1'},()=>{const input=JSON.stringify({services:{app:{image:'node:22',environment:{AUTH_SECRET:'never-log-$$secret'}}}});const config=JSON.parse(execFileSync('docker',['compose','-f','-','config','--format','json'],{input,encoding:'utf8'}));assert.equal(config.services.app.environment.AUTH_SECRET,'never-log-$$secret');});

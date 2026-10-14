@@ -1,0 +1,27 @@
+'use strict';
+// Isolated node entrypoint: no application startup, provider imports or network APIs.
+const KEYS=['commerce_gateway_enabled','commerce_payments_enabled','commerce_purchasing_enabled'];
+const GUARDS=['commerce_enabled','cj_storefront_public','pay_mode','pay_provider','commerce_default_margin_bps'];
+const literal=value=>value===null?'NULL':"CONVERT(0x"+Buffer.from(value,'utf8').toString('hex')+" USING utf8mb4)";
+function canonicalStates(input){if(!Array.isArray(input)||input.length!==3)throw Error('activation_database_scope');return KEYS.map(k=>{const rows=input.filter(row=>row&&row.k===k);if(rows.length!==1||typeof rows[0].present!=='boolean'||![null,'0','1'].includes(rows[0].v)||!rows[0].present&&rows[0].v!==null)throw Error('activation_database_scope');return {k,present:rows[0].present,v:rows[0].v};});}
+const value=k=>`(SELECT v FROM site_settings WHERE k=${literal(k)} LIMIT 1)`;
+const off=k=>`(BINARY COALESCE(${value(k)},'0')=BINARY '0')`;
+const noAliases=`NOT EXISTS(SELECT 1 FROM site_settings WHERE k IN (${KEYS.map(literal).join(',')}) AND BINARY k NOT IN (${KEYS.map(literal).join(',')}))`;
+function inspectionSql(){return KEYS.map(k=>`SELECT JSON_OBJECT('k',${literal(k)},'present',EXISTS(SELECT 1 FROM site_settings WHERE BINARY k=BINARY ${literal(k)}),'v',(SELECT v FROM site_settings WHERE BINARY k=BINARY ${literal(k)} LIMIT 1));`).join('\n')+`\nSELECT JSON_OBJECT('publicOff',${off('commerce_enabled')} AND ${off('cj_storefront_public')} AND ${noAliases},'bankSettingsReady',BINARY ${value('pay_mode')}=BINARY 'live' AND BINARY ${value('pay_provider')}=BINARY 'alrajhi_arb' AND BINARY ${value('commerce_default_margin_bps')}=BINARY '3000','outboxCount',(SELECT COUNT(*) FROM commerce_cj_fulfillment_outbox));`;}
+function casSql(input){
+ if(!input||Object.keys(input).sort().join(',')!=='enable,expected,next'||typeof input.enable!=='boolean')throw Error('activation_database_scope');
+ const expected=canonicalStates(input.expected),next=canonicalStates(input.next);
+ const matches=expected.map(row=>row.present?`EXISTS(SELECT 1 FROM site_settings WHERE BINARY k=BINARY ${literal(row.k)} AND (BINARY v <=> BINARY ${literal(row.v)}))`:`NOT EXISTS(SELECT 1 FROM site_settings WHERE k=${literal(row.k)})`).join(' AND ');
+ const guard=`${off('commerce_enabled')} AND ${off('cj_storefront_public')} AND ${noAliases}`+(input.enable?` AND BINARY ${value('pay_mode')}=BINARY 'live' AND BINARY ${value('pay_provider')}=BINARY 'alrajhi_arb' AND BINARY ${value('commerce_default_margin_bps')}=BINARY '3000' AND NOT EXISTS(SELECT 1 FROM commerce_cj_fulfillment_outbox)`:'');
+ const mutations=next.map(row=>row.present?`INSERT INTO site_settings(k,v) SELECT ${literal(row.k)},${literal(row.v)} WHERE @cj_match=1 AND @cj_guard=1 ON DUPLICATE KEY UPDATE v=VALUES(v);`:`DELETE FROM site_settings WHERE BINARY k=BINARY ${literal(row.k)} AND @cj_match=1 AND @cj_guard=1;`).join('\n');
+ return `SET SESSION innodb_lock_wait_timeout=10;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nSTART TRANSACTION;\nSELECT k FROM site_settings WHERE k IN (${[...KEYS,...GUARDS].map(literal).join(',')}) ORDER BY k FOR UPDATE;\nSELECT id FROM commerce_cj_fulfillment_outbox ORDER BY id LIMIT 1 FOR UPDATE;\nSET @cj_match=(${matches});\nSET @cj_guard=(${guard});\n${mutations}\nSELECT IF(@cj_match=1 AND @cj_guard=1,'CJ_CAS_OK','CJ_CAS_REJECT');\nCOMMIT;`;
+}
+function executeSql(sql){
+ try{const url=new URL(process.env.DATABASE_URL);if(url.protocol!=='mysql:')throw Error('bad_url');return require('node:child_process').execFileSync('mysql',['--protocol=TCP','--host='+url.hostname,'--port='+(url.port||'3306'),'--user='+decodeURIComponent(url.username),'--database='+decodeURIComponent(url.pathname.slice(1)),'--default-character-set=utf8mb4','--batch','--raw','--skip-column-names','--connect-timeout=10'],{input:sql,env:{...process.env,MYSQL_PWD:decodeURIComponent(url.password)},encoding:'utf8',timeout:25000,maxBuffer:1024*1024,stdio:['pipe','pipe','pipe']});}catch{throw Error('activation_database_unavailable');}
+}
+function main(){
+ const mode=process.argv[2];if(mode==='inspect'){const rows=executeSql(inspectionSql()).trim().split('\n').map(line=>JSON.parse(line));if(rows.length!==4)throw Error('activation_database_proof');const settings=rows.slice(0,3).map(row=>({...row,present:row.present===1}));const guard=rows[3];canonicalStates(settings);if(!Number.isSafeInteger(guard.outboxCount)||guard.outboxCount<0)throw Error('activation_database_proof');process.stdout.write(JSON.stringify({settings,proof:{publicOff:guard.publicOff===1,bankSettingsReady:guard.bankSettingsReady===1,outboxEmpty:guard.outboxCount===0}}));return;}
+ if(mode!=='cas'||!process.argv[3]||process.argv[3].length>4096)throw Error('activation_database_arguments');const payload=JSON.parse(Buffer.from(process.argv[3],'base64').toString('utf8'));const lines=executeSql(casSql(payload)).trim().split('\n');if(lines.at(-1)!=='CJ_CAS_OK')throw Error('activation_database_cas_rejected');process.stdout.write(JSON.stringify({ok:true}));
+}
+if(require.main===module){try{main();}catch{process.stderr.write('CJ private settings operation rejected; details withheld.\n');process.exitCode=1;}}
+module.exports={KEYS,canonicalStates,inspectionSql,casSql};

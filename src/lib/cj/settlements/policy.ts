@@ -14,3 +14,10 @@ export function supplierAmounts(value:unknown){
  return {productUsdMinor,shippingUsdMinor,taxUsdMinor,totalUsdMinor};
 }
 export const selectableStatuses=['created','payment_ready'] as const;
+/** Mutation boundary: a forged form must obey the same supplier hold and payment proof. */
+export function settlementPaymentReady(row:{status:string;last_error?:string|null;pay_id?:string|null;shipment_order_id?:string|null;pay_expires_at?:Date|null;evidence_json?:unknown},expectedUsdMinor:number,now=Date.now()){
+ if(row.last_error)return false;
+ if(row.status==='created')return true;
+ if(row.status!=='payment_ready'||!row.pay_id||!row.shipment_order_id||!/^[A-Za-z0-9_-]{1,100}$/.test(row.pay_id)||!/^[A-Za-z0-9_-]{1,100}$/.test(row.shipment_order_id)||!row.pay_expires_at||!(new Date(row.pay_expires_at).getTime()>now))return false;
+ try{const evidence=(typeof row.evidence_json==='string'?JSON.parse(row.evidence_json):row.evidence_json) as {payment?:{payId?:string;shipmentOrderId?:string;payableUsdMinor?:number}}|null;return evidence?.payment?.payId===row.pay_id&&evidence.payment.shipmentOrderId===row.shipment_order_id&&evidence.payment.payableUsdMinor===expectedUsdMinor;}catch{return false;}
+}

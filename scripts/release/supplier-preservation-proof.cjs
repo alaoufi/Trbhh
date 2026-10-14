@@ -28,14 +28,23 @@ function projectTable(name,definitions,records){
   }))).sort();
   return {count:rowHashes.length,columns,schemaHash:hash(normalizedSchema(definitions)),rowHashes};
 }
-function disabledFlags(rows){
+function releaseGates(rows,env={},requireShared=false){
+  const keys=['commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled'],values=new Map();
+  for(const row of rows){if(!keys.includes(row.k)||values.has(row.k))throw Error('supplier_preservation_failed');values.set(row.k,row.v);}
+  const off=v=>v===undefined||['0','false',null].includes(v);
+  if(requireShared&&env.SUPPLIER_ALLOW_LIVE_ORDERS!=='false')throw Error('supplier_preservation_failed');
+  if(keys.every(k=>off(values.get(k))))return 'disabled';
+  if(off(values.get('commerce_enabled'))&&values.get('commerce_purchasing_enabled')==='1'&&values.get('commerce_payments_enabled')==='1'&&env.SUPPLIER_ALLOW_LIVE_ORDERS==='false'&&['CJ_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'].every(k=>env[k]==='true'))return 'private_cj';
+  throw Error('supplier_preservation_failed');
+}
+function disabledFlags(rows,env=process.env){
   const values=new Map();
   for(const row of rows){if(!FLAGS.includes(row.k)||values.has(row.k))fail();values.set(row.k,row.v);}
   const result=FLAGS.map(key=>[key,values.has(key),values.get(key)??null]);
   // Missing flags are fail-closed in the app; any unexpected stored value must
   // be reviewed instead of silently interpreting an unsafe setting as disabled.
-  if(result.some(([,present,value])=>present&&!['0','false',null].includes(value)))fail();
-  return {disabled:true,sha256:hash(result)};
+  const mode=releaseGates(rows,env);
+  return mode==='disabled'?{disabled:true,sha256:hash(result)}:{disabled:false,privateCj:true,sha256:hash(result)};
 }
 async function snapshot(db){
   return db.$transaction(async tx=>{
@@ -56,7 +65,7 @@ async function snapshot(db){
 }
 function validate(proof){
   const digest=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
-  if(!proof||proof.format!==FORMAT||!proof.tables||Object.keys(proof.tables).length!==Object.keys(TABLES).length||proof.flags?.disabled!==true||!digest(proof.flags.sha256))fail();
+  if(!proof||proof.format!==FORMAT||!proof.tables||Object.keys(proof.tables).length!==Object.keys(TABLES).length||!(proof.flags?.disabled===true||proof.flags?.disabled===false&&proof.flags.privateCj===true)||!digest(proof.flags.sha256))fail();
   for(const name of Object.keys(TABLES)){
     const table=proof.tables[name];
     if(!table||!Number.isSafeInteger(table.count)||table.count<0||!Array.isArray(table.columns)||!table.columns.length||new Set(table.columns).size!==table.columns.length||!digest(table.schemaHash)||!Array.isArray(table.rowHashes)||table.rowHashes.length!==table.count||!table.rowHashes.every(digest))fail();
@@ -66,12 +75,12 @@ function validate(proof){
 }
 function verify(before,after){
   validate(before);validate(after);
-  if(before.flags.sha256!==after.flags.sha256)fail();
+  if(before.flags.sha256!==after.flags.sha256||before.flags.disabled!==after.flags.disabled||before.flags.privateCj!==after.flags.privateCj)fail();
   for(const name of Object.keys(TABLES)){
     const first=before.tables[name],last=after.tables[name];
     if(['count','columns','schemaHash','rowHashes'].some(key=>JSON.stringify(first[key])!==JSON.stringify(last[key])))fail();
   }
-  return {ok:true,comparedTables:Object.keys(TABLES).length,purchasingDisabled:true,paymentsDisabled:true,publicCatalogDisabled:true};
+  return {ok:true,comparedTables:Object.keys(TABLES).length,purchasingDisabled:before.flags.disabled,paymentsDisabled:before.flags.disabled,publicCatalogDisabled:true,...(before.flags.privateCj?{privateCjPreserved:true}:{})};
 }
 async function main(){
   let db;
@@ -86,5 +95,5 @@ async function main(){
   }catch{process.stderr.write('Supplier preservation or disabled-purchasing verification failed; private values withheld.\n');process.exitCode=1;}
   finally{if(db)await db.$disconnect().catch(()=>{});}
 }
-module.exports={TABLES,FLAGS,projectTable,disabledFlags,snapshot,verify};
+module.exports={TABLES,FLAGS,projectTable,disabledFlags,releaseGates,snapshot,verify};
 if(require.main===module||module.id==='[stdin]'&&process.argv[1]==='-')void main();

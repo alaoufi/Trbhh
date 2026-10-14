@@ -6,6 +6,16 @@ const {tmpdir}=require('node:os');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {TABLES,projectTable,disabledFlags,snapshot,verify}=require('./supplier-preservation-proof.cjs');
+test('preserves an existing private CJ trial without allowing public or shared purchasing',()=>{
+ const env={CJ_ALLOW_LIVE_ORDERS:'true',CJ_FULFILLMENT_WORKER_ENABLED:'true',CJ_LIVE_TRIAL_ENABLED:'true',SUPPLIER_ALLOW_LIVE_ORDERS:'false'};
+ const rows=[{k:'commerce_enabled',v:'0'},{k:'commerce_purchasing_enabled',v:'1'},{k:'commerce_payments_enabled',v:'1'}];
+ const before=proof(),after=proof();before.flags=disabledFlags(rows,env);after.flags=disabledFlags(rows,env);
+ assert.equal(before.flags.privateCj,true);assert.equal(verify(before,after).privateCjPreserved,true);
+ for(const key of ['CJ_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'])assert.throws(()=>disabledFlags(rows,{...env,[key]:'false'}));
+ assert.throws(()=>disabledFlags(rows,{...env,SUPPLIER_ALLOW_LIVE_ORDERS:'true'}));
+ assert.throws(()=>disabledFlags(rows.map(r=>r.k==='commerce_enabled'?{...r,v:'1'}:r),env));
+ assert.throws(()=>verify(before,proof()));
+});
 const hex=value=>Buffer.from(String(value)).toString('hex').toUpperCase();
 function proof(){
   const tables={};

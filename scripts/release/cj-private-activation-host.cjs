@@ -1,6 +1,10 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process'),{randomUUID}=require('node:crypto');
 const {operate,validArguments,validateBackup,digest,ENV_KEYS,SETTING_KEYS}=require('./cj-private-activation-core.cjs');
+const DIAGNOSTIC_CODES=new Set(["activation_compose_shape","activation_compose_image_drift","activation_compose_environment_drift","activation_compose_mount_drift","activation_compose_network_drift","activation_runtime_image_drift","activation_runtime_mount_drift","activation_runtime_network_drift","activation_runtime_environment_drift","activation_owned_state_drift","activation_host_command","activation_file_ownership","activation_directory_ownership","activation_env_encoding","activation_app_identity","activation_image_identity","activation_compose_identity","activation_compose_source_drift","activation_revision_mismatch","activation_database_proof","activation_database_scope","activation_database_credential_drift","activation_root_required","activation_deployment_active","activation_backup_invalid","activation_app_unhealthy","activation_database_environment","activation_database_cas_rejected","activation_gateway_unavailable","activation_arguments","activation_env_invalid","activation_env_value","activation_env_duplicate","activation_settings_shape","activation_not_ready","activation_backup_missing","activation_failed_restore_blocked","activation_failed_restored"]);
+const DIAGNOSTIC_STAGES=new Set(['arguments','host_preflight','checkout','backup','container','compose_sources','compose_render','compose_compare','health','operation']);
+let diagnosticStage='arguments';
+function safeFailure(error,stage){return {event:'cj_private_activation_failed',reason:DIAGNOSTIC_CODES.has(error?.message)?error.message:'activation_guard_rejected',stage:DIAGNOSTIC_STAGES.has(stage)?stage:'operation',detailsWithheld:true};}
 const PROD='/root/trbhh',BACKUPS='/root/trbhh-release-backups',ACTIVE='/root/trbhh-release-tools/ACTIVE_DEPLOYMENT';
 const BANK_KEYS=['ALRAJHI_TERMINAL_ID','ALRAJHI_TERMINAL_NAME','ALRAJHI_MERCHANT_ID','ALRAJHI_TERMINAL_ALIAS_NAME','ALRAJHI_TRANPORTAL_ID','ALRAJHI_TRANPORTAL_PASSWORD','ALRAJHI_TERMINAL_RESOURCE_KEY','ALRAJHI_PAYMENT_GATEWAY_URL','ALRAJHI_TRANPORTAL_GATEWAY_URL','DATABASE_PAYMENT_SECRET'];
 const envOf=c=>Object.fromEntries(c.Config.Env.map(row=>{const at=row.indexOf('=');return [row.slice(0,at),row.slice(at+1)];}));
@@ -54,16 +58,17 @@ function createHostIO(runId,sha){
  function proof(c,data){const env=envOf(c);return {...data.proof,bankReady:Boolean(bankEnvironmentReady(env)&&cjEnvironmentReady(env)&&data.proof.bankSettingsReady),sharedOff:env.SUPPLIER_ALLOW_LIVE_ORDERS==='false',privateOff:ENV_KEYS.every(key=>env[key]==='false'||env[key]===undefined)};}
  return {
   async preflight(mode){
+   diagnosticStage='host_preflight';
    if(process.getuid?.()!==0||process.platform!=='linux')throw Error('activation_root_required');directory(PROD);if(fs.existsSync(ACTIVE)||fs.existsSync(path.dirname(ACTIVE))&&fs.lstatSync(path.dirname(ACTIVE)).isSymbolicLink())throw Error('activation_deployment_active');regular(envFile,0o600);
-   if(command('git',['rev-parse','HEAD']).trim()!==sha)throw Error('activation_revision_mismatch');command('git',['diff','--quiet','HEAD','--']);
-   if(mode!=='inspect'&&fs.existsSync(backupDir)){
+   diagnosticStage='checkout';if(command('git',['rev-parse','HEAD']).trim()!==sha)throw Error('activation_revision_mismatch');command('git',['diff','--quiet','HEAD','--']);
+   diagnosticStage='backup';if(mode!=='inspect'&&fs.existsSync(backupDir)){
     directory(backupDir,0o700);knownBackup=JSON.parse(read(manifest,0o600));validateBackup(knownBackup,runId,sha);if(read(path.join(backupDir,'before.env'),0o600)!==knownBackup.beforeEnv||read(path.join(backupDir,'desired.env'),0o600)!==knownBackup.desiredEnv)throw Error('activation_backup_invalid');sourcesUnchanged(knownBackup.runtime.info);
    }
-   initial=container(Boolean(knownBackup));const baseline=knownBackup?.runtime.container||initial;revision(baseline,sha);const info=knownBackup?.runtime.info||composeInfo(initial),config=render(info,envFile);const ref=config.services?.app?.image;if(!ref)throw Error('activation_compose_image_drift');const resolved=JSON.parse(command('docker',['image','inspect',ref]))[0].Id,defaults=envOf(image(baseline.Image));
-   if(knownBackup)assertOwnedPair(knownBackup,read(envFile,0o600),initial,config,resolved,defaults);else assertComposeRuntime(config,initial,resolved,'before',defaults);
-   if(!knownBackup&&mode!=='restore'&&!healthy(initial,sha))throw Error('activation_app_unhealthy');
+   diagnosticStage='container';initial=container(Boolean(knownBackup));const baseline=knownBackup?.runtime.container||initial;revision(baseline,sha);diagnosticStage='compose_sources';const info=knownBackup?.runtime.info||composeInfo(initial);diagnosticStage='compose_render';const config=render(info,envFile);const ref=config.services?.app?.image;if(!ref)throw Error('activation_compose_image_drift');const resolved=JSON.parse(command('docker',['image','inspect',ref]))[0].Id,defaults=envOf(image(baseline.Image));
+   diagnosticStage='compose_compare';if(knownBackup)assertOwnedPair(knownBackup,read(envFile,0o600),initial,config,resolved,defaults);else assertComposeRuntime(config,initial,resolved,'before',defaults);
+   diagnosticStage='health';if(!knownBackup&&mode!=='restore'&&!healthy(initial,sha))throw Error('activation_app_unhealthy');
   },
-  async capture(){const info=composeInfo(initial),config=render(info,envFile),data=db('inspect');const runtime={container:initial,compose:config,info,network:networks(initial)[0]};if(!runtime.network||/[\r\n]/.test(envOf(initial).DATABASE_URL||''))throw Error('activation_database_environment');return {env:read(envFile,0o600),settings:data.settings,imageId:initial.Image,runtime,proof:proof(initial,data)};},
+  async capture(){diagnosticStage='operation';const info=composeInfo(initial),config=render(info,envFile),data=db('inspect');const runtime={container:initial,compose:config,info,network:networks(initial)[0]};if(!runtime.network||/[\r\n]/.test(envOf(initial).DATABASE_URL||''))throw Error('activation_database_environment');return {env:read(envFile,0o600),settings:data.settings,imageId:initial.Image,runtime,proof:proof(initial,data)};},
   async load(){if(!fs.existsSync(backupDir))return null;directory(backupDir,0o700);const b=JSON.parse(read(manifest,0o600));if(read(path.join(backupDir,'before.env'),0o600)!==b.beforeEnv||read(path.join(backupDir,'desired.env'),0o600)!==b.desiredEnv)throw Error('activation_backup_invalid');sourcesUnchanged(b.runtime.info);return b;},
   async save(b){directory(BACKUPS);fs.mkdirSync(backupDir,{mode:0o700});directory(backupDir,0o700);atomic(path.join(backupDir,'before.env'),b.beforeEnv);atomic(path.join(backupDir,'desired.env'),b.desiredEnv);atomic(path.join(backupDir,'settings-before.json'),JSON.stringify(b.beforeSettings));atomic(path.join(backupDir,'database.env'),'DATABASE_URL='+envOf(b.runtime.container).DATABASE_URL+'\n');
    const proposed=render(b.runtime.info,path.join(backupDir,'desired.env'));assertComposeRuntime(proposed,b.runtime.container,b.imageId,'desired',envOf(image(b.imageId)));atomic(manifest,JSON.stringify(b));
@@ -79,5 +84,5 @@ function createHostIO(runId,sha){
  };
 }
 async function main(){const [mode,run,sha]=process.argv.slice(2);validArguments(mode,run,sha);const result=await operate(mode,run,sha,createHostIO(run,sha));process.stdout.write(JSON.stringify(result)+'\n');}
-if(require.main===module)main().catch(error=>{const allowed=new Set(['activation_failed_restored','activation_failed_restore_blocked','activation_owned_state_drift','activation_deployment_active','activation_revision_mismatch','activation_not_ready']);process.stderr.write(JSON.stringify({event:'cj_private_activation_failed',reason:allowed.has(error.message)?error.message:'activation_guard_rejected',detailsWithheld:true})+'\n');process.exitCode=1;});
-module.exports={assertComposeRuntime,assertOwnedPair,assertRuntimeOwned,bankEnvironmentReady,cjEnvironmentReady,createHostIO,dollar};
+if(require.main===module)main().catch(error=>{process.stderr.write(JSON.stringify(safeFailure(error,diagnosticStage))+'\n');process.exitCode=1;});
+module.exports={assertComposeRuntime,assertOwnedPair,assertRuntimeOwned,bankEnvironmentReady,cjEnvironmentReady,createHostIO,dollar,safeFailure};

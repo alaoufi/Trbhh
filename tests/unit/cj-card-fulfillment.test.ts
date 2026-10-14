@@ -8,6 +8,27 @@ function fixture(){
  return {provider,proof,store,row:()=>row,set:(p:Partial<FulfillmentRecord>)=>{row={...row,...p};}};
 }
 describe('CJ responsible card settlement',()=>{
+ it('settles ten independent authorized wallet orders in simulation, never claiming one unified charge',async()=>{
+  const debitIds:string[]=[],finished:string[]=[];
+  for(let i=1;i<=10;i++){
+   const f=fixture(),id=String(i),cjId=`CJ${i}`,payId=`PAY${i}`,shipmentOrderId=`SHIP${i}`,reference=`trbhh-${i}`;
+   f.set({id,commitment:{...f.row().commitment,supplierReference:reference}});
+   Object.assign(f.proof,{orderId:cjId,reference,cjOrderCode:shipmentOrderId});
+   f.provider.createUnpaid=vi.fn(async()=>cjId);
+   f.provider.preparePayment=vi.fn(async()=>({shipmentOrderId,payId,paymentUrl:`https://www.cjdropshipping.com/mine/payment?pid=${payId}`,expiresAt:Date.now()+60000,payableUsdMinor:1000}));
+   f.provider.balance=vi.fn(async()=>10000);
+   f.provider.debit=vi.fn(async()=>{debitIds.push(payId);});
+   const options={paymentMode:'wallet' as const,walletAuthorization:{payId,shipmentOrderId,expectedUsdMinor:1000}};
+   await runFulfillment(id,f.store,f.provider,options);
+   expect(f.row().status).toBe('debit_uncertain');
+   Object.assign(f.proof,{paymentDate:'2026-10-14 08:00:00',orderStatus:'UNSHIPPED'});
+   f.provider.billing=vi.fn(async()=>[{id:`BILL${i}`,cjOrderCode:shipmentOrderId,amountUsdMinor:1000,status:'1',type:'Order Payment'}]);
+   await runFulfillment(id,f.store,f.provider,options);
+   await runFulfillment(id,f.store,f.provider,options);
+   expect(f.row().status).toBe('supplier_paid');expect(f.provider.debit).toHaveBeenCalledTimes(1);finished.push(cjId);
+  }
+  expect(new Set(debitIds).size).toBe(10);expect(new Set(finished).size).toBe(10);
+ });
  it('creates once and prepares card link with no wallet balance or debit',async()=>{const f=fixture();await runFulfillment('1',f.store,f.provider);await runFulfillment('1',f.store,f.provider);expect(f.row().status).toBe('payment_ready');expect(f.provider.createUnpaid).toHaveBeenCalledTimes(1);expect(f.provider.preparePayment).toHaveBeenCalledTimes(1);expect(f.provider.balance).not.toHaveBeenCalled();expect(f.provider.debit).not.toHaveBeenCalled();});
  it('reconciles a card payment independently of wallet bills',async()=>{const f=fixture();await runFulfillment('1',f.store,f.provider);f.proof.paymentDate='2026-10-14 08:00:00';f.proof.orderStatus='UNSHIPPED';await runFulfillment('1',f.store,f.provider);expect(f.row().status).toBe('supplier_paid');expect(f.provider.billing).not.toHaveBeenCalled();expect(f.provider.debit).not.toHaveBeenCalled();});
  it.each(['UNPAID','CANCELLED','CREATED'])('does not accept payment date alone in %s',async status=>{const f=fixture();await runFulfillment('1',f.store,f.provider);f.proof.paymentDate='2026-10-14 08:00:00';f.proof.orderStatus=status;await runFulfillment('1',f.store,f.provider);expect(f.row().status).not.toBe('supplier_paid');});

@@ -305,7 +305,10 @@ export async function assertCommerceSchemaReady(db: Pick<CommerceDb,'$queryRaw'>
       if(!tables.some(row=>row.t===table && row.engine==='InnoDB') || names.some(name=>!columns.some(row=>row.t===table && row.c===name))) throw new Error();
       for(const [name,expected] of Object.entries(requiredIndexes[table])) {
         const rows=indexes.filter(row=>row.t===table && row.i===name).sort((a,b)=>Number(a.seq)-Number(b.seq));
-        if(rows.length!==expected.length || rows.some((row,i)=>Number(row.non_unique)!==0 || row.prefix!==null || row.c!==expected[i])) throw new Error();
+        // One batch intentionally contains multiple order lines. Its batch_id
+        // lookup is non-unique; the outbox primary key prevents repeat payment.
+        const nonUnique=table==='commerce_cj_settlement_lines'&&name==='commerce_cj_line_batch'?1:0;
+        if(rows.length!==expected.length || rows.some((row,i)=>Number(row.non_unique)!==nonUnique || row.prefix!==null || row.c!==expected[i])) throw new Error();
       }
     }
     for(const [table,names] of Object.entries({commerce_orders:['request_key','request_fingerprint'],commerce_payment_attempts:['provider','provider_ref','merchant_order_id','claim_token'],commerce_receipts:['provider','provider_ref'],commerce_notifications:['event','channel','recipient']})) {

@@ -6,6 +6,7 @@ import {setSetting} from '@/lib/settings';
 import {prepareCjSettlementBatch,reconcileCjSettlementBatch,getCjSettlementBatch,authorizeCjSettlementWalletBatch} from '@/lib/cj/settlements';
 import {reconcileCjFulfillmentPayment,prepareCjFulfillmentCardPayment} from '@/lib/cj/fulfillment';
 import {settlementSelection,settlementWaitHours,settlementExpectedAmount} from './policy';
+import {prepareSettlementPaymentLinks} from '@/lib/cj/settlements/payment-preparation';
 
 const path = '/admin/suppliers/cj/payables';
 async function authorise() {
@@ -26,7 +27,7 @@ export async function prepareUnpaidSupplierOrder(form: FormData) {
   revalidatePath(path);
   redirect(`${path}?prepared=1`);
 }
-/** Records an accounting grouping only. Does not create CJ orders or debit funds. */
+/** Reserves a durable batch, then prepares card links only; never debits funds. */
 export async function prepareSettlement(form: FormData) {
   const session = await authorise();
   let ids: string[];
@@ -38,8 +39,14 @@ export async function prepareSettlement(form: FormData) {
   let batch: Awaited<ReturnType<typeof prepareCjSettlementBatch>>;
   try { batch = await prepareCjSettlementBatch(ids,BigInt(session.uid),rawKey); }
   catch { redirect(`${path}?error=changed`); }
+  let incomplete=false;
+  try{
+    const saved=await getCjSettlementBatch(batch.id);
+    if(!saved)throw Error('missing');
+    incomplete=(await prepareSettlementPaymentLinks(saved.lines,prepareCjFulfillmentCardPayment)).failedIds.length>0;
+  }catch{incomplete=true;}
   revalidatePath(path);
-  redirect(`${path}?batch=${encodeURIComponent(batch.id)}`);
+  redirect(`${path}?batch=${encodeURIComponent(batch.id)}${incomplete?'&error=prepare':''}#cj-batch-payment`);
 }
 /** Supplier proof reconciliation only; explicitly no balance payment. */
 export async function refreshSettlement(form: FormData) {

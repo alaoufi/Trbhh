@@ -83,6 +83,9 @@ function createHostIO(runId,sha){
   async mark(b,status){b.status=status;atomic(manifest,JSON.stringify(b));}
  };
 }
-async function main(){const [mode,run,sha]=process.argv.slice(2);validArguments(mode,run,sha);const result=await operate(mode,run,sha,createHostIO(run,sha));process.stdout.write(JSON.stringify(result)+'\n');}
+function inspectionMetadata(paths={prod:PROD,env:path.join(PROD,'.env'),backup:BACKUPS,toolsdir:__dirname}){
+ const scopes=['prod','env','backup','toolsdir'];return {event:'cj_private_activation_metadata',scopes:scopes.map(scope=>{try{const target=paths[scope],stat=fs.lstatSync(target);return {scope,available:true,uid:stat.uid,gid:stat.gid,mode:(stat.mode&0o7777).toString(8).padStart(4,'0'),canonical:fs.realpathSync(target)===target,isSymlink:stat.isSymbolicLink()};}catch{return {scope,available:false};}})};
+}
+async function main(){const [mode,run,sha]=process.argv.slice(2);validArguments(mode,run,sha);if(mode==='inspect')process.stdout.write(JSON.stringify(inspectionMetadata())+'\n');const result=await operate(mode,run,sha,createHostIO(run,sha));process.stdout.write(JSON.stringify(result)+'\n');}
 if(require.main===module)main().catch(error=>{process.stderr.write(JSON.stringify(safeFailure(error,diagnosticStage))+'\n');process.exitCode=1;});
-module.exports={assertComposeRuntime,assertOwnedPair,assertRuntimeOwned,bankEnvironmentReady,cjEnvironmentReady,createHostIO,dollar,safeFailure};
+module.exports={assertComposeRuntime,assertOwnedPair,assertRuntimeOwned,bankEnvironmentReady,cjEnvironmentReady,createHostIO,dollar,safeFailure,inspectionMetadata};

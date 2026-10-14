@@ -28,7 +28,7 @@ function owned(current,backup){if(current.env!==backup.beforeEnv&&current.env!==
 function validateBackup(backup,run,sha){if(!backup||backup.version!==1||backup.runId!==run||backup.sha!==sha||backup.beforeHash!==digest(backup.beforeEnv)||backup.desiredHash!==digest(backup.desiredEnv)||! /^sha256:[a-f0-9]{64}$/.test(backup.imageId))throw Error('activation_backup_invalid');states(backup.beforeSettings);states(backup.desiredSettings);}
 async function restoreSaved(backup,io){
  const current=await io.current(backup);owned(current,backup);
- if(current.env===backup.beforeEnv&&equal(current.settings,backup.beforeSettings)&&backup.status==='restored'&&current.runtimeBefore!==false){await io.verify(backup,'before');return;}
+ if(current.env===backup.beforeEnv&&equal(current.settings,backup.beforeSettings)&&backup.status==='restored'&&current.runtimeBefore===true){await io.verify(backup,'before');return;}
  await io.mark(backup,'restoring');
  if(current.env!==backup.beforeEnv)await io.replaceEnvironment(current.env,backup.beforeEnv);
  if(!equal(current.settings,backup.beforeSettings))await io.casSettings(current.settings,backup.beforeSettings,false);

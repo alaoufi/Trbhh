@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
-import { prisma } from '@/lib/prisma';
+import { notificationCounts } from '@/lib/notification-data';
 import { getSession } from '@/lib/auth';
 import { readActorAccess } from '@/lib/access-control/guards';
 import { canAccessPage } from '@/lib/access-control/catalog';
@@ -31,13 +31,7 @@ export async function Header() {
   const adminHrefs = access ? ADMIN_NAV.filter(item => canAccessPage(access.keys, item.href)).map(item => item.href) : [];
   // جرس الهيدر: مجموع الرسائل غير المقروءة + التنبيهات الجديدة
   // الجرس = رسائل غير مقروءة + تنبيهات (عدا نوع message لئلا تُعدّ الرسالة مرتين)
-  const [unreadMsgs, newNotifs] = session
-    ? await Promise.all([
-        prisma.chats.count({ where: { reciver_id: session.uid, is_read: 0 } }).catch(() => 0),
-        prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null, type: { not: 'message' } } }).catch(() => 0),
-      ])
-    : [0, 0];
-  const bellCount = unreadMsgs + newNotifs;
+  const bellCount = session ? await notificationCounts(session.uid).then(n => n.total).catch(() => 0) : 0;
   // «عروض اليوم» و«المزادات» في القائمة — تظهر فقط عند تفعيلها من التحكم
   const dealsOn = await import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false);
   const auctionsOn = await import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false);

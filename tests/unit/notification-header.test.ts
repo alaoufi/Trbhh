@@ -1,0 +1,21 @@
+import {describe,it,expect,vi} from 'vitest';
+const mocks=vi.hoisted(()=>({chats:vi.fn(async()=>205),notifs:vi.fn(async()=>510)}));
+vi.mock('@/lib/auth',()=>({getSession:async()=>({uid:7})}));
+vi.mock('@/lib/prisma',()=>({prisma:{chats:{count:mocks.chats},notfications:{count:mocks.notifs}}}));
+vi.mock('@/lib/access-control/guards',()=>({readActorAccess:async()=>null}));
+vi.mock('@/lib/merchant',()=>({storeIdOfUser:async()=>0}));
+vi.mock('@/lib/commerce/settings',()=>({getCommerceConfig:async()=>({enabled:false})}));
+vi.mock('@/lib/profiles',()=>({getActiveProfile:async()=>null}));
+vi.mock('@/lib/account-links',()=>({linkedAccounts:async()=>[]}));
+vi.mock('@/lib/store-extras',()=>({dealsEnabled:async()=>false}));
+vi.mock('@/lib/settings',()=>({auctionsEnabled:async()=>false}));
+vi.mock('@/components/site-menu',()=>({SiteMenu:()=>null}));
+vi.mock('@/components/header-search',()=>({HeaderSearch:()=>null}));
+vi.mock('@/components/header-cta',()=>({HeaderCta:()=>null}));
+vi.mock('@/components/live-clock',()=>({LiveClock:()=>null}));
+vi.mock('@/components/admin-alerts-banner',()=>({AdminAlertsBanner:()=>null}));
+vi.mock('@/components/profile-switcher',()=>({ProfileSwitcher:()=>null}));
+vi.mock('@/components/commerce/purchase-cart-client',()=>({PurchaseCartLink:()=>null}));
+import {Header} from '@/components/header';
+function texts(value:unknown):string[]{if(typeof value==='string'||typeof value==='number')return [String(value)];if(Array.isArray(value))return value.flatMap(texts);if(value&&typeof value==='object'&&'props' in value)return texts((value as {props:{children?:unknown}}).props.children);return [];}
+describe('header notification badge wiring',()=>{it('uses shared complete counts for authenticated receiver',async()=>{expect(texts(await Header())).toContain('99+');expect(mocks.chats).toHaveBeenCalledWith({where:{reciver_id:7,is_read:0}});expect(mocks.notifs).toHaveBeenCalledWith({where:{user_id:'7',OR:[{type:null},{type:{not:'message'}}],read_at:null}});});});

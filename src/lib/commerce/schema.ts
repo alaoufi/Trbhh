@@ -3,6 +3,22 @@ import type {CommerceDb} from './types';
 
 /** Additive DDL only. Exported for schema-sync; importing this file never runs DDL. */
 export const COMMERCE_DDL = [
+ `CREATE TABLE IF NOT EXISTS commerce_cj_settlement_wallet_grants (
+ outbox_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,batch_id BIGINT UNSIGNED NOT NULL,actor_id BIGINT UNSIGNED NOT NULL,
+ pay_id VARCHAR(100) NOT NULL,shipment_order_id VARCHAR(100) NOT NULL,expected_usd_minor INT NOT NULL,
+ expires_at DATETIME(3) NOT NULL,authorized_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),status VARCHAR(24) NOT NULL DEFAULT 'authorized'
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+ `CREATE TABLE IF NOT EXISTS commerce_cj_settlement_batches (
+ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,request_key VARCHAR(80) COLLATE utf8mb4_bin NOT NULL,
+ selection_key VARCHAR(420) COLLATE utf8mb4_bin NOT NULL,actor_id BIGINT UNSIGNED NOT NULL,total_usd_minor INT NOT NULL,
+ status VARCHAR(24) NOT NULL DEFAULT 'prepared',created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+ UNIQUE KEY commerce_cj_batch_request(request_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+ `CREATE TABLE IF NOT EXISTS commerce_cj_settlement_lines (
+ outbox_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,batch_id BIGINT UNSIGNED NOT NULL,commerce_order_id BIGINT UNSIGNED NOT NULL,
+ cj_order_id VARCHAR(100) NOT NULL,product_usd_minor INT NOT NULL,shipping_usd_minor INT NOT NULL,tax_usd_minor INT NOT NULL,total_usd_minor INT NOT NULL,
+ status VARCHAR(24) NOT NULL DEFAULT 'pending',reconciled_at DATETIME(3) NULL,KEY commerce_cj_line_batch(batch_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS commerce_cj_order_quotes (
     commerce_order_id BIGINT UNSIGNED NOT NULL,
     fulfillment_group VARCHAR(80) COLLATE utf8mb4_bin NOT NULL,
@@ -223,6 +239,9 @@ CONSTRAINT commerce_accrual_supplier_fk FOREIGN KEY (supplier_id) REFERENCES com
 ] as const;
 
 const requiredIndexes: Record<string, Record<string, string[]>> = {
+ commerce_cj_settlement_wallet_grants:{PRIMARY:['outbox_id']},
+ commerce_cj_settlement_batches:{PRIMARY:['id'],commerce_cj_batch_request:['request_key']},
+ commerce_cj_settlement_lines:{PRIMARY:['outbox_id'],commerce_cj_line_batch:['batch_id']},
   commerce_cj_order_quotes:{PRIMARY:['commerce_order_id','fulfillment_group']},
   commerce_cj_fulfillment_outbox:{PRIMARY:['id'],commerce_cj_outbox_group:['commerce_order_id','fulfillment_group'],commerce_cj_outbox_reference:['supplier_reference']},
   commerce_suppliers:{PRIMARY:['id']},
@@ -239,6 +258,9 @@ const requiredIndexes: Record<string, Record<string, string[]>> = {
   commerce_audit_events:{PRIMARY:['id'],commerce_audit_event:['order_id','event']},
 };
 const requiredColumns: Record<string,string[]> = {
+ commerce_cj_settlement_wallet_grants:['outbox_id','batch_id','actor_id','pay_id','shipment_order_id','expected_usd_minor','expires_at','authorized_at','status'],
+ commerce_cj_settlement_batches:['id','request_key','selection_key','actor_id','total_usd_minor','status','created_at'],
+ commerce_cj_settlement_lines:['outbox_id','batch_id','commerce_order_id','cj_order_id','product_usd_minor','shipping_usd_minor','tax_usd_minor','total_usd_minor','status','reconciled_at'],
   commerce_cj_order_quotes:['commerce_order_id','fulfillment_group','quote_hash','quote_json','created_at'],
   commerce_cj_fulfillment_outbox:['id','commerce_order_id','fulfillment_group','version','status','quote_json','supplier_reference','cj_order_id','shipment_order_id','pay_id','pay_expires_at','evidence_json','last_error','created_at','updated_at'],
   commerce_suppliers:['id','name','contact_name','phone','store_coordinator_phone','email','address','registration_number','tax_number','settlement_terms','notes','api_base_url','api_credential_ref','active','api_enabled','created_at','updated_at'],

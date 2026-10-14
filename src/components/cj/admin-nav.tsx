@@ -17,7 +17,6 @@ const TABS: { key: string; href: string; label: string }[] = [
   {key:'tracking',href:'/admin/suppliers/cj/tracking',label:'شحن CJ والتتبع والاستلام'},
   {key:'history',href:'/admin/suppliers/cj/history',label:'سجل CJ المغلق والحسابات'},
   { key: 'orders', href: '/admin/suppliers/cj/orders', label: 'الطلبات' },
-  { key: 'payables', href: '/admin/suppliers/cj/payables', label: 'مستحقات CJ' },
   { key: 'agents', href: '/admin/suppliers/cj/agents', label: 'الوكلاء' },
   { key: 'glossary', href: '/admin/suppliers/cj/glossary', label: 'مُسرد الترجمة' },
   { key: 'settings', href: '/admin/suppliers/cj', label: 'الإعدادات والاختبار' },

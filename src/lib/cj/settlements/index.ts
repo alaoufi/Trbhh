@@ -38,7 +38,10 @@ export async function prepareCjSettlementBatch(ids:string[],actorId:bigint,reque
   // Lock every customer order before its outbox, matching the fulfillment worker.
   const pointers=await tx.$queryRaw<{commerce_order_id:bigint}[]>(Prisma.sql`SELECT DISTINCT commerce_order_id FROM commerce_cj_fulfillment_outbox WHERE id IN (${Prisma.join(selected)}) ORDER BY commerce_order_id`);
   for(const pointer of pointers)await tx.$queryRaw`SELECT id FROM commerce_orders WHERE id=${pointer.commerce_order_id} FOR UPDATE`;
-  const existing=await tx.$queryRaw<{id:bigint;selection_key:string;actor_id:bigint}[]>`SELECT id,selection_key,actor_id FROM commerce_cj_settlement_batches WHERE request_key=${requestKey}`;
+  // A pointer read can establish an older REPEATABLE READ snapshot before waiting
+  // for the order lock. Use a current locking read after those locks so a request
+  // completed by the preceding transaction remains idempotent.
+  const existing=await tx.$queryRaw<{id:bigint;selection_key:string;actor_id:bigint}[]>`SELECT id,selection_key,actor_id FROM commerce_cj_settlement_batches WHERE request_key=${requestKey} FOR UPDATE`;
   if(existing[0]){if(existing[0].selection_key!==fingerprint||existing[0].actor_id!==actorId)throw Error('cj_batch_request_conflict');return {id:String(existing[0].id)};}
   const rows=await tx.$queryRaw<Row[]>(Prisma.sql`SELECT f.*,r.recorded_at AS paid_at FROM commerce_cj_fulfillment_outbox f JOIN commerce_orders o ON o.id=f.commerce_order_id JOIN commerce_receipts r ON r.order_id=o.id AND r.amount_minor=o.total_minor AND r.currency=o.currency WHERE f.id IN (${Prisma.join(selected)}) AND o.status='paid' AND o.currency='SAR' ORDER BY f.id FOR UPDATE`);
   if(rows.length!==selected.length||rows.some(row=>!selectableStatuses.includes(row.status as typeof selectableStatuses[number])||!row.cj_order_id||!settlementPaymentReady(row,supplierAmounts(row.quote_json).totalUsdMinor)))throw Error('cj_batch_not_payable');

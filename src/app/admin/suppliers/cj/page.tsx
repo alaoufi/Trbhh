@@ -63,6 +63,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-4">
       <CjAdminNav current="settings" />
+      <AccessBoundary module="orders" action="view"><AccessBoundary module="wallets" action="view"><Link href="/admin/suppliers/cj/payables" className="inline-block rounded-lg border border-primary/30 px-4 py-2 font-bold text-primary">مستحقات CJ — تجميع ومطابقة سداد المورد</Link></AccessBoundary></AccessBoundary>
       <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">

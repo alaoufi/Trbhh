@@ -12,6 +12,7 @@ import { paymentNotificationTargets } from '@/lib/commerce/notification-policy';
 import { dispatchPaidNotification } from '@/lib/commerce/notifications';
 import { getMessagingConfig, smsCredsReady, sendSms, sendWhatsApp } from '@/lib/sms';
 import { takeSecurityAttempt } from '@/lib/auth-security';
+import {isOwnedCjLiveTrial} from '@/lib/cj/private-trial';
 
 function orderId(form: FormData) {
   const raw = String(form.get('orderId') || '');
@@ -25,7 +26,8 @@ export async function payCommerceOrder(form: FormData) {
   const gateway = await getCommerceGateway();
   // مفتاح الشراء المركزي (fail-closed): يُمنع بدء أي دفع حقيقي إذا كان الشراء معطّلاً.
   if (!config.purchasingEnabled) redirect(`/account/orders/${id}?error=purchasing`);
-  if (!config.enabled || !config.paymentsEnabled || !gateway?.ready || form.get('confirm') !== '1') redirect(`/account/orders/${id}?error=unavailable`);
+  const privateTrial=!config.enabled&&await isOwnedCjLiveTrial(prisma,BigInt(session.uid),id);
+  if ((!config.enabled&&!privateTrial) || !config.paymentsEnabled || !gateway?.ready || form.get('confirm') !== '1') redirect(`/account/orders/${id}?error=unavailable`);
   const result = await initiateCommercePayment(prisma, { memberId: BigInt(session.uid), orderId: id }, gateway);
   if (result.status === 'redirect') redirect(result.url);
   revalidatePath(`/account/orders/${id}`);

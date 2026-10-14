@@ -166,7 +166,7 @@ export async function transitionOrder(
       ...(to === 'sent_to_cj' && !order.placed_at ? { placed_at: now } : {}),
       ...(to === 'delivered' && !order.delivered_at ? { delivered_at: now } : {}),
     },
-  }).catch(() => {});
+  });
   await appendOrderEvent(orderId, {
     eventKey: opts.eventKey ?? `${order.internal_ref}:${to}:${now.getTime()}`,
     type: 'status_change', source: opts.source ?? 'internal', fromStatus: from, toStatus: to,
@@ -190,7 +190,7 @@ export async function setOrderTracking(
       ...(t.trackingStatus !== undefined ? { tracking_status: t.trackingStatus.slice(0, 64) } : {}),
       ...(t.cjOrderId !== undefined ? { cj_order_id: t.cjOrderId.slice(0, 64) } : {}),
     },
-  }).catch(() => {});
+  });
   await appendOrderEvent(orderId, { eventKey: opts.eventKey ?? `${String(orderId)}:track:${Date.now()}`, type: 'tracking', source: opts.source ?? 'carrier', note: t.trackingStatus ?? '', actorId: opts.actorId });
 }
 

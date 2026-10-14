@@ -57,6 +57,8 @@ export type CjFreightOption = {
 };
 
 export type CjTrack = {
+  lastMileCarrier?: string | null;
+  lastTrackNumber?: string | null;
   trackNumber: string;
   logisticName: string | null;
   trackStatus: string | null;
@@ -105,6 +107,8 @@ export type CjOrderDetail = {
   orderStatus: string | null;   // الحالة الخام
   subStatus: string | null;
   trackNumber: string | null;
+  /** Raw read evidence retained for amount/identity reconciliation, never inferred. */
+  proof?: Record<string, unknown>;
 };
 
 /** عيّنة منتج تفصيلية للقراءة فقط — تجمع الملخّص + المتغيّرات + المخزون. */

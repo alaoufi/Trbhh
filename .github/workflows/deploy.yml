@@ -68,7 +68,7 @@ jobs:
           pnpm install --frozen-lockfile
           node scripts/release/build-finance-schema-check.cjs "$RUNNER_TEMP/finance-schema-check.cjs"
           node --test scripts/release/*.test.cjs
-          for script in scripts/release/finance-backup.sh scripts/release/finance-deploy.sh scripts/release/finance-capture-job.sh; do bash -n "$script"; done
+          for script in scripts/release/finance-backup.sh scripts/release/finance-deploy.sh scripts/release/finance-capture-job.sh scripts/release/cj-fulfillment-job.sh; do bash -n "$script"; done
       - name: Upload private release tools using pinned SSH host keys
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -108,7 +108,7 @@ jobs:
             scripts/release/database-proof.cjs scripts/release/media-proof.cjs \
             scripts/release/finance-media-reference.cjs scripts/release/merchant-media-reference.cjs \
             scripts/release/backup-capacity-proof.cjs scripts/release/supplier-preservation-proof.cjs \
-            scripts/release/verify-runtime.cjs scripts/release/finance-capture-job.sh \
+            scripts/release/verify-runtime.cjs scripts/release/finance-capture-job.sh scripts/release/cj-fulfillment-job.sh \
             "$RUNNER_TEMP/finance-schema-check.cjs" "trbhh-release:/root/trbhh-release-tools/$GITHUB_RUN_ID/"
       - name: Back up, restore-test, and cut over the exact candidate
         id: cutover

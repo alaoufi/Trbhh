@@ -63,6 +63,7 @@ jobs:
           bash -n scripts/release/finance-backup.sh
           bash -n scripts/release/finance-deploy.sh
           bash -n scripts/release/finance-capture-job.sh
+          bash -n scripts/release/cj-fulfillment-job.sh
 
       - name: Authentication transactions on isolated MySQL
         if: ${{ !cancelled() }}

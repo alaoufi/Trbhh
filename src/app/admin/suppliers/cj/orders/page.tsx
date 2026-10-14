@@ -17,14 +17,14 @@ const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
 const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
 const usd = (m: number) => `$${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const DEFAULT_TOPUP_URL = 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge';
+const DEFAULT_TOPUP_URL = 'https://www.cjdropshipping.com/mine/wallet';
 
 export default async function CjOrdersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('orders', 'view');
   const sp = await searchParams;
   const [counts, recent, capUsdMinor, topupUrl] = await Promise.all([
     countOrdersByStatus(), listOrders({ limit: 50 }), cjOrderCapUsdMinor(),
-    getSetting('cj_wallet_topup_url', DEFAULT_TOPUP_URL).then((v) => v || DEFAULT_TOPUP_URL),
+    getSetting('cj_wallet_topup_url', DEFAULT_TOPUP_URL).then((v) => v === 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge' ? DEFAULT_TOPUP_URL : (v || DEFAULT_TOPUP_URL)),
   ]);
   const stageCount = (statuses: readonly string[]) => statuses.reduce((a, s) => a + (counts[s] ?? 0), 0);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);

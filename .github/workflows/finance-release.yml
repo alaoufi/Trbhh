@@ -12,7 +12,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [inspect, diagnose-backup, replay-backup-media, cache-audit, cache-cleanup]
+        options: [inspect, diagnose-backup, replay-backup-media, cache-audit, cache-cleanup, cj-store-discovery, cj-store-connect]
         default: inspect
         required: true
       backup_run_id:
@@ -24,6 +24,14 @@ on:
         description: Exact serving checkout SHA required for cache operations
         type: string
         default: ''
+      audit_catalog:
+        description: Read-only fresh CJ identities for every retained catalog product
+        type: boolean
+        default: false
+      catalog_ids:
+        description: Up to 24 explicit retained product IDs for metadata-only CJ connection
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -31,7 +39,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   operate:
-    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/cj-completion-20261013' && (inputs.phase == 'diagnose-backup' || inputs.phase == 'replay-backup-media'))
+    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/cj-completion-20261013' && (inputs.phase == 'diagnose-backup' || inputs.phase == 'replay-backup-media' || inputs.phase == 'cj-store-discovery' || inputs.phase == 'cj-store-connect'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -40,13 +48,15 @@ jobs:
           persist-credentials: false
       - name: Verify bounded cache operation tools
         run: |
-          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs scripts/release/cj-media-replay.test.cjs
+          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs scripts/release/cj-media-replay.test.cjs scripts/release/cj-store-discovery.test.cjs scripts/release/cj-store-connect.test.cjs scripts/release/cj-store-batch.test.cjs
           bash -n scripts/release/finance-cache.sh
       - name: Inspect production or run the selected guarded cache operation
         env:
           PHASE: ${{ inputs.phase || 'inspect' }}
           BACKUP_RUN_ID: ${{ inputs.backup_run_id || '35932588551' }}
           BASELINE_SHA: ${{ inputs.baseline_sha }}
+          AUDIT_CATALOG: ${{ inputs.audit_catalog && 'true' || 'false' }}
+          CATALOG_IDS: ${{ inputs.catalog_ids }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -55,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          [[ "$PHASE" =~ ^(inspect|diagnose-backup|replay-backup-media|cache-audit|cache-cleanup)$ ]]
+          [[ "$PHASE" =~ ^(inspect|diagnose-backup|replay-backup-media|cache-audit|cache-cleanup|cj-store-discovery|cj-store-connect)$ ]]
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
           if [[ "$PHASE" == cache-* ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
           test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
@@ -66,6 +76,19 @@ jobs:
           port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
+          if [[ "$PHASE" == cj-store-connect ]]; then
+            [[ "$CATALOG_IDS" =~ ^[1-9][0-9]{0,15}(,[1-9][0-9]{0,15}){0,47}$ ]]
+            tar -cf - scripts/release/cj-store-connect.cjs scripts/release/cj-store-batch.cjs | "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T -e CJ_STORE_BATCH_IDS='"$CATALOG_IDS"' app sh -c '\''p=$(mktemp -d /tmp/cj-batch.XXXXXX); tar -xf - -C "$p" --strip-components=2; node "$p/cj-store-batch.cjs"; result=$?; rm -f "$p/cj-store-connect.cjs" "$p/cj-store-batch.cjs"; rmdir "$p"; exit "$result"'\''' | tee "$RUNNER_TEMP/cj-batch.log"
+            exit 0
+          fi
+          if [[ "$PHASE" == cj-store-discovery ]]; then
+            audit_env=''; if [[ "$AUDIT_CATALOG" == true ]]; then audit_env='-e CJ_CATALOG_AUDIT=true'; fi
+            echo 'cj_operator_transport_started'
+            "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T '"$audit_env"' app sh -c '\''p=$(mktemp /tmp/cj-audit.XXXXXX.cjs); cat > "$p"; node "$p"; result=$?; rm -f "$p"; exit "$result"'\''' < scripts/release/cj-store-discovery.cjs | tee "$RUNNER_TEMP/cj-discovery.log"
+            echo 'cj_operator_transport_returned'
+            if ! grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"; then echo 'cj_operator_completion_marker_missing'; exit 23; fi
+            exit 0
+          fi
           if [[ "$PHASE" == replay-backup-media ]]; then
             "${SSH[@]}" "$target" "bash -s -- '$GITHUB_RUN_ID'" < scripts/release/cj-media-replay.sh
             exit 0
@@ -113,6 +136,33 @@ jobs:
           console.log(JSON.stringify({financeMediaParentAvailable:ok,financeMediaHistoricalSealAvailable:historicalSealOk,historicalSealSha256}));
           if(!ok||!historicalSealOk)process.exitCode=1;
           PARENT_NODE
+      - name: Require completed CJ discovery evidence
+        if: inputs.phase == 'cj-store-discovery'
+        run: |
+          test -s "$RUNNER_TEMP/cj-discovery.log"
+          grep -Eq '^\{"event":"cj_discovery_completed","ok":true,"catalogCount":[0-9]+\}$' "$RUNNER_TEMP/cj-discovery.log"
+      - name: Preserve bounded CJ discovery readout
+        if: always() && inputs.phase == 'cj-store-discovery'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cj-discovery-readout
+          path: ${{ runner.temp }}/cj-discovery.log
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require completed CJ metadata batch evidence
+        if: inputs.phase == 'cj-store-connect'
+        run: |
+          test -s "$RUNNER_TEMP/cj-batch.log"
+          grep -Eq '^\{"event":"cj_batch_completed","ok":true,' "$RUNNER_TEMP/cj-batch.log"
+      - name: Preserve CJ metadata batch readout
+        if: always() && inputs.phase == 'cj-store-connect'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cj-metadata-batch-readout
+          path: ${{ runner.temp }}/cj-batch.log
+          if-no-files-found: error
+          retention-days: 3
       - name: Remove runner SSH credential
         if: always()
         run: rm -f -- "$HOME/.ssh/finance_key"
+

@@ -23,7 +23,7 @@ exec >> "$tools_dir/deploy.log" 2>&1
 exec 9> /run/lock/trbhh-finance-deploy.lock
 flock -w 600 9
 cd "$prod"
-for helper in finance-backup.sh database-proof.cjs media-proof.cjs backup-capacity-proof.cjs supplier-preservation-proof.cjs verify-runtime.cjs finance-schema-check.cjs finance-capture-job.sh finance-media-reference.cjs merchant-media-reference.cjs; do
+for helper in finance-backup.sh database-proof.cjs media-proof.cjs backup-capacity-proof.cjs supplier-preservation-proof.cjs verify-runtime.cjs finance-schema-check.cjs finance-capture-job.sh cj-fulfillment-job.sh finance-media-reference.cjs merchant-media-reference.cjs; do
   [[ -f "$tools_dir/$helper" && ! -L "$tools_dir/$helper" ]]
 done
 
@@ -64,6 +64,64 @@ restore_capture_units() {
   if [[ "$(cat "$backup/capture-active.txt")" == 1 ]]; then systemctl start trbhh-finance-capture.timer || return 1; fi
 }
 # CAPTURE_UNITS_END
+
+# CJ_UNITS_BEGIN
+cj_unit_target_owned() {
+  local unit=$1 target
+  [[ "$unit" == service || "$unit" == timer ]] || return 1
+  target="/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+  [[ ! -L "$target" ]] || return 1
+  if [[ -f "$backup/cj-$unit.old" ]] && cmp --silent "$target" "$backup/cj-$unit.old"; then return 0; fi
+  if [[ ! -e "$target" && ! -f "$backup/cj-$unit.old" ]]; then return 0; fi
+  if [[ -f "$backup/cj-$unit.new" ]] && cmp --silent "$target" "$backup/cj-$unit.new"; then return 0; fi
+  return 1
+}
+
+replace_cj_unit() (
+  local unit=$1 source=$2 target temporary
+  [[ "$unit" == service || "$unit" == timer ]] || return 1
+  [[ "$source" == "$backup/cj-$unit.old" || "$source" == "$backup/cj-$unit.new" ]] || return 1
+  [[ -f "$source" && ! -L "$source" ]] || return 1
+  target="/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+  cj_unit_target_owned "$unit" || return 1
+  temporary=$(mktemp "$target.release.XXXXXX") || return 1
+  trap 'rm -f -- "$temporary"' EXIT
+  # A failed copy may truncate only the staging file. The active unit remains
+  # complete until a same-directory rename publishes the verified replacement.
+  install -m 644 "$source" "$temporary" || return 1
+  cmp --silent "$source" "$temporary" || return 1
+  cj_unit_target_owned "$unit" || return 1
+  mv -fT -- "$temporary" "$target" || return 1
+)
+
+restore_cj_units() {
+  [[ -f "$backup/CJ_SNAPSHOT_READY" ]] || return 0
+  systemctl stop trbhh-cj-fulfillment.timer trbhh-cj-fulfillment.service >/dev/null 2>&1 || true
+  if [[ -f "$backup/CJ_UNIT_FILES_INSTALLED" ]]; then
+    for unit in service timer; do
+      local target="/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+      [[ ! -L "$target" ]] || return 1
+      # An interrupted pair installation or repeated rollback may leave the
+      # original file (or original absence) already in place.
+      if [[ -f "$backup/cj-$unit.old" ]] && cmp --silent "$target" "$backup/cj-$unit.old"; then continue; fi
+      if [[ ! -e "$target" && ! -f "$backup/cj-$unit.old" ]]; then continue; fi
+      cmp --silent "$target" "$backup/cj-$unit.new" || return 1
+      if [[ -f "$backup/cj-$unit.old" ]]; then
+        replace_cj_unit "$unit" "$backup/cj-$unit.old" || return 1
+      else
+        rm -f -- "$target" || return 1
+      fi
+    done
+    systemctl daemon-reload || return 1
+  fi
+  if [[ "$(cat "$backup/cj-enabled.txt")" == 1 ]]; then
+    systemctl enable trbhh-cj-fulfillment.timer >/dev/null || return 1
+  elif [[ -f "$backup/CJ_UNIT_FILES_INSTALLED" ]]; then
+    systemctl disable trbhh-cj-fulfillment.timer >/dev/null 2>&1 || true
+  fi
+  if [[ "$(cat "$backup/cj-active.txt")" == 1 ]]; then systemctl start trbhh-cj-fulfillment.timer || return 1; fi
+}
+# CJ_UNITS_END
 
 prepare_rollback_compose() {
   node - "$backup" <<'NODE'
@@ -121,6 +179,7 @@ rollback_app() {
     running_image=$(docker inspect -f '{{.Image}}' "$running") || return 1
     [[ "$running_image" == "$old_image" || ( -f "$backup/candidate-image-id.txt" && "$running_image" == "$(cat "$backup/candidate-image-id.txt")" ) ]] || return 1
   fi
+  systemctl stop trbhh-cj-fulfillment.timer trbhh-cj-fulfillment.service >/dev/null 2>&1 || true
   # Only this deployment's timer/units and checked-out revision may be restored.
   systemctl stop trbhh-finance-capture.timer trbhh-finance-capture.service >/dev/null 2>&1 || true
   git diff --cached --quiet || return 1
@@ -163,6 +222,7 @@ NODE
   done
   # Unit restoration failures must not prevent recovery of the application.
   restore_capture_units || return 1
+  restore_cj_units || return 1
   systemctl stop "$watchdog.timer" >/dev/null 2>&1 || true
   printf '%s\n' "$original" > "$backup/ROLLED_BACK" || return 1
   if [[ -f "$active_release" && "$(cat "$active_release")" == "$run_id" ]]; then rm -f -- "$active_release" || return 1; fi
@@ -257,6 +317,7 @@ prove_preservation() {
 const fs=require('node:fs'),env=file=>Object.fromEntries(JSON.parse(fs.readFileSync(file))[0].Config.Env.map(v=>{const i=v.indexOf('=');return [v.slice(0,i),v.slice(i+1)];}));
 const before=env(process.argv[2]),after=env(process.argv[3]);
 for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
+  if(['CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED','CJ_ALLOW_LIVE_ORDERS'].includes(key)&&before[key]===undefined&&after[key]==='false')continue;
   if(key==='FINANCE_ISSUANCE_SECRET'&&before[key]===undefined&&after[key]==='')continue;
   // Legacy inert preview flags were baked into an older production image and
   // later removed from the codebase; the app never reads them. Tolerate ONLY
@@ -332,12 +393,25 @@ if [[ "$mode" == deploy ]]; then
   printf '%s\n' "$enabled" > "$backup/capture-enabled.txt"
   printf '%s\n' "$active" > "$backup/capture-active.txt"
   touch "$backup/CAPTURE_SNAPSHOT_READY"
+  # Preserve pre-existing timer configuration before stopping it for cutover.
+  for unit in service timer; do
+    source="/etc/systemd/system/trbhh-cj-fulfillment.$unit"
+    [[ ! -L "$source" ]]
+    if [[ -f "$source" ]]; then cp "$source" "$backup/cj-$unit.old"; fi
+  done
+  enabled=0; active=0
+  if systemctl is-enabled --quiet trbhh-cj-fulfillment.timer; then enabled=1; fi
+  if systemctl is-active --quiet trbhh-cj-fulfillment.timer; then active=1; fi
+  printf '%s\n' "$enabled" > "$backup/cj-enabled.txt"
+  printf '%s\n' "$active" > "$backup/cj-active.txt"
+  touch "$backup/CJ_SNAPSHOT_READY"
   printf '%s\n' "$run_id" > "$active_release"
   mutated=1
   # Arm before changing the checkout or stopping capture; cancellation during
   # the build is recoverable as well as cancellation after the app is replaced.
   systemd-run --unit="$watchdog" --on-active=15m /bin/bash -c 'test ! -f "$1/DEPLOYMENT_VERIFIED" || exit 0; touch "$2/ROLLBACK_REQUESTED"; exec /bin/bash "$2/finance-deploy.sh" rollback "$3" "$4"' sh "$backup" "$tools_dir" "$run_id" "$candidate" >/dev/null
   systemctl stop trbhh-finance-capture.timer trbhh-finance-capture.service >/dev/null 2>&1 || true
+  systemctl stop trbhh-cj-fulfillment.timer trbhh-cj-fulfillment.service >/dev/null 2>&1 || true
   stage=checkout
   git restore --source "$baseline" -- apps/android-twa/twa-manifest.json
   git -c core.hooksPath=/dev/null merge --ff-only "$candidate"
@@ -453,6 +527,42 @@ systemctl daemon-reload
 substep=enable_capture_timer
 systemctl enable --now trbhh-finance-capture.timer
 systemctl is-active --quiet trbhh-finance-capture.timer
+substep=prepare_cj_units
+cat > "$backup/cj-service.new" <<UNIT
+# trbhh-finance-release=$run_id
+[Unit]
+Description=Process privately authorized CJ orders for Trbhh
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=$prod
+ExecStart=/bin/bash $tools_dir/cj-fulfillment-job.sh
+TimeoutStartSec=140
+NoNewPrivileges=true
+PrivateTmp=true
+UNIT
+cat > "$backup/cj-timer.new" <<'UNIT'
+[Unit]
+Description=Check privately authorized CJ orders every five minutes
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Unit=trbhh-cj-fulfillment.service
+[Install]
+WantedBy=timers.target
+UNIT
+# Mark before installation, so even a partially installed pair is recoverable.
+touch "$backup/CJ_UNIT_FILES_INSTALLED"
+substep=install_cj_units
+for unit in service timer; do
+  replace_cj_unit "$unit" "$backup/cj-$unit.new"
+done
+systemctl daemon-reload
+substep=enable_cj_timer
+systemctl enable --now trbhh-cj-fulfillment.timer
+systemctl is-active --quiet trbhh-cj-fulfillment.timer
 substep=final_container_check
 check_container
 substep=stop_rollback_watchdog

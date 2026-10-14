@@ -1,14 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { initiateCommercePayment, type CommerceGateway } from '@/lib/commerce/gateway';
 import type { CommerceDb, PaymentAttempt } from '@/lib/commerce/types';
+import {checkCjCheckoutFunding} from '@/lib/cj/checkout-funding';
 
 const persistence = vi.hoisted(() => ({ claimPaymentAttempt: vi.fn(), recordPaymentReference: vi.fn(), markPaymentUncertain: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/lib/commerce/orders', () => persistence);
+vi.mock('@/lib/cj/checkout-funding',()=>({checkCjCheckoutFunding:vi.fn().mockResolvedValue('ready')}));
 const attempt = { id: 2n, orderId: 1n, provider: 'fixture', reference: null, merchantOrderId: 'commerce:1', amountMinor: 1025, currency: 'SAR', status: 'creating', redirectUrl: null } as PaymentAttempt;
 // db.$queryRaw is used only by the central purchasing-enabled guard; default enabled.
 const db = { $queryRaw: vi.fn().mockResolvedValue([{ v: '1' }]) } as unknown as CommerceDb;
 const makeGateway = (): CommerceGateway => ({ id: 'fixture', ready: true, create: vi.fn().mockResolvedValue({ reference: 'r1', redirectUrl: 'https://bank.example/pay?r=r1' }), verify: vi.fn(), isSafeRedirect: url => url.startsWith('https://bank.example/') });
 describe('commerce gateway orchestration never blindly repeats creation', () => {
+  it('requires supplier funding before a durable bank claim or external bank create',async()=>{
+    vi.mocked(checkCjCheckoutFunding).mockResolvedValueOnce('funding_required');
+    const before=persistence.claimPaymentAttempt.mock.calls.length,gateway=makeGateway();
+    expect(await initiateCommercePayment(db,{memberId:7n,orderId:1n},gateway)).toEqual({status:'funding_required'});
+    expect(persistence.claimPaymentAttempt.mock.calls.length).toBe(before);expect(gateway.create).not.toHaveBeenCalled();
+  });
   it('calls external create once only when durable claim is won', async () => {
     persistence.claimPaymentAttempt.mockResolvedValueOnce({ claimed: true, claimToken: 'token', attempt });
     persistence.recordPaymentReference.mockResolvedValueOnce(undefined);

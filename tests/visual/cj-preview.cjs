@@ -29,7 +29,7 @@ async function main() {
       return null;
     } }],
     resolve: { alias: [
-      ...['@/lib/auth', '@/lib/access-control/guards', '@/lib/settings', '@/lib/prisma', '@/lib/data', '@/lib/cj/catalog-feed', '@/lib/cj/approved-catalog', './approved-catalog', '@/lib/cj/mapping', './mapping', '@/lib/cj/agents', './agents', '@/lib/cj/availability', '@/lib/cj/tax-quote', 'next/navigation', 'next/headers'].map(find => ({ find, replacement: stub })),
+      ...['@/lib/auth', '@/lib/access-control/guards', '@/lib/settings', '@/lib/prisma', '@/lib/data', '@/lib/cj/catalog-feed', '@/lib/cj/catalog-stores', './catalog-stores', '@/lib/cj/approved-catalog', './approved-catalog', '@/lib/cj/mapping', './mapping', '@/lib/cj/agents', './agents', '@/lib/cj/availability', '@/lib/cj/tax-quote', 'next/navigation', 'next/headers'].map(find => ({ find, replacement: stub })),
       { find: 'next/image', replacement: path.join(__dirname, 'cj-fixture-image.tsx') },
       { find: /^.*admin\/suppliers\/cj\/actions(?:\.ts)?$/, replacement: stub },
       { find: 'server-only', replacement: path.join(root, 'tests/stubs/empty.ts') },

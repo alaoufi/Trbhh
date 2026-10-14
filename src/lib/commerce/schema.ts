@@ -3,6 +3,33 @@ import type {CommerceDb} from './types';
 
 /** Additive DDL only. Exported for schema-sync; importing this file never runs DDL. */
 export const COMMERCE_DDL = [
+  `CREATE TABLE IF NOT EXISTS commerce_cj_order_quotes (
+    commerce_order_id BIGINT UNSIGNED NOT NULL,
+    fulfillment_group VARCHAR(80) COLLATE utf8mb4_bin NOT NULL,
+    quote_hash CHAR(64) COLLATE utf8mb4_bin NOT NULL,
+    quote_json JSON NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (commerce_order_id,fulfillment_group)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS commerce_cj_fulfillment_outbox (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    commerce_order_id BIGINT UNSIGNED NOT NULL,
+    fulfillment_group VARCHAR(80) COLLATE utf8mb4_bin NOT NULL,
+    version INT UNSIGNED NOT NULL DEFAULT 0,
+    status VARCHAR(32) COLLATE utf8mb4_bin NOT NULL DEFAULT 'pending',
+    quote_json JSON NOT NULL,
+    supplier_reference VARCHAR(100) COLLATE utf8mb4_bin NOT NULL,
+    cj_order_id VARCHAR(100) NULL,
+    shipment_order_id VARCHAR(100) NULL,
+    pay_id VARCHAR(100) NULL,
+    pay_expires_at DATETIME(3) NULL,
+    evidence_json JSON NULL,
+    last_error VARCHAR(191) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY commerce_cj_outbox_group (commerce_order_id,fulfillment_group),
+    UNIQUE KEY commerce_cj_outbox_reference (supplier_reference)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS commerce_products (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     ad_id BIGINT UNSIGNED NULL,
@@ -196,6 +223,8 @@ CONSTRAINT commerce_accrual_supplier_fk FOREIGN KEY (supplier_id) REFERENCES com
 ] as const;
 
 const requiredIndexes: Record<string, Record<string, string[]>> = {
+  commerce_cj_order_quotes:{PRIMARY:['commerce_order_id','fulfillment_group']},
+  commerce_cj_fulfillment_outbox:{PRIMARY:['id'],commerce_cj_outbox_group:['commerce_order_id','fulfillment_group'],commerce_cj_outbox_reference:['supplier_reference']},
   commerce_suppliers:{PRIMARY:['id']},
   commerce_product_suppliers:{PRIMARY:['product_id']},
   commerce_order_suppliers:{PRIMARY:['order_id','product_id']},
@@ -210,6 +239,8 @@ const requiredIndexes: Record<string, Record<string, string[]>> = {
   commerce_audit_events:{PRIMARY:['id'],commerce_audit_event:['order_id','event']},
 };
 const requiredColumns: Record<string,string[]> = {
+  commerce_cj_order_quotes:['commerce_order_id','fulfillment_group','quote_hash','quote_json','created_at'],
+  commerce_cj_fulfillment_outbox:['id','commerce_order_id','fulfillment_group','version','status','quote_json','supplier_reference','cj_order_id','shipment_order_id','pay_id','pay_expires_at','evidence_json','last_error','created_at','updated_at'],
   commerce_suppliers:['id','name','contact_name','phone','store_coordinator_phone','email','address','registration_number','tax_number','settlement_terms','notes','api_base_url','api_credential_ref','active','api_enabled','created_at','updated_at'],
   commerce_product_suppliers:['product_id','supplier_id','supplier_sku','unit_cost_minor','currency'],
   commerce_order_suppliers:['order_id','product_id','supplier_id','supplier_name','supplier_sku','quantity','unit_cost_minor','total_cost_minor'],

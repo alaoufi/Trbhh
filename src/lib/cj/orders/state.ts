@@ -141,10 +141,9 @@ export const CJ_STATUS_MAP: Record<string, FlowStatus> = {
   created: 'sent_to_cj',
   unpaid: 'sent_to_cj',
   pending: 'sent_to_cj',
-  paid: 'cj_accepted',
+  // PAID is verified separately against order + billing, never supplier acceptance.
   processing: 'preparing',
   'in production': 'preparing',
-  undelivered: 'preparing',
   // شحن/تتبع
   shipped: 'shipped',
   'partially shipped': 'shipped',

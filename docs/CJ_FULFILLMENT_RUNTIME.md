@@ -1,0 +1,13 @@
+# Private CJ fulfillment runtime
+
+The release injects CJ_ALLOW_LIVE_ORDERS, CJ_FULFILLMENT_WORKER_ENABLED and CJ_LIVE_TRIAL_ENABLED with a default of false. Runtime preservation accepts only an absent flag becoming false; all existing gate values and SUPPLIER_ALLOW_LIVE_ORDERS are preserved. A release never enables financial processing or public commerce.
+
+The existing verified finance release installs an independent trbhh-cj-fulfillment.service and timer only during finalization after public HTTPS and data/runtime preservation checks. Every five minutes the bounded host job checks one supplier status and, only with all three dedicated CJ gates enabled plus the central purchasing policy, attempts one queued dispatch. Credentials stay inside the application container. Service timeout is 140 seconds; host-job timeout is 130 seconds and a nonblocking lock prevents overlap.
+
+The new private CJ path uses the centralized `src/lib/cj/live-gates.ts` guard. Activation requires all three dedicated flags to be exactly `true`, central purchasing approval, and the existing bank payment/gateway readiness for customer checkout. Staff identity and ownership of the persisted immutable quote remain mandatory before bank initiation; the worker still requires independently verified customer bank receipt evidence. The public commerce visibility switch may remain off for this staff-only trial, and privately mapped products remain unpublished.
+
+Keep `SUPPLIER_ALLOW_LIVE_ORDERS=false` for CJ-only activation. That shared flag continues to govern Salla and legacy supplier paths; it is neither consulted nor changed by the new private CJ gates. Enabling the shared flag alone cannot enable new CJ checkout, dispatch, unpaid creation or supplier payment. Legacy CJ financial entrypoints retain their previous independent purchase-commitment blockade. Read-only shipment reconciliation remains available while new financial dispatch is disabled.
+
+Before cutover the release snapshots only these two unit files and their timer enabled/active states, then stops the timer and service. Rollback restores the baseline application first, restores prior CJ unit bytes (or prior absence), and restores enabled/active states. Partial installation and repeated rollback are supported. Unexpected unit edits and symlinks are rejected rather than overwritten. Existing finance receipt capture and rollback watchdog continue independently.
+
+Financial activation requires a separate approved operational decision and fresh supplier balance validation. This change neither writes customer data nor changes CJ flags in the host environment. Installation has not been performed by local tests.

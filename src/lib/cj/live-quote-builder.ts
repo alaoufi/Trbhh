@@ -1,0 +1,44 @@
+import 'server-only';
+import {createHash} from 'node:crypto';
+import {getStorefrontCjProduct,parseCjDetails} from './mapping';
+import {verifyCjVariantForSaudi} from './availability';
+import {getVariants,calculateFreightToKSA} from './client';
+import {readVerifiedCjPricing} from './verified-pricing';
+import {quoteCjFiscal} from './tax-quote';
+import {usdMinor,destinationHash,validateLiveCjQuote,type LiveCjQuote} from './live-quote';
+import type {TrialCartItem} from './trial-cart';
+import {canonicalCjDestination} from './live-destination';
+import {ensurePrivateCjCommerceProduct} from './private-product';
+import {prisma} from '@/lib/prisma';
+type Deps={readProduct?:typeof getStorefrontCjProduct;verify?:typeof verifyCjVariantForSaudi;pricing?:typeof readVerifiedCjPricing;variants?:typeof getVariants;freight?:typeof calculateFreightToKSA;tax?:typeof quoteCjFiscal;ensureMapping?:typeof ensurePrivateCjCommerceProduct};
+/** Staff checkout: all source amounts come from current CJ reads, never client prices. */
+export async function buildLiveCjQuote(input:{memberId:bigint;requestKey:string;item:TrialCartItem;destination:Record<string,string>},deps:Deps={}):Promise<LiveCjQuote>{
+ const {item}=input,destination=canonicalCjDestination(input.destination,{alreadyCanonical:true});
+ if(!item.variantId||!item.snapshot||destination.country!=='SA'||!/^\d{5}$/.test(destination.postalCode||''))throw new Error('cj_live_quote_invalid');
+ const row=await (deps.readProduct??getStorefrontCjProduct)(item.id,false);
+ const selected=row&&parseCjDetails(row)?.variants.find(v=>v.vid===item.variantId);
+ if(!row||!selected||row.hidden!==0)throw new Error('cj_live_product_unavailable');
+ const pricing=await (deps.pricing??readVerifiedCjPricing)();
+ if(pricing.marginBps!==3000||row.margin_bps!==3000||row.sale_price_override_minor!=null)throw new Error('cj_live_margin_unapproved');
+ const live=await (deps.verify??verifyCjVariantForSaudi)(row.cj_product_id,{vid:selected.vid,variantSku:selected.sku,variantName:selected.name,variantKey:selected.optionKey,variantSellPrice:selected.priceUsd,variantImage:null,variantWeight:selected.weight,attributes:selected.attributes},item.qty,{},pricing.usdToSarX100,{otherCostsMinor:row.other_costs_minor,marginBps:3000},destination.postalCode);
+ if(live.status!=='available')throw new Error('cj_live_variant_unavailable');
+ const route=live.shippingOptions.find(s=>s.name===item.snapshot!.shippingName&&s.originCountry===item.snapshot!.originCountry);
+ if(!route||route.priceMinor!==item.snapshot.shippingMinor||route.additionalMinor!==item.snapshot.shippingAdditionalMinor||live.salePriceMinor!==item.snapshot.unitMinor)throw new Error('cj_live_quote_changed');
+ const warehouses=live.warehouses.filter(w=>w.id&&w.originCountry===route.originCountry&&w.quantity>=item.qty);
+ if(warehouses.length!==1)throw new Error('cj_live_warehouse_ambiguous');
+ const [variants,freight]=await Promise.all([(deps.variants??getVariants)(row.cj_product_id),(deps.freight??calculateFreightToKSA)([{vid:selected.vid,quantity:item.qty}],destination.postalCode,route.originCountry)]);
+ if(!variants.ok||!freight.ok)throw new Error('cj_live_provider_unavailable');
+ const variant=variants.data.find(v=>v.vid===selected.vid),shipping=freight.data.filter(s=>s.logisticName.trim()===route.name);
+ if(!variant?.variantSellPrice||shipping.length!==1)throw new Error('cj_live_provider_changed');
+ const supplierUnitUsdMinor=usdMinor(variant.variantSellPrice),supplierFreightUsdMinor=usdMinor(shipping[0].logisticPrice);
+ if(Math.round(supplierUnitUsdMinor*pricing.usdToSarX100/100)!==live.supplierPriceMinor)throw new Error('cj_live_supplier_price_changed');
+ const supplierTaxUsdMinor=shipping[0].totalPostageFeeUsd!=null?usdMinor(shipping[0].totalPostageFeeUsd)-supplierFreightUsdMinor:usdMinor((shipping[0].taxesFeeUsd??0)+(shipping[0].clearanceFeeUsd??0));
+ if(Math.round(supplierFreightUsdMinor*pricing.usdToSarX100/100)!==route.priceMinor||Math.round(supplierTaxUsdMinor*pricing.usdToSarX100/100)!==route.additionalMinor)throw new Error('cj_live_freight_changed');
+ const tax=await (deps.tax??quoteCjFiscal)(live.salePriceMinor,item.qty,route.priceMinor+route.additionalMinor);
+ if(tax.totalMinor!==item.snapshot.totalMinor||tax.vatMinor!==item.snapshot.vatMinor||tax.enabled!==item.snapshot.vatEnabled)throw new Error('cj_live_tax_changed');
+ const commerceProductId=row.commerce_product_id??await (deps.ensureMapping??ensurePrivateCjCommerceProduct)(prisma,{memberId:input.memberId,cjRowId:row.id,pid:row.cj_product_id,unitSarMinor:live.salePriceMinor,verifiedQuantity:item.qty});
+ const now=new Date(),fulfillmentGroup=`line-${commerceProductId}`;
+ const supplierReference=`trbhh-${createHash('sha256').update(JSON.stringify({member:String(input.memberId),request:input.requestKey,group:fulfillmentGroup})).digest('hex').slice(0,44)}`;
+ const quote:LiveCjQuote={version:1,checkedAt:live.checkedAt,expiresAt:new Date(Date.parse(live.checkedAt)+300000).toISOString(),destination:{...destination},destinationHash:destinationHash(destination),fulfillmentGroup,supplierReference,lines:[{productId:String(commerceProductId),pid:row.cj_product_id,vid:selected.vid,quantity:item.qty,supplierUnitUsdMinor,customerUnitSarMinor:live.salePriceMinor}],originAreaId:warehouses[0].id!,originCountry:route.originCountry,logisticName:route.name,supplierFreightUsdMinor,supplierTaxUsdMinor,supplierUsdMinor:supplierUnitUsdMinor*item.qty+supplierFreightUsdMinor+supplierTaxUsdMinor,usdToSarX100:pricing.usdToSarX100,marginBps:3000,customerShippingSarMinor:route.priceMinor+route.additionalMinor,customerTaxSarMinor:tax.vatMinor,customerSarMinor:tax.totalMinor,customerFiscal:tax.customerFiscal};
+ return validateLiveCjQuote(quote,destination,now);
+}

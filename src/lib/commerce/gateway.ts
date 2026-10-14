@@ -1,6 +1,7 @@
 import 'server-only';
 import { claimPaymentAttempt, recordPaymentReference, markPaymentUncertain } from './orders';
 import type { CommerceDb, PaymentAttempt, VerifiedPayment } from './types';
+import {checkCjCheckoutFunding} from '@/lib/cj/checkout-funding';
 
 /** A commerce-specific contract. Legacy top-up callbacks must never be used. */
 export interface CommerceGateway {
@@ -10,7 +11,7 @@ export interface CommerceGateway {
   verify(attempt: PaymentAttempt): Promise<VerifiedPayment | null>;
   isSafeRedirect(url: string): boolean;
 }
-export type CommercePaymentResult = { status: 'redirect'; url: string } | { status: 'paid' | 'action_required' | 'unavailable' };
+export type CommercePaymentResult = { status: 'redirect'; url: string } | { status: 'paid' | 'action_required' | 'unavailable' | 'funding_required' };
 
 export async function initiateCommercePayment(
   db: CommerceDb, input: { memberId: bigint; orderId: bigint }, gateway: CommerceGateway,
@@ -19,6 +20,8 @@ export async function initiateCommercePayment(
   // دفاع في العمق: لا يُبدأ أي دفع حقيقي إذا كان مفتاح الشراء المركزي معطّلاً.
   const [pflag] = await db.$queryRaw<{ v: string | null }[]>`SELECT v FROM site_settings WHERE k='commerce_purchasing_enabled' LIMIT 1`;
   if ((pflag?.v ?? '0') !== '1') return { status: 'unavailable' };
+  const funding=await checkCjCheckoutFunding(db,input);
+  if(funding!=='ready')return {status:funding};
   const claim = await claimPaymentAttempt(db, { ...input, provider: gateway.id });
   if (!claim.claimed) {
     if (claim.attempt.status === 'paid') return { status: 'paid' };

@@ -1,4 +1,5 @@
 import 'server-only';
+import { catalogStoreAdIds } from './catalog-stores';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { publicAdCardSelect, publicAdSearchWhere, toPublicAdCards, type AdCard } from '@/lib/data';
@@ -26,7 +27,8 @@ export function parseCjCatalogQuery(query: CjCatalogQuery) {
   const q = typeof query.q === 'string' ? query.q.trim().slice(0, 80) : '';
   // تصفية بالقسم الموحّد (نفس أقسام إعلانات تربح). 0 = كل الأقسام.
   const cat = typeof query.cat === 'string' && /^[1-9]\d{0,8}$/.test(query.cat) ? Number(query.cat) : 0;
-  return { tab, page, q, cat };
+  const store = typeof query.store === 'string' && /^[1-9]\d{0,8}$/.test(query.store) ? Number(query.store) : 0;
+  return { tab, page, q, cat, store };
 }
 
 /** Read-only private catalog. The public listing predicates run before count/offset. */
@@ -37,21 +39,23 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
   // ليراجعها المشرف. البوابة الصارمة (شحن ومخزون محقّقان خلال 6 ساعات) تُطبَّق فقط
   // على العرض العام الفعلي عند تفعيله. الشراء يبقى معطّلاً بمفتاحه المستقل.
   const readyOnly = view.isPublic;
-  const { tab, page: requestedPage, q, cat } = parseCjCatalogQuery(query);
+  const { tab, page: requestedPage, q, cat, store } = parseCjCatalogQuery(query);
   const normQ = q ? normalizeArabicForSearch(q).toLowerCase() : '';
-  const imports = tab === 'all' || tab === 'imported';
+  const imports = !store && (tab === 'all' || tab === 'imported');
   const members = tab === 'all' || tab === 'members' || tab === 'verified';
   // المتجر المعتمد لا يحمل تصنيفاً مشتركاً — نستثنيه عند التصفية بقسم موحّد.
-  const commerceScope = !cat && (tab === 'all' || tab === 'imported' || tab === 'trbhh') ? tab : null;
+  const commerceScope = !store && !cat && (tab === 'all' || tab === 'imported' || tab === 'trbhh') ? tab : null;
   let adWhere: Prisma.adsWhereInput = { id: { in: [] } };
   if (members) {
-    const [publicWhere, linked, trusted] = await Promise.all([
+    const [publicWhere, linked, trusted, storeAdIds] = await Promise.all([
       publicAdSearchWhere({ ...(normQ ? { q } : {}), ...(cat ? { categoryId: cat } : {}) }),
       // Exclude linked catalog sources even when hidden: ads cannot bypass a source gate.
       prisma.$queryRaw<{ ad_id: bigint }[]>`SELECT DISTINCT cp.ad_id FROM commerce_products cp WHERE cp.ad_id IS NOT NULL`,
       tab === 'verified' ? prisma.users.findMany({ where: { trusted: 1 }, select: { id: true } }) : Promise.resolve([]),
+      store ? catalogStoreAdIds(store) : Promise.resolve([]),
     ]);
     adWhere = { AND: [publicWhere,
+      ...(store ? [{ id: { in: storeAdIds } }] : []),
       { OR: [{ data_archive: null }, { data_archive: '' }] },
       { OR: [{ data_delete: null }, { data_delete: '' }] },
       { paused_by_owner: 0, platform_hidden_at: null, platform_archived_at: null },
@@ -91,5 +95,5 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
     ...approved.map(product => ({ key: product.key, source: 'commerce' as const, product })),
     ...ads.map(ad => ({ key: `ad:${ad.id}`, source: 'ad' as const, ad })),
   ];
-  return { tab, page, pageCount, total, items, q, cat };
+  return { tab, page, pageCount, total, items, q, cat, store };
 }

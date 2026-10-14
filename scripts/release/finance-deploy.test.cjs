@@ -19,6 +19,15 @@ test('runtime allows only a disabled issuance credential addition and preserves 
   };
   try{
     assert.equal(run(base,{...base,FINANCE_ISSUANCE_SECRET:''}),0);
+    const gates={CJ_FULFILLMENT_WORKER_ENABLED:'false',CJ_LIVE_TRIAL_ENABLED:'false',CJ_ALLOW_LIVE_ORDERS:'false'};
+    assert.equal(run(base,{...base,...gates}),0);
+    for(const key of Object.keys(gates)){
+      for(const value of ['true','','0','FALSE'])assert.notEqual(run(base,{...base,...gates,[key]:value}),0);
+      assert.notEqual(run({...base,...gates},{...base,...gates,[key]:'true'}),0);
+      assert.notEqual(run({...base,...gates},base),0);
+    }
+    assert.notEqual(run(base,{...base,...gates,SUPPLIER_ALLOW_LIVE_ORDERS:'true'}),0);
+    assert.notEqual(run(base,{...base,...gates,UNRELATED_NEW_FLAG:'false'}),0);
     assert.notEqual(run(base,{...base,FINANCE_ISSUANCE_SECRET:'new-active-secret'}),0);
     assert.notEqual(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:''}),0);
     assert.equal(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:'existing'}),0);
@@ -203,4 +212,85 @@ test('orchestration keeps backup, immutable revision and private proofs before f
   assert.match(y,/StrictHostKeyChecking=yes/);assert.doesNotMatch(y,/StrictHostKeyChecking=no/);
   assert(y.indexOf('node scripts/release/finance-public-verify.cjs')>y.indexOf('finance-deploy.sh\' deploy'));
   assert(y.indexOf('node scripts/release/finance-public-verify.cjs')<y.indexOf('finance-deploy.sh\' finalize'));
+});
+
+test('CJ unit recovery tolerates either partial installation and repeat rollback, but rejects foreign changes',()=>{
+  const match=read().match(/# CJ_UNITS_BEGIN\n([\s\S]*?)# CJ_UNITS_END/);assert(match);
+  const fragment=match[1].replaceAll('/etc/systemd/system','$units_dir');
+  for(const hadOriginal of [false,true])for(const installed of [0,1,2]){
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-deploy-units-')),backup=path.join(dir,'backup'),units=path.join(dir,'units');
+    fs.mkdirSync(backup);fs.mkdirSync(units);
+    try{
+      fs.writeFileSync(path.join(backup,'CJ_SNAPSHOT_READY'),'');fs.writeFileSync(path.join(backup,'CJ_UNIT_FILES_INSTALLED'),'');
+      fs.writeFileSync(path.join(backup,'cj-enabled.txt'),'0');fs.writeFileSync(path.join(backup,'cj-active.txt'),'0');
+      for(const [i,unit] of ['service','timer'].entries()){
+        fs.writeFileSync(path.join(backup,`cj-${unit}.new`),`new ${unit}\n`);
+        if(hadOriginal)fs.writeFileSync(path.join(backup,`cj-${unit}.old`),`old ${unit}\n`);
+        if(i<installed)fs.writeFileSync(path.join(units,`trbhh-cj-fulfillment.${unit}`),`new ${unit}\n`);
+        else if(hadOriginal)fs.writeFileSync(path.join(units,`trbhh-cj-fulfillment.${unit}`),`old ${unit}\n`);
+      }
+      const script=`set -euo pipefail\nbackup=$1; units_dir=$2\nsystemctl(){ return 0; }\n${fragment}\nrestore_cj_units\nrestore_cj_units`;
+      const args=['-c',script,'test',backup.replaceAll('\\','/'),units.replaceAll('\\','/')];
+      const result=spawnSync(bash,args,{encoding:'utf8'});assert.equal(result.status,0,result.stderr);
+      for(const unit of ['service','timer']){
+        const target=path.join(units,`trbhh-cj-fulfillment.${unit}`);
+        if(hadOriginal)assert.equal(fs.readFileSync(target,'utf8'),`old ${unit}\n`);else assert.equal(fs.existsSync(target),false);
+      }
+      const foreign=path.join(units,'trbhh-cj-fulfillment.timer');fs.writeFileSync(foreign,'foreign change\n');
+      assert.notEqual(spawnSync(bash,args,{encoding:'utf8'}).status,0);assert.equal(fs.readFileSync(foreign,'utf8'),'foreign change\n');
+    }finally{fs.rmSync(dir,{recursive:true,force:true});}
+  }
+});
+
+test('an interrupted CJ unit copy preserves complete active files and remains recoverable',()=>{
+  const source=read(),helpers=source.match(/# CJ_UNITS_BEGIN\n([\s\S]*?)# CJ_UNITS_END/),installation=source.match(/substep=install_cj_units\n([\s\S]*?)\nsystemctl daemon-reload/);assert(helpers);assert(installation);
+  const fragment=helpers[1].replaceAll('/etc/systemd/system','$units_dir'),installFragment=installation[1].replaceAll('/etc/systemd/system','$units_dir');
+  for(const hadOriginal of [false,true])for(const failure of ['service','timer']){
+    const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cj-atomic-unit-')),backup=path.join(dir,'backup'),units=path.join(dir,'units');fs.mkdirSync(backup);fs.mkdirSync(units);
+    try{
+      for(const marker of ['CJ_SNAPSHOT_READY','CJ_UNIT_FILES_INSTALLED'])fs.writeFileSync(path.join(backup,marker),'');
+      fs.writeFileSync(path.join(backup,'cj-enabled.txt'),'0');fs.writeFileSync(path.join(backup,'cj-active.txt'),'0');
+      for(const unit of ['service','timer']){fs.writeFileSync(path.join(backup,'cj-'+unit+'.new'),'new '+unit+'\n');if(hadOriginal){fs.writeFileSync(path.join(backup,'cj-'+unit+'.old'),'old '+unit+'\n');fs.writeFileSync(path.join(units,'trbhh-cj-fulfillment.'+unit),'old '+unit+'\n');}}
+      const prelude='set -euo pipefail\nbackup=$1; units_dir=$2; failure=$3\nsystemctl(){ return 0; }\n'+fragment+'\n';
+      const injected='install(){ local source="${@: -2:1}" destination="${!#}"; if [[ "$source" == "$backup/cj-$failure.new" ]]; then printf partial > "$destination"; return 1; fi; command install "$@"; }\n';
+      const args=['test',backup.replaceAll('\\','/'),units.replaceAll('\\','/'),failure];
+      const result=spawnSync(bash,['-c',prelude+injected+installFragment,...args],{encoding:'utf8'});assert.notEqual(result.status,0);
+      const failedTarget=path.join(units,'trbhh-cj-fulfillment.'+failure);
+      if(hadOriginal)assert.equal(fs.readFileSync(failedTarget,'utf8'),'old '+failure+'\n');else assert.equal(fs.existsSync(failedTarget),false);
+      assert.deepEqual(fs.readdirSync(units).filter(name=>!['trbhh-cj-fulfillment.service','trbhh-cj-fulfillment.timer'].includes(name)),[],'failed staging copies must be cleaned up');
+      const restored=spawnSync(bash,['-c',prelude+'restore_cj_units\nrestore_cj_units',...args],{encoding:'utf8'});assert.equal(restored.status,0,restored.stderr);
+      for(const unit of ['service','timer']){const target=path.join(units,'trbhh-cj-fulfillment.'+unit);if(hadOriginal)assert.equal(fs.readFileSync(target,'utf8'),'old '+unit+'\n');else assert.equal(fs.existsSync(target),false);}
+    }finally{assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));assert(path.basename(dir).startsWith('cj-atomic-unit-'));fs.rmSync(dir,{recursive:true,force:true});}
+  }
+});
+
+test('CJ installation refuses a unit changed since its backup',()=>{
+  const source=read(),helpers=source.match(/# CJ_UNITS_BEGIN\n([\s\S]*?)# CJ_UNITS_END/),installation=source.match(/substep=install_cj_units\n([\s\S]*?)\nsystemctl daemon-reload/);assert(helpers);assert(installation);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cj-atomic-unit-')),backup=path.join(dir,'backup'),units=path.join(dir,'units');fs.mkdirSync(backup);fs.mkdirSync(units);
+  try{
+    for(const unit of ['service','timer']){fs.writeFileSync(path.join(backup,'cj-'+unit+'.old'),'old '+unit+'\n');fs.writeFileSync(path.join(backup,'cj-'+unit+'.new'),'new '+unit+'\n');fs.writeFileSync(path.join(units,'trbhh-cj-fulfillment.'+unit),'foreign change\n');}
+    const script=('set -euo pipefail\nbackup=$1; units_dir=$2\n'+helpers[1]+'\n'+installation[1]).replaceAll('/etc/systemd/system','$units_dir');
+    const result=spawnSync(bash,['-c',script,'test',backup.replaceAll('\\','/'),units.replaceAll('\\','/')],{encoding:'utf8'});assert.notEqual(result.status,0);
+    assert.equal(fs.readFileSync(path.join(units,'trbhh-cj-fulfillment.service'),'utf8'),'foreign change\n');
+  }finally{assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));assert(path.basename(dir).startsWith('cj-atomic-unit-'));fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('an interrupted CJ rollback copy leaves the complete replacement available for retry',()=>{
+  const helpers=read().match(/# CJ_UNITS_BEGIN\n([\s\S]*?)# CJ_UNITS_END/);assert(helpers);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'cj-atomic-unit-')),backup=path.join(dir,'backup'),units=path.join(dir,'units');fs.mkdirSync(backup);fs.mkdirSync(units);
+  try{
+    for(const marker of ['CJ_SNAPSHOT_READY','CJ_UNIT_FILES_INSTALLED'])fs.writeFileSync(path.join(backup,marker),'');
+    fs.writeFileSync(path.join(backup,'cj-enabled.txt'),'1');fs.writeFileSync(path.join(backup,'cj-active.txt'),'1');
+    for(const unit of ['service','timer']){fs.writeFileSync(path.join(backup,'cj-'+unit+'.old'),'old '+unit+'\n');fs.writeFileSync(path.join(backup,'cj-'+unit+'.new'),'new '+unit+'\n');fs.writeFileSync(path.join(units,'trbhh-cj-fulfillment.'+unit),'new '+unit+'\n');}
+    const script=('set -euo pipefail\nbackup=$1; units_dir=$2\nsystemctl(){ printf "%s\\n" "$*" >> "$backup/systemctl.calls"; }\n'+helpers[1]).replaceAll('/etc/systemd/system','$units_dir');
+    const injected='\ninstall(){ printf partial > "${!#}"; return 1; }\nrestore_cj_units';
+    const args=['test',backup.replaceAll('\\','/'),units.replaceAll('\\','/')];
+    const failed=spawnSync(bash,['-c',script+injected,...args],{encoding:'utf8'});assert.notEqual(failed.status,0);
+    assert.equal(fs.readFileSync(path.join(units,'trbhh-cj-fulfillment.service'),'utf8'),'new service\n');
+    assert.doesNotMatch(fs.readFileSync(path.join(backup,'systemctl.calls'),'utf8'),/enable|start/);
+    const retried=spawnSync(bash,['-c',script+'\nrestore_cj_units',...args],{encoding:'utf8'});assert.equal(retried.status,0,retried.stderr);
+    for(const unit of ['service','timer'])assert.equal(fs.readFileSync(path.join(units,'trbhh-cj-fulfillment.'+unit),'utf8'),'old '+unit+'\n');
+    assert.match(fs.readFileSync(path.join(backup,'systemctl.calls'),'utf8'),/enable trbhh-cj-fulfillment.timer\nstart trbhh-cj-fulfillment.timer/);
+    assert.deepEqual(fs.readdirSync(units).sort(),['trbhh-cj-fulfillment.service','trbhh-cj-fulfillment.timer']);
+  }finally{assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));assert(path.basename(dir).startsWith('cj-atomic-unit-'));fs.rmSync(dir,{recursive:true,force:true});}
 });

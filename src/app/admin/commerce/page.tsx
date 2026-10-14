@@ -30,7 +30,8 @@ const labels: Record<string, string> = {
   commerce_payment_pending_text: 'نص انتظار التحقق', commerce_payment_confirmed_text: 'نص تأكيد الدفع', commerce_paid_message: 'قالب تنبيه الدفع: {order} {amount} {reference}',
   commerce_shipment_message: 'قالب واتساب الشحن للعميل: {order} {carrier} {tracking}',
   commerce_checkout_error_text: 'خطأ إنشاء الطلب', commerce_rate_limit_text: 'تنبيه كثرة المحاولات', commerce_location_error_text: 'خطأ المنطقة والمدينة',
-  commerce_payment_action_required_text: 'نص الحاجة لمراجعة نتيجة الدفع', commerce_payment_rate_limit_text: 'نص حد محاولات التحقق من الدفع', commerce_payment_unavailable_text: 'نص تعذر الدفع أو التحقق',
+  commerce_payment_action_required_text: 'نص الحاجة لمراجعة نتيجة الدفع', commerce_payment_rate_limit_text: 'نص حد محاولات التحقق من الدفع', commerce_payment_unavailable_text: 'نص تعذر الدفع أو التحقق', commerce_cj_funding_required_text: 'نص توقف دفع CJ لعدم كفاية رصيد المورد',
+  commerce_cj_supplier_paid_text:'نص تأكيد دفع المورد',commerce_cj_preparing_text:'نص تجهيز CJ',commerce_cj_shipped_text:'نص شحن CJ',commerce_cj_delivered_text:'نص تسليم CJ',commerce_cj_tracking_unavailable_text:'نص تعذر حالة المورد',
 };
 function ProductForm({ product }: { product?: Product }) {
   return <AccessBoundary module={'products'} action={product ? 'edit' : 'create'}><form action={saveCommerceProduct} className="grid gap-2 rounded-xl border border-primary/15 p-3 sm:grid-cols-2">
@@ -66,7 +67,7 @@ export default async function CommerceAdminPage({ searchParams }: { searchParams
   const values = new Map(settings.map(r => [r.k, r.v]));
   return <div className="space-y-4">
     <h1 className="text-xl font-extrabold text-primary">السلع المعتمدة والطلبات</h1>
-    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">العميل يشتري من تربح. تسوية المورد تتم خارج الموقع. لا شحن محفظة ولا دفع آلي للمورد. {gateway?.ready ? '' : 'الدفع المباشر محجوب حتى التحقق من عقد البنك واختبارات بيئته التجريبية.'}</p>
+    <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">العميل يدفع لدى تربح عبر البنك. طلبات CJ التجريبية الخاصة تتطلب رصيد المورد والتحقق من السعر والشحن والمخزون قبل الدفع؛ ثم تظهر حالة تجهيز الشحنة والتتبع في الطلب. شحن رصيد CJ يتم في موقع CJ. {gateway?.ready ? '' : 'بوابة البنك غير جاهزة؛ لا يمكن بدء الدفع.'}</p>
     {sp.saved && <p className="text-emerald-700">تم الحفظ.</p>}
     {sp.error && <p role="alert" className="text-red-700">لم يتم الحفظ. تحقق من الحقول وجاهزية البوابة.</p>}
     {sp.delivery && <p role="status">نتيجة الإرسال: {String(sp.delivery)}. لا تؤثر على حالة الدفع.</p>}

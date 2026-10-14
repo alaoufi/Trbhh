@@ -35,7 +35,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
   const ledger = await listOrderLedger(id);
   const capUsdMinor = order.approved_cap_usd_minor || (await cjOrderCapUsdMinor());
   const { getSetting } = await import('@/lib/settings');
-  const topupUrl = (await getSetting('cj_wallet_topup_url', 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge').catch(() => '')) || 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge';
+  const savedTopupUrl = (await getSetting('cj_wallet_topup_url', 'https://www.cjdropshipping.com/mine/wallet').catch(() => '')) || 'https://www.cjdropshipping.com/mine/wallet';
+  const topupUrl = savedTopupUrl === 'https://app.cjdropshipping.com/myCJ.html#/myCJWallet/recharge' ? 'https://www.cjdropshipping.com/mine/wallet' : savedTopupUrl;
   const usd = (m: number) => `$${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (

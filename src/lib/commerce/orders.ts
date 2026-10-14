@@ -11,6 +11,10 @@ import type {CalculatedFiscalLineV2} from '@/lib/finance/types';
 import {formatAddressLine,normalizeSaudiAddress} from './addresses';
 import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
 import {chosenVariantSnapshot} from './variant-snapshot';
+import {enqueuePaidCjFulfillment,saveLiveCjQuote,requireLiveCjQuotesAtPayment} from '@/lib/cj/bank-handoff';
+import {validateLiveCjQuote,assertCjQuoteFiscalPolicy} from '@/lib/cj/live-quote';
+import {canonicalCjDestination} from '@/lib/cj/live-destination';
+import {requireCjLiveTrialAuthority} from '@/lib/cj/private-trial';
 
 type Tx = Prisma.TransactionClient;
 type OrderRow = {id:bigint;member_id:bigint;created_at:Date;request_fingerprint:string;status:OrderStatus;currency:'SAR';subtotal_minor:number;shipping_fee_minor:number;total_minor:number;shipping:ShippingSnapshot|string};
@@ -84,6 +88,8 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
   const items=normalizeOrderRequest(input.items), shipping=shippingSnapshot(input.shipping);
   const shippingFeeMinor=checkedMoney(policy.shippingFeeMinor);
   const fingerprint=requestFingerprint(items,shipping);
+  const staffCjTrial=policy.staffCjTrial===true&&!!policy.liveCjQuotes?.length;
+  if(policy.liveCjQuotes?.length){if(!staffCjTrial)throw new Error('cj_live_trial_required');await requireCjLiveTrialAuthority(input.memberId);}
   // دفاع في العمق: مفتاح الشراء المركزي fail-closed حتى لو تجاوز المُتصِل حارس الحدود.
   const [pflag]=await db.$queryRaw<{v:string|null}[]>`SELECT v FROM site_settings WHERE k='commerce_purchasing_enabled' LIMIT 1`;
   if((pflag?.v??'0')!=='1') throw new Error('purchasing_disabled');
@@ -96,12 +102,25 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
     if(!row||row.request_fingerprint!==fingerprint) throw new Error('request_conflict');
     if(row.status!=='building') return readOrder(tx,row);
     const fiscalPolicy=await readApprovedFiscalPolicy(tx,row.created_at);
+    for(const quote of policy.liveCjQuotes??[])assertCjQuoteFiscalPolicy(quote,fiscalPolicy);
     const fiscalLines:CalculatedFiscalLineV2[]=[];
     const totals:number[]=[];
     const supplierCostLines=new Map<string,CostLine[]>();
     for(const item of items) {
+      const liveQuote=policy.liveCjQuotes?.find(q=>q.lines.some(l=>l.productId===String(item.productId)));
+      const liveLine=liveQuote?.lines.find(l=>l.productId===String(item.productId));
+      if(liveQuote){validateLiveCjQuote(liveQuote,liveQuote.destination,new Date());const expected=canonicalCjDestination(shipping);if(!liveLine||liveLine.vid!==item.variantKey||liveLine.quantity!==item.quantity||Object.entries(expected).some(([key,value])=>liveQuote.destination[key]!==value))throw new Error('cj_quote_order_mismatch');}
       const [product]=await tx.$queryRaw<{id:bigint;title:string;price_minor:number;currency:string;stock_available:number;stock_reserved:number;approved:number;visible:number;enabled:number}[]>`SELECT id,title,price_minor,currency,stock_available,stock_reserved,approved,visible,enabled FROM commerce_products WHERE id=${item.productId} FOR UPDATE`;
-      if(!product||product.approved!==1||product.visible!==1||product.enabled!==1||product.currency!=='SAR'||product.price_minor<=0||product.stock_available<item.quantity) throw new Error('product_unavailable');
+      if(!product||product.currency!=='SAR')throw new Error('product_unavailable');
+      const isPrivate=product.approved!==1||product.visible!==1||product.enabled!==1;
+      if(product.price_minor<=0&&!(isPrivate&&staffCjTrial&&liveLine))throw new Error('product_unavailable');
+      if(isPrivate){
+        if(!staffCjTrial||!liveLine)throw new Error('product_unavailable');
+        const [binding]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM cj_products WHERE commerce_product_id=${item.productId} AND cj_product_id=${liveLine.pid} AND hidden=0 LIMIT 1 FOR SHARE`;
+        if(!binding)throw new Error('cj_private_product_changed');
+        if(product.stock_available<item.quantity){await tx.$executeRaw`UPDATE commerce_products SET stock_available=${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.productId}`;product.stock_available=item.quantity;}
+      }
+      if(product.stock_available<item.quantity)throw new Error('product_unavailable');
       const [sourceVariant]=await tx.$queryRaw<{variants:unknown;options:unknown}[]>`SELECT variants,options FROM supplier_products WHERE commerce_product_id=${item.productId} FOR SHARE`;
       let sourceVariantValue:unknown=sourceVariant?.variants;try{if(typeof sourceVariantValue==='string')sourceVariantValue=JSON.parse(sourceVariantValue);}catch{sourceVariantValue=null;}
       let sourceOptionsValue:unknown=sourceVariant?.options;try{if(typeof sourceOptionsValue==='string')sourceOptionsValue=JSON.parse(sourceOptionsValue);}catch{sourceOptionsValue=null;}
@@ -115,6 +134,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
       const selectedVariantKey=item.variantKey||'';
       let rawVariant=selectedVariantKey?sourceVariants.find(raw=>raw&&typeof raw==='object'&&[String((raw as Record<string,unknown>).externalId||''),String((raw as Record<string,unknown>).vid||''),String((raw as Record<string,unknown>).id||'')].includes(selectedVariantKey)):undefined;
       let cjVariantFound=false;
+      if(liveLine){rawVariant={vid:liveLine.vid,quantity:item.quantity,available:true,publicPriceMinor:liveLine.customerUnitSarMinor};cjVariantFound=true;}
       if(selectedVariantKey&&!rawVariant){
         const [cjSource]=await tx.$queryRaw<{details_json:unknown;availability_json:unknown;availability_checked_at:Date|null}[]>`SELECT details_json,availability_json,availability_checked_at FROM cj_products WHERE commerce_product_id=${item.productId} AND hidden=0 AND status='ready' ORDER BY availability_checked_at DESC,id LIMIT 1 FOR SHARE`;
         const decode=(value:unknown)=>{if(typeof value!=='string')return value;try{return JSON.parse(value) as unknown;}catch{return null;}};
@@ -165,6 +185,10 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
     fiscalLines.push(shippingLine);
     const fiscalSnapshot=buildOrderFiscalSnapshot(row.id,row.created_at,fiscalPolicy,shipping,fiscalLines);
     const subtotal=sumMoney(totals), total=sumMoney([subtotal,payableShipping]);
+    if(policy.liveCjQuotes?.length){
+      if(policy.liveCjQuotes.length!==items.length||sumMoney(policy.liveCjQuotes.map(q=>q.customerSarMinor))!==total)throw new Error('cj_quote_fiscal_mismatch');
+      for(const quote of policy.liveCjQuotes)await saveLiveCjQuote(tx,row.id,quote,new Date());
+    }
     if(total!==fiscalSnapshot.totalMinor)throw new Error('finance_invoice_difference');
     await saveOrderFiscalSnapshot(tx,fiscalSnapshot);
     await tx.$executeRaw`UPDATE commerce_orders SET status='awaiting_payment',subtotal_minor=${subtotal},shipping_fee_minor=${payableShipping},total_minor=${total} WHERE id=${row.id}`;
@@ -221,6 +245,7 @@ export async function claimPaymentAttempt(db:CommerceDb,input:{memberId:bigint;o
         try{
           const [clock]=await tx.$queryRaw<{now:Date}[]>`SELECT UTC_TIMESTAMP(3) AS now`;
           await requireOrderFiscalPolicyAtPayment(tx,order.id,clock.now);
+          await requireLiveCjQuotesAtPayment(tx,order.id,clock.now);
         }catch{return {claimed:false,attempt:{...attempt,redirectUrl:null}};}
       }
       return {claimed:false,attempt};
@@ -228,6 +253,7 @@ export async function claimPaymentAttempt(db:CommerceDb,input:{memberId:bigint;o
     if(order.status!=='awaiting_payment') throw new Error('order_not_payable');
     const [clock]=await tx.$queryRaw<{now:Date}[]>`SELECT UTC_TIMESTAMP(3) AS now`;
     await requireOrderFiscalPolicyAtPayment(tx,order.id,clock.now);
+    await requireLiveCjQuotesAtPayment(tx,order.id,clock.now);
     checkedMoney(order.total_minor);if(order.total_minor<=0||order.currency!=='SAR') throw new Error('order_not_payable');
     const token=randomUUID(),merchantOrderId=`commerce:${order.id}:${randomUUID()}`;
     await tx.$executeRaw`INSERT INTO commerce_payment_attempts (order_id,provider,merchant_order_id,claim_token,amount_minor,currency) VALUES (${order.id},${input.provider},${merchantOrderId},${token},${order.total_minor},'SAR')`;
@@ -299,6 +325,7 @@ export async function settleVerifiedPayment(db:CommerceDb,evidence:VerifiedPayme
     await tx.$executeRaw`UPDATE commerce_payment_attempts SET status='paid',paid_at=CURRENT_TIMESTAMP(3) WHERE id=${attempt.id}`;
     await tx.$executeRaw`UPDATE commerce_orders SET status='paid',fulfillment_status='offline_pending',paid_at=CURRENT_TIMESTAMP(3) WHERE id=${order.id}`;
     await tx.$executeRaw`INSERT INTO commerce_receipts (order_id,provider,provider_ref,amount_minor,currency) VALUES (${order.id},${attempt.provider},${attempt.provider_ref},${attempt.amount_minor},'SAR')`;
+    await enqueuePaidCjFulfillment(tx,order.id);
     await finishSupplierReservations(tx,order.id,true);
     await tx.$executeRaw`UPDATE supplier_orders SET status='pending',payment_status='paid',updated_at=CURRENT_TIMESTAMP(3) WHERE order_id=${order.id} AND status='awaiting_payment'`;
     // Only immutable order snapshots feed the subledger: a later supplier disable

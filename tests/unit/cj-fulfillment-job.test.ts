@@ -1,0 +1,11 @@
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {describe,it,expect,vi} from 'vitest';
+const source=()=>{const text=readFileSync('scripts/release/cj-fulfillment-job.sh','utf8');const match=text.match(/<<'CJ_RUN_NODE'\r?\n([\s\S]*?)\r?\nCJ_RUN_NODE/);if(!match)throw Error('embedded_runner_missing');return match[1];};
+async function run(enabled:boolean,status=200,overrides:Record<string,string>={}){const output:string[]=[];const process={env:{SUPPLIER_RECONCILE_SECRET:'test-only-long-internal-secret-32chars',SUPPLIER_ALLOW_LIVE_ORDERS:'false',CJ_ALLOW_LIVE_ORDERS:String(enabled),CJ_LIVE_TRIAL_ENABLED:String(enabled),CJ_FULFILLMENT_WORKER_ENABLED:String(enabled),...overrides},exitCode:0,stdout:{write:(s:string)=>output.push(s)}};const fetch=vi.fn(async(url:string)=>({status,text:async()=>JSON.stringify(url.endsWith('fulfill-orders')?{processed:1}:{checked:1})}));await runInNewContext(source(),{process,fetch,JSON,Number,AbortSignal,Error});return {fetch,output:output.join(''),process};}
+describe('bounded operator CJ runner',()=>{
+ it('does not use the global supplier flag to authorize private CJ dispatch',async()=>{const r=await run(true,200,{SUPPLIER_ALLOW_LIVE_ORDERS:'true',CJ_ALLOW_LIVE_ORDERS:'false'});expect(r.fetch).toHaveBeenCalledTimes(1);expect(r.fetch.mock.calls[0][0]).toContain('/fulfillment-status');});
+ it('runs only status reads when financial gates are disabled',async()=>{const r=await run(false);expect(r.fetch).toHaveBeenCalledTimes(1);expect(r.fetch.mock.calls[0][0]).toContain('/fulfillment-status');expect(r.output).toContain('dispatched=0 checked=1');expect(r.output).not.toContain(r.process.env.SUPPLIER_RECONCILE_SECRET);});
+ it('dispatches once then checks status when enabled',async()=>{const r=await run(true);expect(r.fetch).toHaveBeenCalledTimes(2);expect(r.output).toBe('cj_fulfillment status=ok dispatched=1 checked=1\n');});
+ it('failed dispatch still checks existing shipments without financial retries or successful report',async()=>{const r=await run(true,500);expect(r.fetch).toHaveBeenCalledTimes(2);expect(r.fetch.mock.calls[1][0]).toContain('/fulfillment-status');expect(r.process.exitCode).toBe(1);expect(r.output).toBe('cj_fulfillment status=unavailable\n');});
+});

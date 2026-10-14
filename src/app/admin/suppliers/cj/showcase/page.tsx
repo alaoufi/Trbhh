@@ -3,7 +3,9 @@ import { CjAdminNav } from '@/components/cj/admin-nav';
 import { CjProductImage } from '@/components/cj/product-image';
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { requireAccess } from '@/lib/access-control/guards';
-import { listVisibleCjProducts } from '@/lib/cj/mapping';
+import { loadAdminCjCatalog } from '@/lib/cj/admin-catalog';
+import { CjAdminCatalogControls } from '@/components/cj/admin-catalog-controls';
+import { getCategories } from '@/lib/data';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 
@@ -19,9 +21,10 @@ export const metadata = { title: 'معاينة سلع CJ المختارة', robo
 export default async function CjShowcasePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('products', 'view');
   const sp = await searchParams;
-  const items = await listVisibleCjProducts(200);
+  const [catalog, categories] = await Promise.all([loadAdminCjCatalog(sp, true), getCategories()]);
+  const items = catalog.items;
   const translations = await getCachedArabic(items.map(r => r.name));
-  const readyCount = items.filter((r) => r.status === 'ready').length;
+  const readyCount = catalog.ready;
 
   return (
     <div className="space-y-4">
@@ -36,9 +39,10 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
 
       <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-7">
         <b>تجربة خاصة بالمشرفين — التعميم غير مفعّل.</b>
-        <p>السلع المراجعة: {readyCount} من {items.length}. اعتماد السلعة هنا لا ينشرها للعامة ولا يفعّل شراءها.</p>
+        <p>السلع المراجعة: {readyCount} من {catalog.total}. اعتماد السلعة هنا لا ينشرها للعامة ولا يفعّل شراءها.</p>
         {sp.published !== undefined && <p>إعدادات النشر السابقة لا تتيح هذه النسخة للعامة؛ المرحلة الحالية تجربة خاصة فقط.</p>}
       </div>
+      <CjAdminCatalogControls path="/admin/suppliers/cj/showcase" catalog={catalog} categories={categories} />
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
         افتح تجربة CJ لمراجعة الصور وتفاصيل الجوال وتجميع السلع في السلة. يتطلب الوصول صلاحية عرض المنتجات؛ لا شراء ولا دفع.

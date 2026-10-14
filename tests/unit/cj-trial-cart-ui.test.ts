@@ -4,12 +4,14 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const mock=vi.hoisted(()=>({access:vi.fn()}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:mock.access}));
 vi.mock('@/lib/commerce/address-book',()=>({listMemberAddresses:async()=>[]}));
+vi.mock('@/lib/commerce/settings',()=>({getCommerceConfig:async()=>({text:{paymentUnavailable:'CUSTOM checkout unavailable'}})}));
 import CartPage from '@/app/cj/cart/page';
 import {AddToTrialCart,CartLink} from '@/components/cj/cart-controls';
 import {TrialCart} from '@/components/cj/trial-cart';
 beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
 
 describe('private CJ trial cart presentation',()=>{
+  it('shows checkout unavailable feedback when fulfillment readiness blocks the live path',async()=>{const tree=await CartPage({searchParams:Promise.resolve({order:'unavailable'})});const html=renderToStaticMarkup(tree);expect(html).toContain('CUSTOM checkout unavailable');expect(html).toContain('role="alert"');});
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{
     const tree=await CartPage();expect(mock.access).toHaveBeenCalledExactlyOnceWith('products','view');expect(tree.props.accountId).toBe(9);
     const html=renderToStaticMarkup(tree);expect(html).toContain('سلة الشراء');

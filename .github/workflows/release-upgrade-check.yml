@@ -1,7 +1,7 @@
 name: Verify baseline database upgrade preserves data
 on:
   push:
-    branches: [codex/trbhh-audit-fixes-20260910, codex/finance-tax-audit-20260922, codex/finance-issuance-completion-20260924, codex/cj-storefront-trial-20260924, claude/hostinger-vps-project-amw8vb]
+    branches: [codex/trbhh-audit-fixes-20260910, codex/finance-tax-audit-20260922, codex/finance-issuance-completion-20260924, codex/cj-storefront-trial-20260924, codex/cj-completion-20261013, claude/hostinger-vps-project-amw8vb]
 permissions:
   contents: read
 jobs:
@@ -16,13 +16,13 @@ jobs:
           MYSQL_USER: upgrade
           MYSQL_PASSWORD: isolated_upgrade_only
           MYSQL_ROOT_PASSWORD: isolated_upgrade_root_only
-        ports: ['3306:3306']
+        ports: ['33309:3306']
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uupgrade -pisolated_upgrade_only"
           --health-interval=10s --health-timeout=5s --health-retries=10
     env:
-      DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:3306/trbhh_upgrade_test
-      UPGRADE_TEST_DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:3306/trbhh_upgrade_test
+      DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:33309/trbhh_upgrade_test
+      UPGRADE_TEST_DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:33309/trbhh_upgrade_test
       UPGRADE_DB_TESTS: '1'
       AUTH_SECRET: isolated_upgrade_test_only_0123456789abcdef0123456789abcdef
     steps:
@@ -61,3 +61,8 @@ jobs:
           });
           CONFIG
           pnpm exec vitest run --config .release-upgrade/vitest.config.ts
+      - name: Verify CJ bank handoff on isolated MySQL
+        run: pnpm exec vitest run --config vitest.commerce.config.ts -t 'keeps a CJ handoff idempotent'
+        env:
+          COMMERCE_DB_TESTS: '1'
+          COMMERCE_TEST_DATABASE_URL: mysql://root:isolated_upgrade_root_only@127.0.0.1:33309/trbhh_commerce_test

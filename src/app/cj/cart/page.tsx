@@ -2,6 +2,7 @@ import {requireAccess} from '@/lib/access-control/guards';
 import {TrialCart} from '@/components/cj/trial-cart';
 import {listMemberAddresses} from '@/lib/commerce/address-book';
 import {getCommerceConfig} from '@/lib/commerce/settings';
+import {cjCheckoutFeedback} from '@/lib/cj/checkout-feedback';
 
 export const dynamic='force-dynamic';
 export const metadata={title:'السلة',robots:{index:false,follow:false}};
@@ -20,9 +21,12 @@ export default async function CjTrialCartPage({searchParams}:{searchParams?:Prom
     address2:def.snapshot.postalCode?`الرمز البريدي ${def.snapshot.postalCode}`:'',
   }:null;
   const cart=<TrialCart key={session.uid} accountId={session.uid} ship={ship}/>;
-  if((await searchParams)?.order==='unavailable'){
+  const outcome=(await searchParams)?.order;
+  if(outcome==='unavailable'){
     const config=await getCommerceConfig();
     return <><p role="alert" className="mx-auto mt-4 max-w-4xl rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">{config.text.paymentUnavailable}</p>{cart}</>;
   }
+  const feedback=cjCheckoutFeedback(outcome);
+  if(feedback)return <><p role="alert" className="mx-auto mt-4 max-w-4xl rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">{feedback}</p>{cart}</>;
   return cart;
 }

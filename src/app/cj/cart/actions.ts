@@ -16,6 +16,7 @@ import {resolveCjCheckoutRequestKey} from '@/lib/cj/checkout-renewal';
 import {canonicalCjDestination} from '@/lib/cj/live-destination';
 import {requireCjLiveTrialAuthority} from '@/lib/cj/private-trial';
 import {cjPrivateRuntimeEnabled} from '@/lib/cj/live-gates';
+import {cjCheckoutFailure} from '@/lib/cj/checkout-feedback';
 
 /**
  * جسر «إتمام الطلب» (المرحلة 1 — بلا أموال ولا شراء حقيقي):
@@ -70,7 +71,11 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
       const liveQuotes=await Promise.all(lines.map(item=>buildLiveCjQuote({memberId:BigInt(session.uid),requestKey,item,destination:cjDestination})));
       const order=await createCommerceOrder(prisma,{memberId:BigInt(session.uid),requestKey,shipping,items:liveQuotes.flatMap(q=>q.lines.map(line=>({productId:BigInt(line.productId),quantity:line.quantity,variantKey:line.vid})))},{shippingFeeMinor:liveQuotes.reduce((sum,q)=>sum+q.customerShippingSarMinor,0),liveCjQuotes:liveQuotes,staffCjTrial:true});
       commerceOrderId=order.id;
-    }catch{redirect('/cj/cart?order=recheck');}
+    }catch(cause){
+      const reason=cjCheckoutFailure(cause);
+      console.error('cj_checkout_failed',{reason});
+      redirect(`/cj/cart?order=${reason}`);
+    }
     redirect(`/account/orders/${commerceOrderId}`);
   }
   // بنود الإرسال للمورد: المورد يحتاج vid (وهو variantId في السلة) + الكمية، ومسار الشحن.

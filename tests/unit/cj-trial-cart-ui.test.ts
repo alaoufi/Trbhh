@@ -11,6 +11,7 @@ import {TrialCart} from '@/components/cj/trial-cart';
 beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
 
 describe('private CJ trial cart presentation',()=>{
+  it('explains checkout recheck and finance failures instead of silently returning to the cart',async()=>{for(const order of ['recheck','fiscal','pricing','warehouse']){const html=renderToStaticMarkup(await CartPage({searchParams:Promise.resolve({order})}));expect(html).toContain('role="alert"');}});
   it('shows checkout unavailable feedback when fulfillment readiness blocks the live path',async()=>{const tree=await CartPage({searchParams:Promise.resolve({order:'unavailable'})});const html=renderToStaticMarkup(tree);expect(html).toContain('CUSTOM checkout unavailable');expect(html).toContain('role="alert"');});
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{
     const tree=await CartPage();expect(mock.access).toHaveBeenCalledExactlyOnceWith('products','view');expect(tree.props.accountId).toBe(9);

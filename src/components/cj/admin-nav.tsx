@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {ADMIN_NAV} from '@/components/admin-nav-def';
 
 /**
  * شريط تنقّل موحّد لصفحات إدارة CJ — يظهر أعلى كل صفحة ليسهُل الانتقال بينها.
@@ -23,7 +24,7 @@ export function CjAdminNav({ current }: { current: 'browse' | 'imported' | 'show
         return (
           <Link key={tab.key} href={tab.href} aria-current={active ? 'page' : undefined}
             className={`min-h-9 rounded-lg px-3 py-1.5 text-sm font-bold ${active ? 'bg-primary text-white' : 'border border-primary/25 text-primary hover:bg-primary/5'}`}>
-            {tab.label}
+            {ADMIN_NAV.find(item=>item.href===tab.href)?.label??tab.label}
           </Link>
         );
       })}

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import {Suspense} from 'react';
+import {AdminPageHeading} from '@/components/admin-page-heading';
 import { headers } from 'next/headers';
 import { Home, ChevronDown } from 'lucide-react';
 import { requireAnyAdmin } from '@/lib/roles';
@@ -54,7 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-muted-foreground hover:bg-secondary"><Home className="h-4 w-4" /> العودة للموقع</Link>
         </nav>
       </aside>
-      <section id="admin-content" className="min-w-0 scroll-mt-20 font-bold">{children}</section>
+      <section id="admin-content" className="min-w-0 scroll-mt-20 font-bold"><Suspense fallback={null}><AdminPageHeading items={groups.flatMap(group=>group.items.map(({href,label})=>({href,label})))}/></Suspense>{children}</section>
       <ScrollTop targetId="admin-content" />
     </div>
   );

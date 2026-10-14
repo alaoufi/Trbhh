@@ -126,7 +126,8 @@ export function pagePermission(href:string,query?:{section?:string;tab?:string})
   else if(/^\/admin\/commerce\/orders\/[^/]+$/.test(path))pageModule='orders';
   else if(/^\/admin\/users\/[^/]+\/permissions$/.test(path))pageModule='access_control';
   else if(/^\/admin\/users\/[^/]+$/.test(path))pageModule='users';
-  else if(/^\/admin\/suppliers\/cj\/(?:browse|showcase|review\/[1-9]\d*)$/.test(path))pageModule='products';
+  else if(/^\/admin\/suppliers\/cj\/(?:browse|imported|showcase|glossary|review\/[1-9]\d*)$/.test(path))pageModule='products';
+  else if(path==='/admin/suppliers/cj/orders/new')return 'orders:create';
   else if(/^\/admin\/suppliers\/cj\/orders(?:\/[1-9]\d*)?$/.test(path))pageModule='orders';
   else if(path==='/admin/suppliers/cj/payables')pageModule='orders';
   else if(path==='/admin/suppliers/cj/agents')pageModule='integrations';

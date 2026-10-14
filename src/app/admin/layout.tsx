@@ -1,8 +1,6 @@
-import Link from 'next/link';
+import {AdminSidebar} from '@/components/admin-sidebar';
 import {Suspense} from 'react';
 import {AdminPageHeading} from '@/components/admin-page-heading';
-import { headers } from 'next/headers';
-import { Home, ChevronDown } from 'lucide-react';
 import { requireAnyAdmin } from '@/lib/roles';
 import { readActorAccess } from '@/lib/access-control/guards';
 import { canAccessPage } from '@/lib/access-control/catalog';
@@ -12,7 +10,6 @@ import { ADMIN_GROUPS } from '@/components/admin-nav-def';
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAnyAdmin();
   const access = await readActorAccess(session.uid);
-  const pathname = ((await headers()).get('x-pathname') || '').split('?')[0];
 
   // المتشابهات في قوائم فرعية ملوّنة — تُفتح المجموعة التي تحوي الصفحة الحالية
   const groups = ADMIN_GROUPS
@@ -23,39 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="grid gap-4 md:grid-cols-[230px_1fr]">
       {/* على الجوال: القائمة الجانبية (الهامبرغر ☰ «قائمة الإدارة») تكفي، فلا نكرّر هذه
           القائمة ونزحم المكان — تظهر كشريط جانبي على الشاشات الكبيرة فقط. */}
-      <aside id="admin-nav" className="hidden h-fit card-3d rounded-xl p-3 md:block">
-        <div className="mb-3 border-b pb-3">
-          <div className="text-base font-extrabold text-primary">لوحة التحكم</div>
-          <div className="mt-2 flex flex-wrap gap-1">{access.roles.map(role => <span key={role.id} className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">{role.name}</span>)}</div>
-        </div>
-        <nav className="space-y-1.5">
-          {groups.map((g) =>
-            g.key === 'top' ? (
-              // الروابط الرئيسية مباشرة بلا طي
-              g.items.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={`${href}#admin-content`} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold hover:bg-secondary" style={{ color: g.color }}>
-                  <Icon className="h-4 w-4" /> {label}
-                </Link>
-              ))
-            ) : (
-              <details key={g.key} open={g.items.some((n) => pathname === n.href || pathname.startsWith(n.href + '/'))} className="overflow-hidden rounded-lg border" style={{ borderColor: `${g.color}40` }}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-extrabold text-white" style={{ background: g.color }}>
-                  <span className="flex items-center gap-2"><g.icon className="h-4 w-4" /> {g.title}</span>
-                  <ChevronDown className="h-4 w-4 opacity-80" />
-                </summary>
-                <div className="space-y-0.5 p-1" style={{ background: `${g.color}0d` }}>
-                  {g.items.map(({ href, label, icon: Icon }) => (
-                    <Link key={href} href={`${href}#admin-content`} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold hover:bg-white/70 ${pathname === href ? 'bg-white shadow-sm' : ''}`} style={{ color: g.color }}>
-                      <Icon className="h-4 w-4" /> {label}
-                    </Link>
-                  ))}
-                </div>
-              </details>
-            ),
-          )}
-          <Link href="/" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-muted-foreground hover:bg-secondary"><Home className="h-4 w-4" /> العودة للموقع</Link>
-        </nav>
-      </aside>
+      <Suspense fallback={null}><AdminSidebar allowedHrefs={groups.flatMap(group=>group.items.map(item=>item.href))} roles={access.roles.map(role=>({id:String(role.id),name:role.name}))}/></Suspense>
       <section id="admin-content" className="min-w-0 scroll-mt-20 font-bold"><Suspense fallback={null}><AdminPageHeading items={groups.flatMap(group=>group.items.map(({href,label})=>({href,label})))}/></Suspense>{children}</section>
       <ScrollTop targetId="admin-content" />
     </div>

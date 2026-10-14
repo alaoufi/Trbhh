@@ -37,6 +37,8 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y default-mysql-client
+      - name: Real privileged archive ownership verification
+        run: sudo env CJ_ACTIVATION_ROOT_TESTS=1 node --test scripts/release/cj-private-activation-transport.test.cjs
       - name: Isolated real SQL and Compose verification
         env:
           CJ_ACTIVATION_DB_TESTS: '1'
@@ -87,5 +89,5 @@ jobs:
           target="$VPS_USER@$VPS_HOST"
           tools="/root/trbhh-cj-activation-tools-$GITHUB_RUN_ID"
           "${SSH[@]}" "$target" "umask 077; mkdir '$tools'; chmod 700 '$tools'"
-          tar -cf - scripts/release/cj-private-activation.sh scripts/release/cj-private-activation-core.cjs scripts/release/cj-private-activation-db.cjs scripts/release/cj-private-activation-host.cjs | "${SSH[@]}" "$target" "umask 077; tar -xf - -C '$tools' --strip-components=2; chmod 600 '$tools'/*"
+          tar -cf - scripts/release/cj-private-activation.sh scripts/release/cj-private-activation-core.cjs scripts/release/cj-private-activation-db.cjs scripts/release/cj-private-activation-host.cjs | "${SSH[@]}" "$target" "umask 077; tar --no-same-owner --no-same-permissions -xf - -C '$tools' --strip-components=2; chmod 600 '$tools'/*"
           "${SSH[@]}" "$target" "bash '$tools/cj-private-activation.sh' '$MODE' '$run' '$SHA'"

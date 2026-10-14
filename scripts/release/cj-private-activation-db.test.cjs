@@ -23,6 +23,8 @@ test('actual isolated MySQL CAS success, foreign drift and nonempty outbox rejec
  sql("UPDATE site_settings SET v='0' WHERE k='cj_storefront_public'; UPDATE site_settings SET k='COMMERCE_GATEWAY_ENABLED' WHERE k='commerce_gateway_enabled';");
  result=entry('inspect');assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).proof.publicOff,false);
  result=entry('cas',{expected:next,next:before,enable:false});assert.equal(result.status,1);assert.equal(result.stdout,'');
+ sql("UPDATE site_settings SET k='commerce_gateway_enabled' WHERE k='COMMERCE_GATEWAY_ENABLED'; UPDATE site_settings SET k='cj_storéfront_public' WHERE k='cj_storefront_public';");
+ result=entry('inspect');assert.equal(result.status,0,result.stderr);assert.equal(JSON.parse(result.stdout).proof.publicOff,false);result=entry('cas',{expected:next,next:before,enable:false});assert.equal(result.status,1);
  const imported=spawnSync(process.execPath,['-e',"require('./scripts/release/cj-private-activation-db.cjs');process.stdout.write('import-only')"],{encoding:'utf8',env});assert.equal(imported.status,0);assert.equal(imported.stdout,'import-only');
 });
 test('actual Compose preserves literal dollar credentials',{skip:process.env.CJ_ACTIVATION_COMPOSE_TESTS!=='1'},()=>{const input=JSON.stringify({services:{app:{image:'node:22',environment:{AUTH_SECRET:'never-log-$$secret'}}}});const config=JSON.parse(execFileSync('docker',['compose','-f','-','config','--format','json'],{input,encoding:'utf8'}));assert.equal(config.services.app.environment.AUTH_SECRET,'never-log-$$secret');});

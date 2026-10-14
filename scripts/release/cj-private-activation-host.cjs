@@ -55,7 +55,7 @@ function createHostIO(runId,sha){
   else args=['exec','-i',initial.Id,'node','-',mode];if(encoded)args.push(encoded);
   const output=command('docker',args,dbCode,35000);return mode==='inspect'?parseProof(output):JSON.parse(output);
  }
- function proof(c,data){const env=envOf(c);return {...data.proof,bankReady:Boolean(bankEnvironmentReady(env)&&cjEnvironmentReady(env)&&data.proof.bankSettingsReady),sharedOff:env.SUPPLIER_ALLOW_LIVE_ORDERS==='false',privateOff:ENV_KEYS.every(key=>env[key]==='false'||env[key]===undefined)};}
+ function proof(c,data){const env=envOf(c);return {...data.proof,bankCredentialsReady:Boolean(bankEnvironmentReady(env)),cjApiReady:Boolean(env.CJ_API_KEY?.trim()),encryptionReady:/^[a-fA-F0-9]{64}$/.test(env.SUPPLIER_TOKEN_ENCRYPTION_KEY?.trim()||''),workerSecretReady:(env.SUPPLIER_RECONCILE_SECRET||'').length>=32,bankReady:Boolean(bankEnvironmentReady(env)&&cjEnvironmentReady(env)&&data.proof.bankSettingsReady),sharedOff:env.SUPPLIER_ALLOW_LIVE_ORDERS==='false',privateOff:ENV_KEYS.every(key=>env[key]==='false'||env[key]===undefined)};}
  return {
   async preflight(mode){
    diagnosticStage='host_preflight';

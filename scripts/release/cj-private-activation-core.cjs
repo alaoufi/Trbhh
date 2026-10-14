@@ -36,7 +36,7 @@ async function restoreSaved(backup,io){
 }
 async function operate(mode,run,sha,io){
  validArguments(mode,run,sha);await io.preflight(mode,sha);
- if(mode==='inspect'){const baseline=await io.capture();return {event:'cj_private_activation',mode,sha,ready:baseline.proof.bankReady===true&&baseline.proof.publicOff===true&&baseline.proof.sharedOff===true&&baseline.proof.outboxEmpty===true,bankReady:baseline.proof.bankReady===true,outboxEmpty:baseline.proof.outboxEmpty===true};}
+ if(mode==='inspect'){const baseline=await io.capture();return {event:'cj_private_activation',mode,sha,ready:baseline.proof.bankReady===true&&baseline.proof.publicOff===true&&baseline.proof.sharedOff===true&&baseline.proof.outboxEmpty===true,bankReady:baseline.proof.bankReady===true,bankCredentialsReady:baseline.proof.bankCredentialsReady===true,cjApiReady:baseline.proof.cjApiReady===true,encryptionReady:baseline.proof.encryptionReady===true,workerSecretReady:baseline.proof.workerSecretReady===true,publicOff:baseline.proof.publicOff===true,sharedOff:baseline.proof.sharedOff===true,outboxEmpty:baseline.proof.outboxEmpty===true};}
  let backup=await io.load(run);
  if(!backup){
   if(mode!=='enable')throw Error('activation_backup_missing');

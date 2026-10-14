@@ -11,5 +11,13 @@ test('actual isolated MySQL CAS success, foreign drift and nonempty outbox rejec
  assert.match(sql(casSql({expected:before,next,enable:true})),/CJ_CAS_REJECT/);
  assert.match(sql(casSql({expected:next,next:before,enable:false})),/CJ_CAS_OK/);
  sql('INSERT INTO commerce_cj_fulfillment_outbox VALUES(1);');assert.match(sql(casSql({expected:before,next,enable:true})),/CJ_CAS_REJECT/);assert.equal(sql(`SELECT SUM(v='0') FROM site_settings WHERE k IN (${KEYS.map(k=>`'${k}'`).join(',')});`).trim(),'3');
+ const code=require('node:fs').readFileSync(__dirname+'/cj-private-activation-db.cjs','utf8'),{spawnSync}=require('node:child_process'),env={...process.env,DATABASE_URL:'mysql://root:isolated-ci-only@127.0.0.1:33316/cj_activation_test'};
+ const entry=(mode,payload)=>spawnSync(process.execPath,['-',mode,...(payload?[Buffer.from(JSON.stringify(payload)).toString('base64')]:[])],{input:code,encoding:'utf8',env});
+ let result=entry('inspect');assert.equal(result.status,0);const proof=JSON.parse(result.stdout);assert.equal(proof.settings.length,3);assert.equal(proof.proof.outboxEmpty,false);
+ result=entry('cas',{expected:before,next,enable:true});assert.equal(result.status,1);assert.equal(result.stdout,'');assert.doesNotMatch(result.stderr,/isolated-ci-only|mysql:\/\//);
+ sql('DELETE FROM commerce_cj_fulfillment_outbox;');result=entry('cas',{expected:before,next,enable:true});assert.equal(result.status,0);assert.deepEqual(JSON.parse(result.stdout),{ok:true});
+ result=entry('cas',{expected:before,next,enable:true});assert.equal(result.status,1);assert.equal(result.stdout,'');
+ sql("UPDATE site_settings SET v='1' WHERE k='cj_storefront_public';");result=entry('cas',{expected:next,next:before,enable:false});assert.equal(result.status,1);assert.equal(result.stdout,'');
+ const imported=spawnSync(process.execPath,['-e',"require('./scripts/release/cj-private-activation-db.cjs');process.stdout.write('import-only')"],{encoding:'utf8',env});assert.equal(imported.status,0);assert.equal(imported.stdout,'import-only');
 });
 test('actual Compose preserves literal dollar credentials',{skip:process.env.CJ_ACTIVATION_COMPOSE_TESTS!=='1'},()=>{const input=JSON.stringify({services:{app:{image:'node:22',environment:{AUTH_SECRET:'never-log-$$secret'}}}});const config=JSON.parse(execFileSync('docker',['compose','-f','-','config','--format','json'],{input,encoding:'utf8'}));assert.equal(config.services.app.environment.AUTH_SECRET,'never-log-$$secret');});

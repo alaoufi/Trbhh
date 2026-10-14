@@ -1,4 +1,4 @@
-import {requireAccess} from '@/lib/access-control/guards';
+import {hasAccess,requireAccess} from '@/lib/access-control/guards';
 import {TrialCart} from '@/components/cj/trial-cart';
 import {listMemberAddresses} from '@/lib/commerce/address-book';
 import {getCommerceConfig} from '@/lib/commerce/settings';
@@ -20,13 +20,14 @@ export default async function CjTrialCartPage({searchParams}:{searchParams?:Prom
     address1:[def.snapshot.district,def.snapshot.street,def.snapshot.buildingNumber].filter(Boolean).join('، '),
     address2:def.snapshot.postalCode?`الرمز البريدي ${def.snapshot.postalCode}`:'',
   }:null;
-  const cart=<TrialCart key={session.uid} accountId={session.uid} ship={ship}/>;
   const outcome=(await searchParams)?.order;
+  const feedback=cjCheckoutFeedback(outcome);
+  const setupHref=outcome==='fiscal'&&await hasAccess(session.uid,'tax','view')?'/admin/finance?section=tax':null;
+  const cart=<TrialCart key={session.uid} accountId={session.uid} ship={ship} checkoutMessage={feedback} setupHref={setupHref}/>;
   if(outcome==='unavailable'){
     const config=await getCommerceConfig();
     return <><p role="alert" className="mx-auto mt-4 max-w-4xl rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm">{config.text.paymentUnavailable}</p>{cart}</>;
   }
-  const feedback=cjCheckoutFeedback(outcome);
-  if(feedback)return <><p role="alert" className="mx-auto mt-4 max-w-4xl rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">{feedback}</p>{cart}</>;
+
   return cart;
 }

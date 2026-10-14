@@ -1,16 +1,17 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-const mock=vi.hoisted(()=>({access:vi.fn()}));
-vi.mock('@/lib/access-control/guards',()=>({requireAccess:mock.access}));
+const mock=vi.hoisted(()=>({access:vi.fn(),hasAccess:vi.fn()}));
+vi.mock('@/lib/access-control/guards',()=>({requireAccess:mock.access,hasAccess:mock.hasAccess}));
 vi.mock('@/lib/commerce/address-book',()=>({listMemberAddresses:async()=>[]}));
 vi.mock('@/lib/commerce/settings',()=>({getCommerceConfig:async()=>({text:{paymentUnavailable:'CUSTOM checkout unavailable'}})}));
 import CartPage from '@/app/cj/cart/page';
 import {AddToTrialCart,CartLink} from '@/components/cj/cart-controls';
 import {TrialCart} from '@/components/cj/trial-cart';
-beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
+beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});mock.hasAccess.mockResolvedValue(false);});
 
 describe('private CJ trial cart presentation',()=>{
+  it('offers the fiscal setup link only to an authorized tax viewer',async()=>{mock.hasAccess.mockResolvedValue(true);const allowed=renderToStaticMarkup(await CartPage({searchParams:Promise.resolve({order:'fiscal'})}));expect(allowed).toContain('/admin/finance?section=tax');expect(allowed).toContain('الرقم الضريبي لا يلزم عند التعطيل');mock.hasAccess.mockResolvedValue(false);const denied=renderToStaticMarkup(await CartPage({searchParams:Promise.resolve({order:'fiscal'})}));expect(denied).not.toContain('/admin/finance?section=tax');expect(denied).toContain('لم يبدأ الدفع');});
   it('explains checkout recheck and finance failures instead of silently returning to the cart',async()=>{for(const order of ['recheck','fiscal','pricing','warehouse']){const html=renderToStaticMarkup(await CartPage({searchParams:Promise.resolve({order})}));expect(html).toContain('role="alert"');}});
   it('shows checkout unavailable feedback when fulfillment readiness blocks the live path',async()=>{const tree=await CartPage({searchParams:Promise.resolve({order:'unavailable'})});const html=renderToStaticMarkup(tree);expect(html).toContain('CUSTOM checkout unavailable');expect(html).toContain('role="alert"');});
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{

@@ -22,7 +22,7 @@ function CartQuantity({qty,title,max=MAX_TRIAL_QTY,resetSignal,disabled,onCommit
 }
 
 type ShipDefault={name:string;phone:string;city:string;region:string;address1:string;address2:string};
-export function TrialCart({accountId,ship}:{accountId:number;ship:ShipDefault|null}){
+export function TrialCart({accountId,ship,checkoutMessage,setupHref}:{accountId:number;ship:ShipDefault|null;checkoutMessage?:string|null;setupHref?:string|null}){
   const {items,ready,notice,save,latest}=useTrialCart(accountId);
   const [quote,setQuote]=useState<TrialCartQuote|null>(null),[quoteKey,setQuoteKey]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[feedback,setFeedback]=useState(''),[resetSignal,setResetSignal]=useState(0);
   const generation=useRef(0);
@@ -97,6 +97,7 @@ export function TrialCart({accountId,ship}:{accountId:number;ship:ShipDefault|nu
         </article>;})}
       </section>
     </>}
+    {checkoutMessage&&<div role="alert" className="sticky bottom-3 z-10 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p className="font-bold">لم يبدأ الدفع: {checkoutMessage}</p>{setupHref&&<Link href={setupHref} className="mt-2 inline-block font-bold underline">إعداد جهة إصدار الفاتورة واعتمادها</Link>}</div>}
     {items.length>0&&currentQuote&&!currentQuote.rejected.length&&!busy&&!error
       ? <form action={placeCjTrialOrder} aria-label="إتمام الطلب" className="space-y-2.5 rounded-2xl border border-slate-200 bg-white p-3">
           <input type="hidden" name="items" value={JSON.stringify(items)}/>

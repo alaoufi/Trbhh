@@ -10,6 +10,8 @@ cd /root/trbhh
 if [[ ${1:-} != --run ]]; then
   [[ ${1:-} =~ ^[a-f0-9]{40}$ ]]
   revision=$1
+  reference=${2:-}
+  [[ -z $reference || $reference =~ ^/root/trbhh-release-tools/code-only-[0-9]+/before.json$ ]]
   run_id=$(date +%s)
   target=/root/trbhh-release-tools/code-only-$run_id
   [[ ! -e $target ]]
@@ -19,7 +21,7 @@ if [[ ${1:-} != --run ]]; then
   done
   bash -n "$target/manual-code-only-deploy.sh"
   touch "$target/result.log"
-  systemd-run --unit="trbhh-code-deploy-$run_id" --property=Type=exec /bin/bash "$target/manual-code-only-deploy.sh" --run "$target"
+  systemd-run --unit="trbhh-code-deploy-$run_id" --property=Type=exec /bin/bash "$target/manual-code-only-deploy.sh" --run "$target" "$reference"
   printf 'RUN_ID=%s\nRESULT: tail -n 30 %s/result.log\n' "$run_id" "$target"
   exit 0
 fi
@@ -40,7 +42,20 @@ git diff --quiet "$baseline" "$candidate" -- Dockerfile docker-compose.yml .dock
 env_hash=$(sha256sum .env | cut -d' ' -f1)
 container=$(docker compose ps -q app)
 [[ -n $container ]]
-docker inspect "$container" > "$target/before.json"
+docker inspect "$container" > "$target/current.json"
+reference=${3:-}
+if [[ -n $reference ]]; then
+  [[ $reference =~ ^/root/trbhh-release-tools/code-only-[0-9]+/before.json$ && -f $reference && ! -L $reference ]]
+  cp "$reference" "$target/before.json"
+  node - "$target/before.json" "$target/current.json" <<'NODE'
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const a=JSON.parse(fs.readFileSync(process.argv[2]))[0],b=JSON.parse(fs.readFileSync(process.argv[3]))[0];
+const mounts=c=>c.Mounts.map(({Type,Name,Source,Destination,RW})=>({Type,Name,Source,Destination,RW})).sort((x,y)=>x.Destination.localeCompare(y.Destination));
+try{assert.equal(a.Image,b.Image);assert.deepEqual(mounts(a),mounts(b));}catch{console.error('Prior runtime does not match the restored image and mounts; values withheld.');process.exit(1);}
+NODE
+else
+  cp "$target/current.json" "$target/before.json"
+fi
 old_image=$(docker inspect -f '{{.Image}}' "$container")
 [[ $(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$old_image") == "$baseline" ]]
 project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$container")
@@ -67,6 +82,13 @@ git archive --format=tar "$candidate" | docker build --build-arg "TRBHH_RELEASE_
 image=$(docker image inspect -f '{{.Id}}' "trbhh-code:$candidate")
 [[ $(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image") == "$candidate" ]]
 node "$target/code-only-compose.cjs" "$target/config.json" "$target/before.json" "$image" "$target/candidate.json"
+docker compose --project-directory /root/trbhh --project-name "$project" -f "$target/candidate.json" config --format json > "$target/resolved-candidate.json"
+node - "$target/before.json" "$target/resolved-candidate.json" <<'NODE'
+const fs=require('node:fs');
+const before=JSON.parse(fs.readFileSync(process.argv[2]))[0],config=JSON.parse(fs.readFileSync(process.argv[3]));
+const valid=before.Config.Env.every(value=>{const at=value.indexOf('=');return config.services.app.environment[value.slice(0,at)]===value.slice(at+1);});
+if(!valid){console.error('Compose environment roundtrip failed; values withheld.');process.exit(1);}
+NODE
 [[ $(sha256sum .env | cut -d' ' -f1) == "$env_hash" ]]
 [[ $(git rev-parse HEAD) == "$baseline" ]]
 switched=1
@@ -75,7 +97,7 @@ timeout 180s docker compose --project-directory /root/trbhh --project-name "$pro
 ready=0
 for attempt in $(seq 1 60); do
   running=$(docker compose ps -q app)
-  if [[ -n $running && $(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$running") == healthy ]]; then ready=1; break; fi
+  if [[ -n $running ]] && docker exec "$running" node -e 'fetch("http://127.0.0.1:3000/api/version").then(r=>r.json()).then(j=>process.exit(j.commit===process.argv[1]?0:1)).catch(()=>process.exit(1))' "$candidate"; then ready=1; break; fi
   sleep 2
 done
 [[ $ready == 1 ]]

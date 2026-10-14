@@ -3,7 +3,7 @@ set +x +v
 set -Eeuo pipefail
 umask 077
 trap 'printf "%s\n" "CJ private activation rejected; details withheld." >&2' ERR
-[[ $# == 3 && "$1" =~ ^(inspect|enable|restore)$ && "$2" =~ ^[1-9][0-9]{0,19}$ && "$3" =~ ^[a-f0-9]{40}$ ]]
+[[ $# == 3 && "$1" =~ ^(inspect|enable|restore|prepare-permissions)$ && "$2" =~ ^[1-9][0-9]{0,19}$ && "$3" =~ ^[a-f0-9]{40}$ ]]
 [[ $(id -u) == 0 && $(realpath /root/trbhh) == /root/trbhh ]]
 for executable in node docker flock; do command -v "$executable" >/dev/null; done
 exec 9>/run/lock/trbhh-finance-deploy.lock

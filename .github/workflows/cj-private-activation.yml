@@ -7,7 +7,7 @@ on:
     inputs:
       mode:
         type: choice
-        options: [inspect, enable, restore]
+        options: [inspect, enable, restore, prepare-permissions]
         default: inspect
         required: true
       serving_sha:
@@ -74,7 +74,7 @@ jobs:
           set +x +v
           set -euo pipefail
           umask 077
-          [[ "$MODE" =~ ^(inspect|enable|restore)$ && "$SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$MODE" =~ ^(inspect|enable|restore|prepare-permissions)$ && "$SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
           if [[ "$MODE" == restore ]]; then test -n "$SAVED_RUN"; fi
           run=${SAVED_RUN:-$GITHUB_RUN_ID}; [[ "$run" =~ ^[1-9][0-9]{0,19}$ ]]

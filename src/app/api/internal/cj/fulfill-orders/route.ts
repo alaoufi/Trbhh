@@ -3,6 +3,7 @@ import {constantSecret} from '@/lib/suppliers/crypto';
 import {prisma} from '@/lib/prisma';
 import {processCjFulfillment} from '@/lib/cj/fulfillment';
 import {cjPrivateFinancialOperationsAllowed} from '@/lib/cj/live-gates';
+import {reconcileCjSettlementForFulfillment} from '@/lib/cj/settlements';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -21,6 +22,7 @@ export async function POST(request:Request){
   // Rotate even incomplete reconciliation attempts; durable worker CAS remains the mutation claim.
   await prisma.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET updated_at=CURRENT_TIMESTAMP(3) WHERE id=${rows[0].id}`;
   await processCjFulfillment(String(rows[0].id));
+  await reconcileCjSettlementForFulfillment(String(rows[0].id));
   return NextResponse.json({processed:1},{headers});
  }catch{return fail('cj_fulfillment_unavailable',503);}
 }

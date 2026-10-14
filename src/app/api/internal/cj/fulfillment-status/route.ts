@@ -2,6 +2,7 @@ import {NextResponse} from 'next/server';
 import {constantSecret} from '@/lib/suppliers/crypto';
 import {prisma} from '@/lib/prisma';
 import {reconcileCjFulfillment} from '@/lib/cj/fulfillment/status';
+import {reconcileCjSettlementForFulfillment} from '@/lib/cj/settlements';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -19,6 +20,7 @@ export async function POST(request:Request){
   // A failed provider read must not monopolize every later status refresh.
   await prisma.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET updated_at=CURRENT_TIMESTAMP(3) WHERE id=${rows[0].id} AND status='supplier_paid'`;
   await reconcileCjFulfillment(String(rows[0].id));
+  await reconcileCjSettlementForFulfillment(String(rows[0].id));
   return NextResponse.json({checked:1},{headers});
  }catch{return fail('cj_status_unavailable',503);}
 }

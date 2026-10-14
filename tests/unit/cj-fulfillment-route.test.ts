@@ -1,5 +1,6 @@
 import {beforeEach,afterEach,describe,expect,it,vi} from 'vitest';
-const mock=vi.hoisted(()=>({query:vi.fn(),update:vi.fn(),process:vi.fn()}));
+const mock=vi.hoisted(()=>({query:vi.fn(),update:vi.fn(),process:vi.fn(),sync:vi.fn()}));
+vi.mock('@/lib/cj/settlements',()=>({reconcileCjSettlementForFulfillment:mock.sync}));
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:mock.query,$executeRaw:mock.update}}));
 vi.mock('@/lib/cj/fulfillment',()=>({processCjFulfillment:mock.process}));
 vi.mock('@/lib/commerce/settings',()=>({getCommerceConfig:async()=>({purchasingEnabled:true})}));
@@ -9,6 +10,7 @@ const req=(authorization=`Bearer ${secret}`)=>new Request('https://trbhh.sa/api/
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('SUPPLIER_RECONCILE_SECRET',secret);vi.stubEnv('SUPPLIER_ALLOW_LIVE_ORDERS','false');vi.stubEnv('CJ_ALLOW_LIVE_ORDERS','true');vi.stubEnv('CJ_LIVE_TRIAL_ENABLED','true');vi.stubEnv('CJ_FULFILLMENT_WORKER_ENABLED','true');mock.query.mockResolvedValue([{id:7n}]);mock.process.mockResolvedValue(undefined);mock.update.mockResolvedValue(1);});
 afterEach(()=>vi.unstubAllEnvs());
 describe('authenticated bounded CJ fulfillment dispatch',()=>{
+ it('updates accounting only after the durable supplier worker finishes',async()=>{await POST(req());expect(mock.sync).toHaveBeenCalledExactlyOnceWith('7');expect(mock.sync.mock.invocationCallOrder[0]).toBeGreaterThan(mock.process.mock.invocationCallOrder[0]);});
  it('does not dispatch with shared supplier enabled and dedicated CJ gate disabled',async()=>{vi.stubEnv('SUPPLIER_ALLOW_LIVE_ORDERS','true');vi.stubEnv('CJ_ALLOW_LIVE_ORDERS','false');expect((await POST(req())).status).toBe(503);expect(mock.query).not.toHaveBeenCalled();expect(mock.process).not.toHaveBeenCalled();});
  it('rejects unauthenticated requests before DB or supplier access',async()=>{expect((await POST(req('Bearer wrong'))).status).toBe(401);expect(mock.query).not.toHaveBeenCalled();expect(mock.process).not.toHaveBeenCalled();});
  it('does not run when the dedicated live worker gate is disabled',async()=>{vi.stubEnv('CJ_FULFILLMENT_WORKER_ENABLED','false');expect((await POST(req())).status).toBe(503);expect(mock.query).not.toHaveBeenCalled();});

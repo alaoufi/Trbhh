@@ -2,11 +2,14 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Bell, MessageCircle, Star, MessagesSquare, Sparkles, Archive, CheckCheck, ShieldAlert } from 'lucide-react';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
-import { openNotifAction, archiveAllNotifsAction } from './actions';
+import { readMessageNotificationAction, openNotifAction, archiveAllNotifsAction } from './actions';
 import { AdminPager } from '@/components/admin-pager';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+
+import { canUseMemberChat } from '@/lib/chat-access';
+import { notificationPageData } from '@/lib/notification-data';
+import { messageNotificationDestination } from '@/lib/notification-policy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'التنبيهات' };
@@ -22,63 +25,25 @@ const KINDS = [
 type Kind = typeof KINDS[number];
 const kindOf = (t: string | null): Kind => KINDS.find((k) => k.key === t) || KINDS.find((k) => k.key === 'other')!;
 
-const PAGE_SIZE = 30;
 
-export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
+
+export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; mp?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const { tab: tabRaw, page: pageRaw } = await searchParams;
-  const page = Math.max(1, parseInt(pageRaw || '1') || 1);
-
-  const all = await prisma.notfications.findMany({
-    // نوع message قديم: الرسائل تُعرض حيّة أدناه (قسم مستقل) فلا تُكرّر هنا
-    where: { user_id: String(session.uid), type: { not: 'message' } },
-    orderBy: { id: 'desc' },
-    take: 500,
-  }).catch(() => []);
-
-  // الرسائل غير المقروءة (حيّة) — تجميع حسب المُرسِل، ليطابق الجرس صفحته
-  const unreadChats = await prisma.chats.findMany({
-    where: { reciver_id: session.uid, is_read: 0 },
-    orderBy: { id: 'desc' },
-    take: 200,
-    select: { sender_id: true, message: true, created_at: true },
-  }).catch(() => []);
-  const bySender = new Map<number, { count: number; last: string; at: Date | null }>();
-  for (const c of unreadChats) {
-    const ex = bySender.get(c.sender_id);
-    if (ex) ex.count += 1;
-    else bySender.set(c.sender_id, { count: 1, last: c.message, at: c.created_at });
-  }
-  const senderIds = [...bySender.keys()];
-  const senderRows = senderIds.length
-    ? await prisma.users.findMany({ where: { id: { in: senderIds.map((n) => BigInt(n)) } }, select: { id: true, name: true, userName: true } }).catch(() => [])
-    : [];
-  const senderName = new Map(senderRows.map((u) => [Number(u.id), u.name || u.userName || 'عضو']));
-  const unreadMsgThreads = senderIds.map((id) => ({ id, name: senderName.get(id) || 'عضو', ...bySender.get(id)! }));
-  const unreadMsgTotal = unreadChats.length;
-
-  const fresh = all.filter((n) => !n.read_at);
-  const archived = all.filter((n) => !!n.read_at);
-  const countBy = (key: string) => fresh.filter((n) => kindOf(n.type).key === key).length;
-
-  const TABS = [
-    { key: 'all', label: 'الجديدة', count: fresh.length + unreadMsgTotal, cls: 'bg-primary' },
-    ...KINDS.map((k) => ({ key: k.key, label: k.label, count: k.key === 'message' ? unreadMsgTotal : countBy(k.key), cls: '' })),
-    { key: 'archive', label: 'الأرشيف', count: archived.length, cls: 'bg-slate-500' },
-  ];
-  const tab = TABS.some((t) => t.key === tabRaw) ? (tabRaw as string) : 'all';
-  const filtered = tab === 'archive' ? archived : tab === 'all' ? fresh : fresh.filter((n) => kindOf(n.type).key === tab);
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
+  const {tab:tabRaw,page:pageRaw,mp:mpRaw}=await searchParams;
+  const tab=['all','archive',...KINDS.map(k=>k.key)].includes(tabRaw||'')?tabRaw!:'all';
+  const canViewMessages=await canUseMemberChat(session.uid,'view');
+  const data=await notificationPageData(session.uid,tab,Math.max(1,parseInt(pageRaw||'1')||1),Math.max(1,parseInt(mpRaw||'1')||1),canViewMessages);
+  const {rows,page,pages,storedTotal,threads:unreadMsgThreads}=data;
+  const freshCount=data.counts.stored;
+  const TABS=[{key:'all',label:'الجديدة',count:data.counts.total},...KINDS.map(k=>({key:k.key,label:k.label,count:k.key==='message'?data.counts.messages:data.kindCounts.get(k.key)||0})),{key:'archive',label:'الأرشيف',count:data.archiveBadge}];
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Bell className="h-6 w-6 text-primary" />
         <h1 className="text-xl font-bold text-primary">التنبيهات</h1>
-        {fresh.length > 0 && <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-extrabold text-white">{fresh.length} جديد</span>}
-        {fresh.length > 0 && (
+        {freshCount > 0 && <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-extrabold text-white">{freshCount} جديد</span>}
+        {freshCount > 0 && (
           <form action={archiveAllNotifsAction} className="mr-auto">
             <ConfirmSubmit msg="نقل كل التنبيهات الجديدة إلى الأرشيف؟" className="flex items-center gap-1.5 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5">
               <CheckCheck className="h-3.5 w-3.5" /> نقل الكل للأرشيف
@@ -102,28 +67,33 @@ export default async function NotificationsPage({ searchParams }: { searchParams
       </div>
 
       {/* الرسائل غير المقروءة (حيّة) — تظهر في «الجديدة» و«الرسائل»، وتُمسح فور قراءتها */}
-      {(tab === 'all' || tab === 'message') && unreadMsgThreads.length > 0 && (
+      {(tab === 'all' || tab === 'message' || tab === 'archive') && unreadMsgThreads.length > 0 && (
         <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">{tab === 'archive' ? 'أرشيف الرسائل المستلمة' : 'الرسائل غير المقروءة'} — {data.threadTotal} مرسل</p>
           {unreadMsgThreads.map((t) => (
-            <Link key={t.id} href={`/messages/${t.id}`} className="flex w-full items-center gap-3 rounded-xl border-r-4 border-sky-400 bg-sky-50 p-3 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow">
+            <div key={t.id}><Link href={messageNotificationDestination(session.uid,t.id,tab !== 'archive' && t.exists,canViewMessages) || "/notifications?tab=message"} className="flex w-full items-center gap-3 rounded-xl border-r-4 border-sky-400 bg-sky-50 p-3 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sky-500 text-white"><MessageCircle className="h-5 w-5" /></span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-bold text-sky-800">رسالة من {t.name}{t.count > 1 ? ` (${t.count})` : ''}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">{t.last}{t.at ? ` • ${timeAgo(t.at)}` : ''}</span>
+                <span className="block whitespace-pre-wrap break-words text-sm font-bold text-sky-800">{canViewMessages ? `رسالة من ${t.name}` : tab === 'archive' ? 'رسائل إدارية مؤرشفة' : 'رسائل إدارية غير مقروءة'}{t.count > 1 ? ` (${t.count})` : ''}</span>
+                <span className="block whitespace-pre-wrap break-words text-[11px] text-muted-foreground">{canViewMessages ? t.last : 'يتطلب فتح هذه الرسائل صلاحية عرض المراسلات الإدارية.'}{t.at ? ` • ${timeAgo(t.at)}` : ''}</span>
               </span>
-              <span className="shrink-0 rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-extrabold text-white">جديد</span>
+              <span className="shrink-0 rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-extrabold text-white">{tab === 'archive' ? 'مقروء' : 'جديد'}</span>
             </Link>
+            {canViewMessages && tab !== 'archive' && <form action={readMessageNotificationAction} className="px-3 py-1"><input type="hidden" name="sender" value={t.id}/><button className="text-xs text-primary">تعليم رسائل هذا التنبيه كمقروءة</button></form>}
+            </div>
           ))}
         </div>
       )}
 
-      {rows.length === 0 && !((tab === 'all' || tab === 'message') && unreadMsgThreads.length > 0) && (
+      {(tab==='all'||tab==='message'||tab==='archive') && data.messagePages>1 && <div className="flex justify-center gap-4 text-sm"><Link href={`/notifications?tab=${tab}&page=${page}&mp=${Math.max(1,data.messagePage-1)}`}>رسائل سابقة</Link><span>{tab === 'archive' ? 'أرشيف الرسائل' : 'صفحة الرسائل'} {data.messagePage} من {data.messagePages}</span><Link href={`/notifications?tab=${tab}&page=${page}&mp=${Math.min(data.messagePages,data.messagePage+1)}`}>رسائل تالية</Link></div>}
+      {rows.length === 0 && !((tab === 'all' || tab === 'message' || tab === 'archive') && unreadMsgThreads.length > 0) && (
         <div className="card-3d rounded-2xl p-8 text-center text-muted-foreground">
           <Bell className="mx-auto mb-2 h-8 w-8" /> {tab === 'archive' ? 'الأرشيف فارغ.' : 'لا توجد تنبيهات جديدة — كل شيء تمام ✓'}
         </div>
       )}
 
       <div className="space-y-2">
+
         {rows.map((n) => {
           const k = kindOf(n.type);
           const isNew = !n.read_at;
@@ -135,17 +105,17 @@ export default async function NotificationsPage({ searchParams }: { searchParams
                   <k.icon className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-sm font-bold ${isNew ? k.text : 'text-muted-foreground'}`}>{n.title}</span>
+                  <span className={`block whitespace-pre-wrap break-words text-sm font-bold ${isNew ? k.text : 'text-muted-foreground'}`}>{n.title}</span>
                   <span className="block text-[11px] text-muted-foreground">{timeAgo(n.created_at)}{!isNew ? ' • مقروء' : ''}</span>
                 </span>
-                {isNew && <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white" style={{ background: k.color }}>جديد</span>}
+                {isNew && <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white" style={{ background: k.color }}>{tab === 'archive' ? 'مقروء' : 'جديد'}</span>}
               </button>
             </form>
           );
         })}
       </div>
 
-      <AdminPager basePath="/notifications" page={page} pages={pages} total={filtered.length} params={{ tab }} />
+      <AdminPager basePath="/notifications" page={page} pages={pages} total={storedTotal} params={{ tab, mp: String(data.messagePage) }} />
     </div>
   );
 }

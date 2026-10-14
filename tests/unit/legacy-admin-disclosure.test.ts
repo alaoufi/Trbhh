@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactNode } from 'react';
 
-const state = vi.hoisted(() => ({ keys: new Set<string>(), logs: vi.fn(), user: vi.fn(), dependencies: vi.fn() }));
+const state = vi.hoisted(() => ({ keys: new Set<string>(), logs: vi.fn(), user: vi.fn(), dependencies: vi.fn(), aggregate: vi.fn() }));
 vi.mock('@/lib/access-control/guards', () => ({ requireAdminPage: async () => ({ uid: 9 }), readActorAccess: async () => ({ ready: true, keys: state.keys, roles: [] }) }));
 vi.mock('@/components/access-boundary', () => ({ AccessPage: ({ children }: { children: ReactNode }) => children, AccessBoundary: ({ children, module, action = 'view' }: { children: ReactNode; module: string; action?: string }) => state.keys.has(`${module}:${action}`) ? children : null }));
 vi.mock('@/lib/audit', () => ({ listAdminLog: state.logs, getUserAdminLog: state.logs, countAdminLog: async () => 1 }));
-vi.mock('@/lib/prisma', () => ({ prisma: { users: { findUnique: state.user }, ads: { count: async () => 0 }, user_strikes: { findMany: async () => [] }, dup_attempts: { findUnique: async () => null } } }));
+vi.mock('@/lib/prisma', () => ({ prisma: { wallet_txns: { aggregate: state.aggregate }, users: { findUnique: state.user }, ads: { count: async () => 0 }, user_strikes: { findMany: async () => [] }, dup_attempts: { findUnique: async () => null } } }));
 vi.mock('@/lib/wallet', () => ({ getBalance: async () => 0, listTxns: async () => [] }));
 vi.mock('@/lib/moderation', () => ({ getModLog: async () => [], DUP_LIMIT: 3, CONTENT_STRIKE_LIMIT: 3 }));
 vi.mock('@/lib/account-links', () => ({ linkedAccounts: async () => [] }));
@@ -25,7 +25,8 @@ const userHtml = async () => renderToStaticMarkup(await UserPage({ params: Promi
 beforeEach(() => {
   vi.clearAllMocks(); state.keys = new Set(['audit:view', 'users:view', 'users:delete']);
   state.logs.mockResolvedValue([row]);
-  state.user.mockResolvedValue({ id: 7n, name: 'Member', userName: 'member', ban: 'no', created_at: null });
+  state.user.mockResolvedValue({ id: 7n, name: 'Member', userName: 'member', ban: 'no', created_at: null, balance: 100, reserved: 40 });
+  state.aggregate.mockImplementation(async ({ where }: { where: { reason: string | { in?: string[]; not?: string } } }) => ({ _sum: { amount: where.reason === 'topup' ? 160 : typeof where.reason === 'object' && where.reason.in ? -25 : -70 } }));
   state.dependencies.mockResolvedValue({ advertisements: 132, stores: 143, balanceHalala: 987654, walletTransactions: 827, topups: 739, messages: 651 });
 });
 
@@ -57,6 +58,19 @@ describe('legacy administration pages respect source grants', () => {
     const html = await userHtml(); expect(html).toContain('أرشفة آمنة وإخفاء الحساب');
     for (const value of ['9876.54', '827', '739', '1566', '132', '143', '651']) expect(html).not.toContain(value);
     expect(state.dependencies).toHaveBeenCalledWith(7);
+    expect(state.aggregate).not.toHaveBeenCalled();
+  });
+  it('renders authorized wallet balance and actual ledger totals without confusing them with subscription payment', async () => {
+    state.keys.add('wallets:view');
+    const html = await userHtml();
+    expect(state.aggregate).toHaveBeenCalledTimes(3);
+    expect(html).toContain('الرصيد الكلي: <b>100');
+    expect(html).toContain('المحجوز: <b>40');
+    expect(html).toContain('المتاح للإنفاق: <b>60');
+    expect(html).toContain('الشحن المسجل في المحفظة: <b>160');
+    expect(html).toContain('إجمالي خصومات الخدمات (قبل الاسترداد): <b>70');
+    expect(html).toContain('خصومات اشتراكات المتاجر وPlus: <b>25');
+    expect(html).toContain('الحركات القديمة لا تحدد المتجر دائماً');
   });
   it('wallet and topup dependency details require their own independent view grants', async () => {
     state.keys.add('wallets:view'); const wallets = await userHtml();

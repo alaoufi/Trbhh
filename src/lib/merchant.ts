@@ -7,6 +7,7 @@ import { toInt } from './utils';
 import { ensureSchema } from '@/data/schema-sync';
 import { cached } from './redis';
 import { getStoreSubPricing } from './settings';
+import { pendingStoreWhere, storeApprovalAction } from './store-admin-action-policy';
 import { publicStoreWhere } from './store-subscription-access';
 
 async function logoUrl(logoId: number | null): Promise<string> {
@@ -988,13 +989,13 @@ export async function completeStoreTransfer(storeId: number): Promise<boolean> {
 export async function getPendingStores() {
   await ensure();
   const rows = await prisma.stores.findMany({
-    where: { status: 0 }, orderBy: { id: 'desc' }, take: 100,
+    where: pendingStoreWhere, orderBy: { id: 'desc' }, take: 100,
     select: { id: true, user_id: true, store_name: true, created_at: true },
   }).catch(() => []);
   const ids = [...new Set(rows.map((r) => r.user_id))].map((n) => BigInt(n));
   const users = ids.length ? await prisma.users.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, userName: true } }) : [];
   const nameOf = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'تاجر']));
-  return rows.map((r) => ({ id: toInt(r.id), owner: nameOf.get(r.user_id) || 'تاجر', storeName: r.store_name, at: r.created_at ? r.created_at.toISOString() : null }));
+  return rows.map((r) => ({ id: toInt(r.id), userId: r.user_id, ...storeApprovalAction(r.user_id), owner: nameOf.get(r.user_id) || 'تاجر', storeName: r.store_name, at: r.created_at ? r.created_at.toISOString() : null }));
 }
 
 /* memoized per-request (React cache): tames repeated hot reads within one navigation */

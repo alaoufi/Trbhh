@@ -1,0 +1,19 @@
+import {describe,it,expect,vi,beforeEach} from 'vitest';
+import {renderToStaticMarkup} from 'react-dom/server';
+const mocks=vi.hoisted(()=>({view:vi.fn(),notifications:vi.fn(),chats:vi.fn(),users:vi.fn(),groups:vi.fn(),count:vi.fn(),raw:vi.fn()}));
+vi.mock('@/lib/auth',()=>({getSession:async()=>({uid:7})}));
+vi.mock('@/lib/chat-access',()=>({canUseMemberChat:mocks.view}));
+vi.mock('@/lib/prisma',()=>({prisma:{notfications:{findMany:mocks.notifications,count:mocks.count},chats:{findMany:mocks.chats,count:mocks.count,groupBy:mocks.groups},$queryRaw:mocks.raw,users:{findMany:mocks.users}}}));
+vi.mock('@/app/notifications/actions',()=>({readMessageNotificationAction:()=>{},openNotifAction:()=>{},archiveAllNotifsAction:()=>{}}));
+vi.mock('@/components/admin-pager',()=>({AdminPager:()=>null}));
+vi.mock('@/components/confirm-submit',()=>({ConfirmSubmit:()=>null}));
+import Page from '@/app/notifications/page';
+beforeEach(()=>{vi.clearAllMocks();mocks.view.mockResolvedValue(true);mocks.count.mockResolvedValue(205);mocks.raw.mockResolvedValue([{total:62n}]);mocks.groups.mockResolvedValue([{sender_id:7,_count:{_all:200},_max:{id:1}},{sender_id:8,_count:{_all:5},_max:{id:2}}]);mocks.notifications.mockResolvedValue([]);mocks.chats.mockResolvedValue([{sender_id:7,message:'complete reason',created_at:null},{sender_id:8,message:'orphan reason',created_at:null}]);mocks.users.mockResolvedValue([{id:7n,name:'Self',userName:null}]);});
+describe('notifications page wiring',()=>{
+ it('renders self and orphan safe detail links with acknowledgement, with bounded queries and full counts',async()=>{const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({})}));expect(html).toContain('/notifications/messages/7');expect(html).toContain('/notifications/messages/8');expect(html).toContain('complete reason');expect(html).toContain('تعليم رسائل هذا التنبيه');expect(mocks.chats.mock.calls[0][0].take).toBe(30);expect(mocks.notifications.mock.calls[0][0].take).toBe(30);expect(mocks.groups.mock.calls[0][0].take).toBe(30);expect(mocks.notifications.mock.calls[0][0].where.OR).toEqual([{type:null},{type:{not:'message'}}]);});
+ it('restricted inbox renders access explanation and hides message contents and write actions',async()=>{mocks.view.mockResolvedValue(false);const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({})}));expect(html).toContain('صلاحية عرض المراسلات الإدارية');expect(html).not.toContain('complete reason');expect(html).not.toContain('orphan reason');expect(html).not.toContain('تعليم رسائل هذا التنبيه');});
+ it('paginates stored and message groups independently',async()=>{await Page({searchParams:Promise.resolve({page:'3',mp:'2'})});expect(mocks.notifications.mock.calls[0][0].skip).toBe(60);expect(mocks.groups.mock.calls[0][0].skip).toBe(30);});
+ it('archive badge includes read chats while stored paging stays empty',async()=>{mocks.count.mockImplementation(async query=>query.where.reciver_id===7&&query.where.is_read===1?6:0);const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({tab:'archive'})}));expect(html).toMatch(/الأرشيف.*?>6<\/span>/);expect(mocks.count).toHaveBeenCalledWith({where:{reciver_id:7,is_read:1}});expect(mocks.notifications.mock.calls[0][0].where.read_at).toEqual({not:null});});
+ it('archive keeps read sender history reachable',async()=>{const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({tab:'archive'})}));expect(mocks.groups.mock.calls[0][0].where).toEqual({reciver_id:7,is_read:1});expect(html).toContain('/notifications/messages/7');expect(html).not.toContain('تعليم رسائل هذا التنبيه');});
+ it('valid peer opens ordinary chat',async()=>{mocks.users.mockResolvedValue([{id:8n,name:'Peer',userName:null}]);const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({})}));expect(html).toContain('href="/messages/8"');});
+});

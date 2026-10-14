@@ -9,12 +9,13 @@ const TABS: { key: string; href: string; label: string }[] = [
   { key: 'imported', href: '/admin/suppliers/cj/imported', label: 'البضائع المستوردة' },
   { key: 'showcase', href: '/admin/suppliers/cj/showcase', label: 'السلع المعروضة' },
   { key: 'orders', href: '/admin/suppliers/cj/orders', label: 'الطلبات' },
+  { key: 'payables', href: '/admin/suppliers/cj/payables', label: 'مستحقات CJ' },
   { key: 'agents', href: '/admin/suppliers/cj/agents', label: 'الوكلاء' },
   { key: 'glossary', href: '/admin/suppliers/cj/glossary', label: 'مُسرد الترجمة' },
   { key: 'settings', href: '/admin/suppliers/cj', label: 'الإعدادات والاختبار' },
 ];
 
-export function CjAdminNav({ current }: { current: 'browse' | 'imported' | 'showcase' | 'orders' | 'agents' | 'glossary' | 'settings' }) {
+export function CjAdminNav({ current }: { current: 'browse' | 'imported' | 'showcase' | 'orders' | 'payables' | 'agents' | 'glossary' | 'settings' }) {
   return (
     <nav aria-label="إدارة CJ" className="-mx-1 flex flex-wrap gap-1.5 border-b border-primary/15 pb-2">
       {TABS.map(tab => {

@@ -4,7 +4,7 @@ import {revalidatePath} from 'next/cache';
 import {requireAccess} from '@/lib/access-control/guards';
 import {setSetting} from '@/lib/settings';
 import {prepareCjSettlementBatch,reconcileCjSettlementBatch,getCjSettlementBatch,authorizeCjSettlementWalletBatch} from '@/lib/cj/settlements';
-import {reconcileCjFulfillmentPayment} from '@/lib/cj/fulfillment';
+import {reconcileCjFulfillmentPayment,prepareCjFulfillmentCardPayment} from '@/lib/cj/fulfillment';
 import {settlementSelection,settlementWaitHours,settlementExpectedAmount} from './policy';
 
 const path = '/admin/suppliers/cj/payables';
@@ -13,6 +13,18 @@ async function authorise() {
   await requireAccess('orders','edit');
   await requireAccess('wallets','view');
   return session;
+}
+/** Explicit unpaid preparation; never consumes a wallet authorization. */
+export async function prepareUnpaidSupplierOrder(form: FormData) {
+  await authorise();
+  if(form.get('confirmUnpaid')!=='1')redirect(`${path}?error=confirmation`);
+  let id:string;
+  try { [id]=settlementSelection([form.get('fulfillmentId') as FormDataEntryValue]); }
+  catch { redirect(`${path}?error=selection`); }
+  try { await prepareCjFulfillmentCardPayment(id); }
+  catch { redirect(`${path}?error=prepare`); }
+  revalidatePath(path);
+  redirect(`${path}?prepared=1`);
 }
 /** Records an accounting grouping only. Does not create CJ orders or debit funds. */
 export async function prepareSettlement(form: FormData) {

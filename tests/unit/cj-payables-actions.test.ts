@@ -1,12 +1,12 @@
 import {describe,it,expect,vi,beforeEach} from 'vitest';
-const mocks=vi.hoisted(()=>({access:vi.fn(),prepare:vi.fn(),refresh:vi.fn(),setting:vi.fn(),authorize:vi.fn(),batch:vi.fn(),supplierRead:vi.fn()}));
+const mocks=vi.hoisted(()=>({access:vi.fn(),prepare:vi.fn(),refresh:vi.fn(),setting:vi.fn(),authorize:vi.fn(),batch:vi.fn(),supplierRead:vi.fn(),cardPrepare:vi.fn()}));
 vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw Error(url);}}));
 vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:mocks.access}));
 vi.mock('@/lib/settings',()=>({setSetting:mocks.setting}));
 vi.mock('@/lib/cj/settlements',()=>({prepareCjSettlementBatch:mocks.prepare,reconcileCjSettlementBatch:mocks.refresh,getCjSettlementBatch:mocks.batch,authorizeCjSettlementWalletBatch:mocks.authorize}));
-vi.mock('@/lib/cj/fulfillment',()=>({reconcileCjFulfillmentPayment:mocks.supplierRead}));
-import {prepareSettlement,saveSettlementWait,authorizeWalletSettlement,refreshSettlement} from '@/app/admin/suppliers/cj/payables/actions';
+vi.mock('@/lib/cj/fulfillment',()=>({reconcileCjFulfillmentPayment:mocks.supplierRead,prepareCjFulfillmentCardPayment:mocks.cardPrepare}));
+import {prepareSettlement,saveSettlementWait,authorizeWalletSettlement,refreshSettlement,prepareUnpaidSupplierOrder} from '@/app/admin/suppliers/cj/payables/actions';
 function form(){const data=new FormData();data.append('fulfillmentId','2');data.set('reviewed','1');data.set('requestKey','12345678-1234-4234-8234-123456789abc');return data;}
 describe('CJ settlement actions authority',()=>{
   beforeEach(()=>{vi.clearAllMocks();mocks.access.mockResolvedValue({uid:7});mocks.prepare.mockResolvedValue({id:'8'});});
@@ -39,5 +39,9 @@ describe('CJ settlement actions authority',()=>{
   it('keeps successful independent reconciliation when another request cannot be read',async()=>{
     mocks.batch.mockResolvedValueOnce({lines:[{id:'2',status:'unpaid'},{id:'4',status:'unpaid'}]});mocks.supplierRead.mockRejectedValueOnce(Error('timeout'));
     const data=new FormData();data.set('batchId','8');await expect(refreshSettlement(data)).rejects.toThrow('error=refresh');expect(mocks.supplierRead.mock.calls).toEqual([['2'],['4']]);expect(mocks.refresh).toHaveBeenCalledWith('8');
+  });
+  it('prepares unpaid card flow only after confirmation and never invokes wallet authority',async()=>{
+    const data=new FormData();data.set('fulfillmentId','8');await expect(prepareUnpaidSupplierOrder(data)).rejects.toThrow('confirmation');expect(mocks.cardPrepare).not.toHaveBeenCalled();
+    data.set('confirmUnpaid','1');await expect(prepareUnpaidSupplierOrder(data)).rejects.toThrow('prepared=1');expect(mocks.cardPrepare).toHaveBeenCalledWith('8');expect(mocks.authorize).not.toHaveBeenCalled();
   });
 });

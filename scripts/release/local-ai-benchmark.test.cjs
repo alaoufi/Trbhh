@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {compare,api}=require('./local-ai-benchmark.cjs');
+const {compare,api,measure}=require('./local-ai-benchmark.cjs');
 function fixture(){const calls=[];return {calls,call:async(path,body)=>{calls.push({path,body});if(path==='pull')return {status:'success'};if(path==='tags')return {models:[{name:'qwen3.5:4b',digest:'small'},{name:'qwen3.5:9b',digest:'large'}]};}};}
 test('tests the smallest candidate first and stops without downloading the larger one on success',async()=>{
  const f=fixture(),models=[];const result=await compare(f.call,async(_call,model)=>{models.push(model);return [{elapsedMs:1000}];},()=>{});
@@ -39,4 +39,15 @@ test('the launcher pins the existing gate, keeps resource ceilings and has no cu
  assert.match(text,/candidate=16e1e6e6ef8d1e795c406aef1740b687b0ba7032/);
  assert.match(text,/10737418240/);assert.match(text,/4000000000/);
  assert.doesNotMatch(text,/git (?:switch|checkout|reset)|compose.*\b(?:up|down)\b|docker (?:rm|stop|restart|volume|system)|systemctl/);
+});
+test('measures all installed 9B cases without downloading, activating or stopping at a slow answer',async t=>{
+ let clock=0;t.mock.method(Date,'now',()=>clock);
+ const f=fixture();const result=await measure(async(path,body)=>{if(path==='chat'){if(body.messages.length)clock+=13000;return {done:true,message:{content:JSON.stringify({queries:['measured result']})},eval_duration:13000000000};}return f.call(path,body);},{request:(model,text,task)=>({model,messages:[{role:'user',content:text}],task}),searchTask:'search',searchFormat:{},translationTask:()=> 'translate',translationFormat:{}},()=>{});
+ assert.equal(result.status,'LOCAL_AI_MEASUREMENT_COMPLETE');assert.equal(result.proof.length,6);assert.equal(result.activated,false);
+ assert.ok(f.calls.every(c=>c.path==='tags'));
+ assert.equal(result.proof[0].evalMs,13000);
+ assert.equal(result.accepted,false);assert.ok(result.proof.every(item=>item.withinBudget===false));
+});
+test('measurement refuses a missing 9B model rather than downloading it',async()=>{
+ let gateCalls=0;await assert.rejects(measure(async path=>{assert.equal(path,'tags');return {models:[]};},{request:()=>{gateCalls++;}},()=>{}),/benchmark_installed_model_missing/);assert.equal(gateCalls,0);
 });

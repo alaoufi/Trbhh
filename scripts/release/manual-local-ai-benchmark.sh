@@ -4,6 +4,8 @@ set -Eeuo pipefail
 umask 077
 [[ $EUID -eq 0 && ${1:-} =~ ^[a-f0-9]{40}$ ]]
 revision=$1
+mode=${2:---measure-9b}
+[[ $mode == --measure-9b || $mode == --compare ]]
 cd /root/trbhh
 [[ $(pwd -P) == /root/trbhh ]]
 exec 8>/run/lock/trbhh-finance-deploy.lock
@@ -36,4 +38,4 @@ echo "BENCHMARK_LOG=$target/result.log"
  cat "$target/update-model.cjs"
  printf '\nreturn module.exports.smoke;})();\n'
  cat "$target/benchmark.cjs"
-} | docker exec -i trbhh-app node - |& tee "$target/result.log"
+} | docker exec -i trbhh-app node - "$mode" |& tee "$target/result.log"

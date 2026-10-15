@@ -41,6 +41,52 @@ afterEach(() => {
 });
 
 describe('CJ authentication and verified connection', () => {
+  it('also pauses already queued stock reads when the first request hits the account quota',async()=>{
+    const sent:number[]=[];
+    mock.fetch.mockImplementation(async()=>{sent.push(Date.now());return sent.length===1?reply({code:1600200,result:false,message:'Too Many Requests'},429):success([]);});
+    const {getInventoryByVid}=await import('@/lib/cj/client');
+    expect(await finish(Promise.all([getInventoryByVid('V1'),getInventoryByVid('V2')]))).toEqual([{ok:true,data:[]},{ok:true,data:[]}]);
+    expect(sent).toHaveLength(3);
+    expect(sent[1]-sent[0]).toBeGreaterThanOrEqual(1500);
+    expect(sent[2]-sent[1]).toBeGreaterThanOrEqual(1100);
+  });
+  it('retries rate-limited stock reads with a pause, then accepts fresh stock',async()=>{
+    mock.fetch.mockResolvedValueOnce(reply({code:1600200,result:false,message:'Too Many Requests'},429)).mockResolvedValueOnce(success([]));
+    const {getInventoryByVid}=await import('@/lib/cj/client');
+    expect(await finish(getInventoryByVid('VID'))).toEqual({ok:true,data:[]});
+    expect(mock.fetch).toHaveBeenCalledTimes(2);
+    expect(Date.now()-NOW.getTime()).toBeGreaterThanOrEqual(1500);
+    expect(mock.fetch.mock.calls.every(([url])=>url===`${BASE}/product/stock/queryByVid?vid=VID`)).toBe(true);
+  });
+  it('retries freight calculation even when CJ returns its rate code with HTTP 200',async()=>{
+    mock.fetch.mockResolvedValueOnce(reply({code:1600200,result:false,message:'Too Many Requests'})).mockResolvedValueOnce(success([]));
+    const {calculateFreightToKSA}=await import('@/lib/cj/client');
+    expect(await finish(calculateFreightToKSA([{vid:'VID',quantity:1}],'56357','CN'))).toEqual({ok:true,data:[]});
+    expect(mock.fetch).toHaveBeenCalledTimes(2);
+    expect(mock.fetch.mock.calls[0][1].body).toBe(mock.fetch.mock.calls[1][1].body);
+  });
+  it('stops after three rate-limited inventory attempts and fails closed',async()=>{
+    mock.fetch.mockResolvedValue(reply({code:1600200,result:false,message:'Too Many Requests'},429));
+    const {getInventoryByVid}=await import('@/lib/cj/client');
+    expect(await finish(getInventoryByVid('VID'))).toEqual({ok:false,error:'Too Many Requests',status:429});
+    expect(mock.fetch).toHaveBeenCalledTimes(3);
+  });
+  it.each(['/shopping/order/createOrderV3','/shopping/order/saveGenerateParentOrder','/shopping/pay/payBalanceV2'])('never retries financial transport %s after a rate limit',async path=>{
+    for(const key of ['CJ_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'])vi.stubEnv(key,'true');
+    const {getCommerceConfig}=await import('@/lib/commerce/settings');vi.mocked(getCommerceConfig).mockResolvedValue({purchasingEnabled:true} as never);
+    mock.fetch.mockResolvedValue(reply({code:1600200,result:false,message:'Too Many Requests'},429));
+    const {cjFulfillmentTransport}=await import('@/lib/cj/client');
+    expect(await finish(cjFulfillmentTransport(path,{payType:3}))).toMatchObject({ok:false,status:429});
+    expect(mock.fetch).toHaveBeenCalledTimes(1);
+  });
+  it('does not retry inventory network timeouts or authentication failures',async()=>{
+    mock.fetch.mockRejectedValueOnce(Error('timeout')).mockResolvedValueOnce(reply({code:1600001,result:false,message:'Expired'},401));
+    const {getInventoryByVid}=await import('@/lib/cj/client');
+    expect(await finish(getInventoryByVid('VID'))).toMatchObject({ok:false,status:0});
+    expect(mock.fetch).toHaveBeenCalledTimes(1);
+    expect(await finish(getInventoryByVid('VID'))).toMatchObject({ok:false,status:401});
+    expect(mock.fetch).toHaveBeenCalledTimes(2);
+  });
   it('routes only the new private CJ unpaid transport through dedicated gates with shared supplier gate off',async()=>{
     vi.stubEnv('SUPPLIER_ALLOW_LIVE_ORDERS','false');for(const key of ['CJ_ALLOW_LIVE_ORDERS','CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED'])vi.stubEnv(key,'true');
     const {getCommerceConfig}=await import('@/lib/commerce/settings');vi.mocked(getCommerceConfig).mockResolvedValue({purchasingEnabled:true} as never);mock.fetch.mockResolvedValueOnce(success({orderId:'fixture-unpaid'}));

@@ -26,14 +26,18 @@ function successfulEnvelope(env: CjEnvelope<unknown>): boolean {
 }
 
 // CJ يفرض حدّ معدّل صارم (طلب واحد/ثانية). نسلسل كل الطلبات بفاصل ≥1.1ث لتفادي
-// code=1600200 «Too Many Requests». التسلسل على مستوى العملية يكفي (مثيل واحد).
+// code=1600200 «Too Many Requests». حد الحساب مشترك؛ نؤخر القراءة عند رفض CJ أيضاً.
 const MIN_GAP_MS = 1100;
 let lastAt = 0;
+let rateLimitUntil = 0;
 let gate: Promise<void> = Promise.resolve();
 function throttle(): Promise<void> {
   gate = gate.then(async () => {
-    const wait = MIN_GAP_MS - (Date.now() - lastAt);
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    for(;;){
+      const wait = Math.max(MIN_GAP_MS - (Date.now() - lastAt), rateLimitUntil - Date.now());
+      if(wait<=0)break;
+      await new Promise((r) => setTimeout(r, wait));
+    }
     lastAt = Date.now();
   });
   return gate;
@@ -105,11 +109,26 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
   const qs = opts.query
     ? '?' + Object.entries(opts.query).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&')
     : '';
-  const { status, body } = await fetchJson(`${cfg.base}${path}${qs}`, {
+  const request:RequestInit = {
     method: opts.method || 'GET',
     headers: { 'Content-Type': 'application/json', 'CJ-Access-Token': tok.data },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
-  }).catch(() => ({ status: 0, body: null }));
+  };
+  // Only proven non-mutating catalog reads may be replayed. In particular,
+  // POST freightCalculate is a quote; order/payment POSTs must stay single-send.
+  const retryableRead = (request.method === 'GET' && [
+    '/product/query','/product/variant/query','/product/stock/queryByVid','/product/stock/getInventoryByPid',
+  ].includes(path)) || (request.method === 'POST' && path === '/logistic/freightCalculate');
+  let response:{status:number;body:unknown};
+  for(let attempt=0;;attempt++){
+    response=await fetchJson(`${cfg.base}${path}${qs}`,request).catch(()=>({status:0,body:null}));
+    const limited=response.status===429||(response.body as CjEnvelope<unknown>|null)?.code===1600200;
+    if(!limited||!retryableRead||attempt>=2)break;
+    // CJ quota is shared by the account, including other workers/processes.
+    // Cool down this process too, with jitter to avoid synchronized retries.
+    rateLimitUntil=Math.max(rateLimitUntil,Date.now()+1500*2**attempt+Math.floor(Math.random()*500));
+  }
+  const {status,body}=response;
   const env = (body || {}) as CjEnvelope<T>;
   // This endpoint's documented successful envelope omits code/result.
   const parentSuccess = path === '/shopping/order/saveGenerateParentOrder' && env.code === undefined && env.success === true && env.result !== false;

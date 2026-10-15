@@ -1,11 +1,11 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { FinanceData, FinanceInvoice, FinanceSection } from '@/lib/finance/types';
+import type { FinanceData, FinanceInvoice, FinanceSection, FinanceTaxPayload } from '@/lib/finance/types';
 
 vi.mock('@/app/admin/finance/actions', () => ({
   restoreFinanceDraftInvoice: async () => {},
-  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceReturnReversal: async () => {}, saveFinanceTaxDraft:async()=>{},requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
+  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceReturnReversal: async () => {}, saveFinanceTaxSettings:async()=>{},saveFinanceTaxDraft:async()=>{},requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
   approveFinanceSettlement: async () => {}, captureFinanceInvoices: async () => {}, closeFinanceMonth: async () => {},
   prepareFinanceSettlement: async () => {}, recordFinanceExpense: async () => {}, releaseFinanceAccrual: async () => {},
   reverseFinanceExpense: async () => {}, reverseFinanceSettlement: async () => {}, saveFinanceBudget: async () => {},
@@ -159,12 +159,12 @@ describe('finance request controls and preserved records',()=>{
  });
  it('restores the own pending submission before approval and offers a partial draft save',()=>{
   const source=data();source.requests=[{id:'91',kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-09-25',issuer:{name:'Saved pending issuer',taxNumber:'',address:'Saved pending address'},vatBps:0,policyReference:'pending-policy',calculationPolicy:{version:2,priceBasis:'exclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:0,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'9',vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}}},status:'pending',makerId:'9',checkerId:null,reason:'saved submission',approvalReason:'',at:invoice.at,decidedAt:null,result:null}];
-  const html=workflow('tax',{canManageTax:true,currentUserId:'9'},source);expect(html).toContain('value="Saved pending issuer"');expect(html).toContain('value="Saved pending address"');expect(html).toContain('value="2026-09-25"');expect(html).toContain('formNoValidate=""');expect(html).toContain('حفظ المسودة — ولو كانت ناقصة');expect(html).toContain('saved submission');
+  const html=workflow('tax',{canManageTax:true,currentUserId:'9'},source);expect(html).toContain('value="Saved pending issuer"');expect(html).toContain('value="Saved pending address"');expect(html).toContain('value="2026-09-25"');expect(html).toContain('formNoValidate=""');expect(html).toContain('>حفظ</button>');expect(html).not.toContain('حفظ المسودة');expect(html).not.toContain('إرسال إعدادات الضريبة للمراجعة');expect(html).not.toContain('اعتماد الطلب بعد المراجعة');
   const other=workflow('tax',{canManageTax:true,currentUserId:'10'},source);expect(other).not.toContain('value="Saved pending issuer"');
  });
  it('tax settings are not assumed and cannot be changed with approve-only permission',()=>{
   const reader=workflow('tax',{canApprove:true});expect(reader).not.toContain('name="vatPercent"');
-  const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).toContain('name="vatPercent" value="0"');expect(manager).toContain('ليس إثباتًا للامتثال الضريبي');
+  const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).toContain('name="vatPercent" value="0"');expect(manager).toContain('لا يعاد حساب الفواتير السابقة');
  });
  it('provides an explicit zero VAT preset without inventing an issuer from an old incomplete policy',()=>{
   const source=data();source.taxPolicies=[{id:'1',requestId:'2',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Previous issuer',taxNumber:'300000000000003',address:'Previous address'},vatBps:1500,policyReference:'previous-policy'}];
@@ -189,11 +189,12 @@ describe('finance request controls and preserved records',()=>{
   expect(formHtml).toMatch(/<input(?=[^>]*name="registrationConfirmed")(?=[^>]*checked="")[^>]*>/);
   expect(formHtml).toContain('name="reason"');expect(formHtml).not.toContain('value="375000"');
  });
- it('shows the full proposed calculation and automation policy for independent review',()=>{
+ it('keeps the full saved calculation policy visible in the internal history',()=>{
   const source=data();source.requests=[{id:'32',kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-10-01',issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},vatBps:1500,policyReference:'future-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'}},status:'pending',makerId:'9',checkerId:null,reason:'policy evidence',approvalReason:'',at:invoice.at,decidedAt:null,result:null}];
+  source.taxPolicies=[{...source.requests[0].payload as FinanceTaxPayload,id:'1',requestId:'32',at:invoice.at}];
   const html=workflow('tax',{canApprove:true},source);
   for(const text of ['شامل الضريبة','غير شامل الضريبة','نسبة موحدة على جميع منتجات الكتالوج','5.25%','قبل احتساب الضريبة','تقريب كل بند إلى أقرب هللة؛ النصف للأعلى','إيقاف الإصدار للمراجعة عند تغير السياسة','الموظف المفوض #42'])expect(html).toContain(text);
-  expect(html).toContain('اعتماد الطلب بعد المراجعة');
+  expect(html).not.toContain('اعتماد الطلب بعد المراجعة');
  });
  it('offers a source-only full reversal for issued credit notes, independently of approval controls',()=>{
   const source=data();source.invoices.push({...invoice,id:'credit-1',kind:'credit_note',parentId:'inv-1',status:'issued',number:'CN-001',snapshot:{version:1,issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},customer:{name:'Customer',address:'Address'},currency:'SAR',lines:[],netMinor:10000,vatMinor:1500,totalMinor:11500,paidMinor:11500,sourceOrderId:'order-1',sourceReceiptId:'receipt-1',policyReference:'fixture'}});

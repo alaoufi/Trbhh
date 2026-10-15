@@ -35,6 +35,13 @@ export const fulfillmentStore:FulfillmentStore={
    await tx.$executeRaw`INSERT INTO commerce_audit_events(order_id,event,payload) VALUES(${order.id},${event},${payload}) ON DUPLICATE KEY UPDATE id=id`;
    await tx.$executeRaw`INSERT INTO commerce_notifications(order_id,event,channel,recipient,payload) VALUES(${order.id},${event},'in_app',${'member:'+order.member_id},${payload}) ON DUPLICATE KEY UPDATE id=id`;
   }
+  if(next.status!==current.status&&next.cjOrderId&&((next.status==='payment_ready'&&next.payment)||(next.status==='supplier_paid'&&next.evidence))){
+   const stage=next.status==='supplier_paid'?'supplier_paid':'registered';
+   const event=`ship:cj:${stage==='supplier_paid'?'paid':'registered'}:${current.id}`;
+   const payload=JSON.stringify({orderId:String(order.id),fulfillmentId:current.id,cjOrderId:next.cjOrderId,source:'cj',supplierPaymentVerified:stage==='supplier_paid',stage});
+   await tx.$executeRaw`INSERT INTO commerce_audit_events(order_id,event,payload) VALUES(${order.id},${event},${payload}) ON DUPLICATE KEY UPDATE id=id`;
+   await tx.$executeRaw`INSERT INTO commerce_notifications(order_id,event,channel,recipient,payload) VALUES(${order.id},${event},'in_app',${'member:'+order.member_id},${payload}) ON DUPLICATE KEY UPDATE id=id`;
+  }
   return true;
  },{maxWait:10000,timeout:20000});
  },

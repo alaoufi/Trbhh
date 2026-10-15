@@ -107,3 +107,9 @@ describe('durable customer-visible CJ fulfillment holds',()=>{
   expect(provider.createUnpaid).not.toHaveBeenCalled();expect(provider.preparePayment).not.toHaveBeenCalled();expect(provider.debit).not.toHaveBeenCalled();expect(f.state().order.status).toBe('paid');
  });
 });
+
+describe('CJ acknowledgement and payment notices',()=>{
+it('persists a supplier registration notice without claiming paid or reserved',async()=>{const f=fixture();const payment={payId:'PAY1',shipmentOrderId:'SD1',expiresAt:Date.now()+60000,payableUsdMinor:1000};expect(await fulfillmentStore.cas('7',4,{status:'payment_ready',payment})).toBe(true);expect(f.state().notices).toHaveLength(1);expect(f.state().notices[0].payload).toMatchObject({source:'cj',stage:'registered',supplierPaymentVerified:false,cjOrderId:'CJ1'});expect(f.state().notices[0].event.length).toBeLessThanOrEqual(40);await fulfillmentStore.cas('7',5,{status:'payment_ready',payment});expect(f.state().notices).toHaveLength(1);});
+it('records confirmed supplier payment once without changing the bank receipt',async()=>{const f=fixture(),receipt=structuredClone(f.state().receipt);await fulfillmentStore.cas('7',4,{status:'supplier_paid',evidence:{method:'card',order:{paymentDate:'confirmed'}}});expect(f.state().notices[0].payload).toMatchObject({stage:'supplier_paid',supplierPaymentVerified:true});expect(f.state().receipt).toEqual(receipt);expect(f.state().notices[0].event).toBe('ship:cj:paid:7');});
+it('cannot publish supplier progress without a matching customer receipt',async()=>{const f=fixture();f.state().receipt.amount_minor=1;expect(await fulfillmentStore.cas('7',4,{status:'supplier_paid',evidence:{}})).toBe(false);expect(f.state().notices).toHaveLength(0);});
+});

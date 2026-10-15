@@ -167,3 +167,28 @@ export async function cancelFinanceChange(db:CommerceDb,actor:bigint,id:bigint,r
   await auditFinance(tx,actor,'change_cancelled','change',String(id),reason,{before:{status:row.status,payload:financeJson(row.payload)},after:{status:'cancelled'}},now);
  },options);
 }
+
+/** One authorized settings save. Immutable records preserve old invoice snapshots;
+ * there is no separate maker/checker UI for this settings-only operation. */
+export async function saveFinanceTaxPolicyDirect(db:CommerceDb,actor:bigint,input:FinanceChangeInput,now=new Date()):Promise<string>{
+ if(input.kind!=='tax_settings'||input.targetId!=='tax')throw Error('finance_change_invalid');
+ const value=validateFinanceChange(input,now),payload=value.payload as FinanceTaxPayload,hash=fingerprint({...value,actor});
+ await assertFinanceSchemaReady(db);
+ return db.$transaction(async tx=>{
+  await requireFinancePermission(tx,actor,'tax:manage_settings');
+  await requireFinancePermission(tx,actor,'tax:approve');
+  if(!payload.calculationPolicy)throw Error('finance_calculation_policy_invalid');
+  await requireFinancePermission(tx,BigInt(payload.calculationPolicy.automationDelegateId),'invoices:create');
+  const [prior]=await tx.$queryRaw<{id:bigint;fingerprint:string;status:string;result:unknown}[]>`SELECT id,fingerprint,status,result FROM finance_change_requests WHERE request_key=${value.requestKey} FOR UPDATE`;
+  if(prior){if(prior.fingerprint!==hash)throw Error('finance_idempotency_conflict');const result=financeJson<{policyId?:string}>(prior.result);if(prior.status!=='approved'||!result?.policyId)throw Error('finance_change_state');return result.policyId;}
+  const previous=await readEffectiveFinanceTaxPolicy(tx,now);
+  await tx.$executeRaw`INSERT INTO finance_change_requests(request_key,fingerprint,kind,target_id,payload,status,maker_id,checker_id,reason,approval_reason,created_at,decided_at) VALUES(${value.requestKey},${hash},'tax_settings','tax',${JSON.stringify(payload)},'approved',${actor},${actor},${value.reason},${value.reason},${now},${now})`;
+  const [request]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_change_requests WHERE request_key=${value.requestKey}`;
+  await tx.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at,calculation_policy) VALUES(${request.id},${payload.effectiveFrom},${JSON.stringify(payload.issuer)},${payload.vatBps},${payload.policyReference},${now},${JSON.stringify(payload.calculationPolicy)})`;
+  const [policy]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_tax_policies WHERE request_id=${request.id}`;
+  const policyId=String(policy.id);
+  await tx.$executeRaw`UPDATE finance_change_requests SET result=${JSON.stringify({policyId,mode:'direct_settings'})} WHERE id=${request.id}`;
+  await auditFinance(tx,actor,'tax_settings_saved','tax',policyId,value.reason,{before:previous,after:{...payload,id:policyId,requestId:String(request.id)},mode:'direct_settings'},now);
+  return policyId;
+ },options);
+}

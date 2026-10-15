@@ -17,7 +17,8 @@ import {issueAdjustment,recordVerifiedFinanceRefund,type VerifiedFinanceRefund} 
 import {readFinanceData,financeJson} from '@/lib/finance/read-model';
 import {buildFinanceReport} from '@/lib/finance/reports';
 import {recordFinanceReconciliation} from '@/lib/finance/reconciliation';
-import {requestFinanceChange,approveFinanceChange,cancelFinanceChange} from '@/lib/finance/workflows';
+import {saveFinanceTaxPolicyDirect,requestFinanceChange,approveFinanceChange,cancelFinanceChange} from '@/lib/finance/workflows';
+import {readApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
 import {withFinanceAuditContext} from '@/lib/finance/audit-context';
 import {issueProspectiveInvoice,issueInvoicesForWorker} from '@/lib/finance/issuance';
 import {readFinanceInvoice} from '@/lib/finance/documents';
@@ -224,6 +225,19 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     await db.$executeRaw`INSERT INTO commerce_suppliers(id,name) VALUES(1,'Synthetic supplier'),(2,'Other synthetic supplier')`;
   });
 
+
+  it('direct settings save is immediately readable, idempotent and preserves the prior policy',async()=>{
+    const now=new Date('2026-10-15T09:00:00Z');
+    const payload:FinanceTaxPayload={effectiveFrom:'2026-10-15',issuer:{name:'Direct saved issuer',address:'Direct address',taxNumber:''},vatBps:0,policyReference:'direct-vat-off',calculationPolicy:{version:2,priceBasis:'exclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:0,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:String(actor),vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}}};
+    const input={kind:'tax_settings' as const,targetId:'tax',payload,reason:'Synthetic direct settings save',requestKey:'fixture-direct-tax-save'};
+    const id=await saveFinanceTaxPolicyDirect(db,actor,input,now);expect(await saveFinanceTaxPolicyDirect(db,actor,input,now)).toBe(id);
+    expect(await count('finance_tax_policies')).toBe(2);const read=await readApprovedFiscalPolicy(db,new Date(now.getTime()+1000));expect(read.issuer.name).toBe('Direct saved issuer');expect(read.calculationPolicy.vatControl?.enabled).toBe(false);
+    const edited={...input,requestKey:'fixture-direct-tax-edit',payload:{...payload,issuer:{...payload.issuer,name:'Updated issuer'}}};
+    await saveFinanceTaxPolicyDirect(db,actor,edited,new Date(now.getTime()+2000));expect((await readApprovedFiscalPolicy(db,new Date(now.getTime()+3000))).issuer.name).toBe('Updated issuer');
+    const [old]=await db.$queryRaw<{n:bigint}[]>`SELECT COUNT(*) AS n FROM finance_tax_policies WHERE policy_reference=${gate.approvedPolicyReference}`;expect(Number(old.n)).toBe(1);
+    await db.$executeRaw`DELETE FROM access_role_permissions WHERE role_id='fixture-maker' AND permission='tax:approve'`;
+    await expect(saveFinanceTaxPolicyDirect(db,actor,{...edited,requestKey:'fixture-direct-denied'},new Date(now.getTime()+4000))).rejects.toThrow('access_forbidden');expect(await count('finance_tax_policies')).toBe(3);
+  });
   it('owns a newly created database and refuses to replace an existing one',async()=>{
     await expect(admin.$executeRawUnsafe('CREATE DATABASE trbhh_finance_test')).rejects.toThrow();
     expect(await count('commerce_suppliers')).toBe(2);

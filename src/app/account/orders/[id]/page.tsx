@@ -1,3 +1,4 @@
+import {memberCjOrderNotices} from '@/lib/cj/fulfillment/notices';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { financeSchemaAvailable } from '@/lib/finance/schema';
@@ -34,6 +35,7 @@ export default async function MemberOrder({ params, searchParams }: {
   const documents = await financeSchemaAvailable(prisma)
     ? await prisma.$queryRaw<{id:bigint;number:string|null;status:string}[]>`SELECT i.id,i.number,i.status FROM finance_invoices i INNER JOIN commerce_orders o ON o.id=i.order_id WHERE o.id=${order.id} AND o.member_id=${BigInt(session.uid)} ORDER BY i.id`
     : [];
+  const cjNotices=order.status==='paid'?await memberCjOrderNotices(order.id,BigInt(session.uid)):[];
   let cjTrackingUnavailable=false;
   const tracking:(MemberTracking&{trackingUrl?:string|null;lastTrackNumber?:string})[]=order.status==='paid'?await memberOrderTracking(prisma,order.id,BigInt(session.uid)):[];
   if(order.status==='paid'){
@@ -92,6 +94,7 @@ export default async function MemberOrder({ params, searchParams }: {
         </dl>
       </li>)}</ul>
     </section>}
+    {cjNotices.length>0&&<section aria-label="تحديثات CJ" className="space-y-2"><h2 className="font-bold">تحديثات CJ</h2><ul>{cjNotices.map(notice=><li key={notice.id} className="rounded-lg border p-3 text-sm">{notice.message}</li>)}</ul></section>}
     {query.receipt==='unverified'&&order.fulfillment_status!=='completed'&&<p role="alert" className="rounded-lg bg-amber-50 p-3">تعذر تأكيد اكتمال التسليم؛ لم تُغلق العملية. يرجى مراجعة دعم تربح.</p>}
     {order.fulfillment_status==='completed'&&<p className="rounded-lg bg-green-50 p-3 text-green-900">تم تأكيد استلام الشحنة وإغلاق العملية.</p>}
     {order.fulfillment_status==='delivered'&&tracking.some(s=>s.id.startsWith('cj-'))&&<form action={confirmCjReceipt} className="space-y-2 rounded-lg border p-3">

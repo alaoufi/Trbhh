@@ -10,23 +10,23 @@ import { financeSections } from '@/lib/finance/reports';
 import { financeField as field, parseFinanceSar, publicFinanceError } from '@/lib/finance/input';
 import { approveSettlement, cancelDraftInvoice, cancelSettlement, captureInvoices, closeMonth, financeMonth, parseFinanceId, parseFinanceMonth, prepareSettlement, recordExpense, releaseAccrual, restoreDraftInvoice, reverseExpense, reverseSettlement, saveBudget } from '@/lib/finance/service';
 import { recordFinanceReconciliation } from '@/lib/finance/reconciliation';
-import { approveFinanceChange, cancelFinanceChange, readFinanceChangeKind, requestFinanceChange } from '@/lib/finance/workflows';
+import { saveFinanceTaxPolicyDirect,validateFinanceChange,approveFinanceChange, cancelFinanceChange, readFinanceChangeKind, requestFinanceChange } from '@/lib/finance/workflows';
 import { validateFiscalVatControl } from '@/lib/finance/fiscal-v2';
 import { DEFAULT_REGISTRATION_THRESHOLD_MINOR } from '@/lib/finance/tax-registration';
 
-async function run(form:FormData,module:AccessModule,permission:AccessAction,work:(actor:bigint)=>Promise<unknown>,successKey='saved'):Promise<never> {
+async function run(form:FormData,module:AccessModule,permission:AccessAction,work:(actor:bigint)=>Promise<unknown>,successKey:string|((result:unknown)=>string)='saved'):Promise<never> {
   await requireAccess(module,'view');
   const session=await requireAccess(module,permission);
   const auditActor=await accessActor(session);
   const section=form.get('returnTo');
   const params=new URLSearchParams({section:typeof section==='string'&&financeSections.some(s=>s.key===section)?section:'overview'});
-  let error:string|null=null;
+  let error:string|null=null;let result:unknown;
   try{
     params.set('month',parseFinanceMonth(field(form,'month')));
-    await withFinanceAuditContext({ip:auditActor.ip,sessionFingerprint:auditActor.sessionFingerprint},()=>work(BigInt(session.uid)));
+    result=await withFinanceAuditContext({ip:auditActor.ip,sessionFingerprint:auditActor.sessionFingerprint},()=>work(BigInt(session.uid)));
   }catch(cause){error=publicFinanceError(cause);}
   if(error)params.set('error',error);
-  else{params.set('saved','1');if(successKey!=='saved')params.set(successKey,'1');revalidatePath('/admin/finance');}
+  else{params.set('saved','1');const key=typeof successKey==='function'?successKey(result):successKey;if(key!=='saved')params.set(key,'1');revalidatePath('/admin/finance');}
   redirect('/admin/finance?'+params.toString());
 }
 export async function saveFinanceBudget(form:FormData) {
@@ -103,24 +103,7 @@ export async function saveFinanceTaxDraft(form:FormData){
 export async function requestFinanceTaxSettings(form:FormData) {
   return run(form,'tax','manage_settings',async actor=>{
     await saveTaxDraft(actor,form);
-    const enabled=policySelection(form,'vatEnabled',['off','on'] as const)==='on';
-    const vatBps=parseFinanceSar(field(form,'vatPercent')||(enabled?'':'0'));
-    if(vatBps>10000)throw new Error('finance_calculation_policy_invalid');
-    const optional=(name:string)=>form.has(name)?field(form,name):'';
-    const confirmed=optional('registrationConfirmed'),threshold=optional('registrationThreshold');
-    if(!['','1'].includes(confirmed))throw new Error('finance_tax_policy_invalid');
-    const vatControl=validateFiscalVatControl({enabled,registrationConfirmed:confirmed==='1',registrationEffectiveFrom:optional('registrationEffectiveFrom')||null,registrationThresholdMinor:threshold?parseFinanceSar(threshold):DEFAULT_REGISTRATION_THRESHOLD_MINOR});
-    const calculationPolicy={version:2 as const,
-      priceBasis:policySelection(form,'priceBasis',['inclusive','exclusive'] as const),
-      itemScope:policySelection(form,'itemScope',['uniform_catalog'] as const),
-      shippingPriceBasis:policySelection(form,'shippingPriceBasis',['inclusive','exclusive'] as const),shippingVatBps:vatBps,
-      discountTreatment:policySelection(form,'discountTreatment',['none','before_tax'] as const),
-      rounding:policySelection(form,'rounding',['line_half_up'] as const),
-      policyRollover:policySelection(form,'policyRollover',['hold_for_review'] as const),
-      automationDelegateId:String(parseFinanceId(field(form,'automationDelegateId'))),
-      vatControl,
-    };
-    return requestFinanceChange(prisma,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps,policyReference:field(form,'policyReference'),calculationPolicy},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
+    return requestFinanceChange(prisma,actor,taxSettingsInput(form));
   },'submitted');
 }
 export async function requestFinancePeriodReopen(form:FormData) {
@@ -154,4 +137,37 @@ export async function restoreFinanceDraftInvoice(form:FormData) {
     await requireAccess('invoices','create');
     return restoreDraftInvoice(prisma,actor,parseFinanceId(field(form,'invoiceId')),field(form,'reason'));
   });
+}
+
+function taxSettingsInput(form:FormData){
+    const enabled=policySelection(form,'vatEnabled',['off','on'] as const)==='on';
+    const vatBps=parseFinanceSar(field(form,'vatPercent')||(enabled?'':'0'));
+    if(vatBps>10000)throw new Error('finance_calculation_policy_invalid');
+    const optional=(name:string)=>form.has(name)?field(form,name):'';
+    const confirmed=optional('registrationConfirmed'),threshold=optional('registrationThreshold');
+    if(!['','1'].includes(confirmed))throw new Error('finance_tax_policy_invalid');
+    const vatControl=validateFiscalVatControl({enabled,registrationConfirmed:confirmed==='1',registrationEffectiveFrom:optional('registrationEffectiveFrom')||null,registrationThresholdMinor:threshold?parseFinanceSar(threshold):DEFAULT_REGISTRATION_THRESHOLD_MINOR});
+    const calculationPolicy={version:2 as const,
+      priceBasis:policySelection(form,'priceBasis',['inclusive','exclusive'] as const),
+      itemScope:policySelection(form,'itemScope',['uniform_catalog'] as const),
+      shippingPriceBasis:policySelection(form,'shippingPriceBasis',['inclusive','exclusive'] as const),shippingVatBps:vatBps,
+      discountTreatment:policySelection(form,'discountTreatment',['none','before_tax'] as const),
+      rounding:policySelection(form,'rounding',['line_half_up'] as const),
+      policyRollover:policySelection(form,'policyRollover',['hold_for_review'] as const),
+      automationDelegateId:String(parseFinanceId(field(form,'automationDelegateId'))),
+      vatControl,
+    };
+    return ({kind:'tax_settings' as const,targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps,policyReference:field(form,'policyReference'),calculationPolicy},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
+}
+
+export async function saveFinanceTaxSettings(form:FormData){
+ return run(form,'tax','manage_settings',async actor=>{
+  await saveTaxDraft(actor,form);
+  const normalized=new FormData();for(const [key,value] of form.entries())normalized.append(key,value);
+  if(!String(normalized.get('reason')||'').trim())normalized.set('reason','حفظ إعدادات الجهة البائعة والفواتير');
+  let input:ReturnType<typeof taxSettingsInput>;
+  try{input=taxSettingsInput(normalized);validateFinanceChange(input);}catch{return false;}
+  await saveFinanceTaxPolicyDirect(prisma,actor,input);
+  return true;
+ },result=>result===true?'settingsApplied':'settingsStored');
 }

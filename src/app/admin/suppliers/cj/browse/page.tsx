@@ -64,10 +64,10 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   // keep the Arabic text in the URL and search box.
   const sourceQuery = q ? await translateArabicCjSearch(q) : '';
   // CJ يفهرس بالاسم المصدر الإنجليزي. عند فشل ترجمة عبارة عربية لا نرسل العربية إلى CJ
-  // (تُرجِع نتائج غير ذات صلة)، بل نُلغي فلتر الاسم ونعرض تنبيهاً للمستخدم.
+  // (تُرجِع نتائج غير ذات صلة)، بل نوقف الاستعلام ونعرض تنبيهاً للمستخدم.
   const queryIsArabic = !!q && /\p{Script=Arabic}/u.test(q);
   const searchName = sourceQuery ? sourceQuery : (queryIsArabic ? undefined : (q || undefined));
-  const listing = catalogFilters.error?{ok:false as const,error:'cj_catalog_filters_invalid',status:400}:await listBrowseProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined,filters:catalogFilters.values });
+  const listing = queryIsArabic && !sourceQuery ? {ok:false as const,error:'cj_search_translation_failed',status:400} : catalogFilters.error?{ok:false as const,error:'cj_catalog_filters_invalid',status:400}:await listBrowseProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined,filters:catalogFilters.values });
   const items = listing.ok ? listing.data.items : [];
   // صلاحية العرض تقرأ الترجمات المحفوظة فقط؛ الترجمة والكتابة إجراءات تحرير صريحة.
   const importedList = await listCjProducts(60);
@@ -209,7 +209,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           {listing.ok ? <>إجمالي المنتجات{activeCat ? ` في «${categoryLabels.get(activeCat.id)}»` : ''}{q ? ` للبحث «${q}»` : ''}: <b className="text-primary">{total.toLocaleString('en')}</b> · صفحة {page.toLocaleString('en')} من {totalPages.toLocaleString('en')}</> : '—'}
         </span>
       </div>
-      {q && queryIsArabic && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600" dir="auto">{searchName ? <>البحث في CJ تمّ بالمصطلح الإنجليزي: <b dir="ltr">«{searchName}»</b>. إن كانت الترجمة غير دقيقة فالنتائج قد تكون غير مطابقة — جرّب كلمة إنجليزية مباشرة (مثل <code>screen</code>) للمقارنة.</> : 'تعذّرت ترجمة العبارة العربية إلى الإنجليزية الآن (مزوّد الترجمة غير جاهز) — عُرضت منتجات عامة بلا فلتر اسم. انتظر اكتمال نماذج LibreTranslate أو ابحث بالإنجليزية.'}</p>}
+      {q && queryIsArabic && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600" dir="auto">{searchName ? <>البحث في CJ تمّ بالمصطلح الإنجليزي: <b dir="ltr">«{searchName}»</b>. إن كانت الترجمة غير دقيقة فالنتائج قد تكون غير مطابقة — جرّب كلمة إنجليزية مباشرة (مثل <code>screen</code>) للمقارنة.</> : 'تعذّرت ترجمة عبارة البحث؛ لم تُعرض منتجات عامة. أعد المحاولة أو استخدم الاسم الإنجليزي.'}</p>}
 
       {/* شبكة المنتجات */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

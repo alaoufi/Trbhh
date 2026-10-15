@@ -58,6 +58,10 @@ export async function translateArabicCjSearch(query: string): Promise<string | n
   if (!source) return '';
   if (!hasArabic(source)) return source;
 
+  // Exact product-family aliases only; never replace words inside a longer query.
+  const phoneNames = ['هاتف', 'الهواتف', 'هواتف', 'الهاتف', 'الهواتف النقالة', 'هواتف نقالة', 'الهاتف النقال', 'هاتف نقال', 'الهواتف المحمولة', 'هواتف محمولة', 'الهاتف المحمول', 'هاتف محمول', 'الجوالات', 'جوالات', 'الجوال', 'جوال'];
+  if (phoneNames.some(name => normArabic(name) === normArabic(source))) return 'mobile phone';
+
   // أولاً: المزوّدات المُعتمَدة (LibreTranslate الذاتي/DeepL تعمل على الخادم بثبات).
   const viaProviders = await translateArabicToEnglish(source).catch(() => null);
   if (viaProviders && /\p{Script=Latin}/u.test(viaProviders) && !hasArabic(viaProviders)) return viaProviders;

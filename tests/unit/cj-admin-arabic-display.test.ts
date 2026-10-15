@@ -150,3 +150,11 @@ it('offers suppliers by name without asking for an id and preserves the certific
  expect(html).not.toMatch(/<input(?![^>]*type="hidden")[^>]*name="supplier"/);expect(html).toContain('لديها شهادة حسب CJ');
  expect(state.list).toHaveBeenCalledWith(1,24,{productName:undefined,categoryId:undefined,filters:{supplier:'SUP-1',certified:'1'}});
 });
+
+it('does not discard an Arabic name filter when translation fails',async()=>{
+  state.translateSearch.mockResolvedValueOnce(null as unknown as string);
+  const html=await browse({q:'عبارة عربية غير مترجمة'});
+  expect(state.list).not.toHaveBeenCalled();
+  expect(html).not.toContain(state.sourceName);
+  expect(html).toContain('تعذّرت ترجمة');
+});

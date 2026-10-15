@@ -44,3 +44,16 @@ describe('CJ Arabic catalog search',()=>{
     await expect(translateArabicCjSearch('شاشة')).resolves.toBe('screen');
   });
 });
+
+describe('Arabic phone search aliases',()=>{
+  it.each(['الهواتف','الهواتف النقالة','هواتف نقالة','الهَوَاتِف النَّقَّالة','الجوالات'])('searches %s without depending on translation availability',async(query)=>{
+    const fetcher=vi.fn(async()=>new Response('unavailable',{status:503}));vi.stubGlobal('fetch',fetcher);
+    await expect(translateArabicCjSearch(query)).resolves.toBe('mobile phone');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+it('preserves a specific phone accessory query rather than broadening it to phones',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'mobile phone case'}}),{status:200})));
+  await expect(translateArabicCjSearch('غطاء الهواتف النقالة')).resolves.toBe('mobile phone case');
+});

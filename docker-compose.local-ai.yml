@@ -3,9 +3,11 @@ services:
   ollama:
     image: ollama/ollama:0.40.4
     container_name: trbhh-ollama
+    labels:
+      trbhh.local-ai: "1"
     restart: unless-stopped
-    mem_limit: 5g
-    cpus: 2
+    mem_limit: 10g
+    cpus: 4
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_NO_CLOUD: "1"

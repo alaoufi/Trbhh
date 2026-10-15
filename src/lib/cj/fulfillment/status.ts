@@ -11,7 +11,7 @@ export function supplierStageFromProof(d:Record<string,unknown>):SupplierStage|n
  const status=String(d.orderStatus||'').toUpperCase(),sub=String(d.subStatus||'').toUpperCase();
  if(status==='UNSHIPPED'&&sub==='PROCESSING'||status==='PROCESSING')return 'preparing';
  if(status==='SHIPPED'&&typeof d.trackNumber==='string'&&d.trackNumber.trim())return 'shipped';
- if(status==='DELIVERED')return 'delivered';
+ if(status==='DELIVERED'||status==='COMPLETED')return 'delivered';
  return null;
 }
 export function safeTrackingUrl(value:unknown):string|null {
@@ -20,12 +20,19 @@ export function safeTrackingUrl(value:unknown):string|null {
 }
 type Meta={payment?:unknown;proof?:unknown;exception?:{actionRequired:boolean;source:'cj';orderStatus:string;observedAt:string};fulfillment?:{stage:SupplierStage;carrier:string;trackingNumber:string;lastTrackNumber?:string;trackingUrl:string|null;observedAt:string}};
 function parseMeta(raw:unknown):Meta {return (typeof raw==='string'?JSON.parse(raw):raw||{}) as Meta;}
+export function cjShipmentException(raw:Record<string,unknown>,trackingStatus?:string|null):string|null{
+ if(raw.disputeId||raw.disputeOpenedId)return 'CJ_DISPUTE_OPEN';
+ const status=String(raw.orderStatus||'').toUpperCase();
+ if(['CANCELLED','FAILED_DELIVERY','DELIVERY_FAILED','RETURNED','RETURNED_TO_SENDER'].includes(status))return status;
+ if(typeof trackingStatus==='string'&&/unsuccessful|undelivered|returned(?:\s+to\s+sender)?|delivery[_ ]failed|failed[_ ]delivery/i.test(trackingStatus))return 'DELIVERY_EXCEPTION';
+ return null;
+}
 /** Read-only CJ reconciliation, with transactional customer-order status/notice persistence. */
-export async function reconcileCjFulfillment(id:string):Promise<void> {
+export async function reconcileCjFulfillment(id:string,snapshot?:Record<string,unknown>):Promise<void> {
  const row=await fulfillmentStore.read(id);if(!row?.customerPaidVerified||row.status!=='supplier_paid'||!row.cjOrderId)return;
- const normalized=await makeFulfillmentProvider(row.commitment).detail(row.cjOrderId);
+ const normalized=await makeFulfillmentProvider(row.commitment,snapshot).detail(row.cjOrderId);
  if(normalized.orderId!==row.cjOrderId||!matchesCommitment(row.commitment,normalized))throw Error('cj_status_identity_mismatch');
- const detail=await getCjOrderDetail(row.cjOrderId);if(!detail.ok||!detail.data.proof)throw Error('cj_status_proof_unavailable');
+ const detail=snapshot?{ok:true as const,data:{proof:snapshot}}:await getCjOrderDetail(row.cjOrderId);if(!detail.ok||!detail.data.proof)throw Error('cj_status_proof_unavailable');
  const raw=detail.data.proof;
  // The second read must preserve order identity as well, even during provider updates.
  if(String(raw.orderId)!==row.cjOrderId||String(raw.orderNum)!==row.commitment.supplierReference)throw Error('cj_status_identity_mismatch');
@@ -51,7 +58,8 @@ export async function reconcileCjFulfillment(id:string):Promise<void> {
   if(!stored)return;const meta=parseMeta(stored.evidence_json),previous=meta.fulfillment?.stage||'supplier_paid';
   const stage=observed&&ranks[observed]>=ranks[previous]?observed:previous;
   const next={stage,carrier:carrier||meta.fulfillment?.carrier||'',trackingNumber:trackingNumber||meta.fulfillment?.trackingNumber||'',lastTrackNumber:lastTrackNumber||meta.fulfillment?.lastTrackNumber||'',trackingUrl:trackingUrl||meta.fulfillment?.trackingUrl||null,observedAt:new Date().toISOString()};
-  const exception=String(raw.orderStatus).toUpperCase()==='CANCELLED'?{actionRequired:true,source:'cj' as const,orderStatus:'CANCELLED',observedAt:next.observedAt}:meta.exception;
+  const exceptionCode=cjShipmentException(raw,tracking?.ok?tracking.data.trackStatus:null);
+  const exception=exceptionCode?{actionRequired:true,source:'cj' as const,orderStatus:exceptionCode,observedAt:next.observedAt}:meta.exception;
   await tx.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET evidence_json=${JSON.stringify({...meta,fulfillment:next,exception})},version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${BigInt(id)}`;
   // Aggregate the least advanced fulfillment group; one delivered parcel cannot complete a multi-group order.
   // Read current group versions after the order lock, not the snapshot created

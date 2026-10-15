@@ -66,7 +66,7 @@ export function AddressEntryForm({regions, areas}:{regions:{id:number;name:strin
     <div><label className={label}>رقم المبنى *</label><input name="buildingNumber" required maxLength={20} inputMode="numeric" placeholder="4 أرقام" className={field}/></div>
     <div><label className={label}>الرقم الفرعي (اختياري)</label><input name="secondaryNumber" maxLength={20} inputMode="numeric" className={field}/></div>
     <div><label className={label}>الرمز البريدي *</label><input name="postalCode" required inputMode="numeric" pattern="[0-9]{5}" maxLength={5} placeholder="5 أرقام" className={field}/></div>
-    <div><label className={label}>العنوان الوطني المختصر (اختياري)</label><input name="shortAddress" maxLength={8} pattern="[A-Za-z]{4}[0-9]{4}" title="٤ أحرف ثم ٤ أرقام مثل QDMA9340" placeholder="مثال: QDMA9340" className={field} style={{textTransform:'uppercase'}}/><span className="mt-0.5 block text-[11px] text-slate-400">٤ أحرف ثم ٤ أرقام</span></div>
+    <div><label className={label}>العنوان الوطني المختصر (مطلوب لشحن CJ)</label><input name="shortAddress" maxLength={8} pattern="[A-Za-z]{4}[0-9]{4}" title="٤ أحرف ثم ٤ أرقام مثل QDMA9340" placeholder="مثال: QDMA9340" className={field} style={{textTransform:'uppercase'}}/><span className="mt-0.5 block text-[11px] text-slate-400">٤ أحرف ثم ٤ أرقام</span></div>
 
     {/* ===== تحديد الموقع من الخريطة (اختياري) ===== */}
     <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3">

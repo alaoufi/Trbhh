@@ -21,7 +21,7 @@ export async function POST(request:Request){
   if(!rows.length)return NextResponse.json({processed:0},{headers});
   // Rotate even incomplete reconciliation attempts; durable worker CAS remains the mutation claim.
   await prisma.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET updated_at=CURRENT_TIMESTAMP(3) WHERE id=${rows[0].id}`;
-  await processCjFulfillment(String(rows[0].id));
+  await processCjFulfillment(String(rows[0].id),{deferPayment:true});
   await reconcileCjSettlementForFulfillment(String(rows[0].id));
   return NextResponse.json({processed:1},{headers});
  }catch{return fail('cj_fulfillment_unavailable',503);}

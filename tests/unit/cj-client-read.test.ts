@@ -41,6 +41,14 @@ afterEach(() => {
 });
 
 describe('CJ authentication and verified connection', () => {
+  it('uses the documented orderIds batch schema with at most 100 ids, and retries only a read limit',async()=>{
+    mock.fetch.mockResolvedValueOnce(reply({code:1600200,result:false,message:'Too Many Requests'},429)).mockResolvedValueOnce(success([{orderId:'O1',orderNum:'R1'}]));
+    const {getCjOrderDetailBatch}=await import('@/lib/cj/client');
+    expect(await finish(getCjOrderDetailBatch(['O1']))).toEqual({ok:true,data:[{orderId:'O1',orderNum:'R1'}]});
+    expect(mock.fetch.mock.calls[0][1].body).toBe(JSON.stringify({orderIds:['O1']}));
+    expect(await getCjOrderDetailBatch(Array.from({length:101},(_,i)=>String(i)))).toMatchObject({ok:false});
+    expect(mock.fetch).toHaveBeenCalledTimes(2);
+  });
   it('also pauses already queued stock reads when the first request hits the account quota',async()=>{
     const sent:number[]=[];
     mock.fetch.mockImplementation(async()=>{sent.push(Date.now());return sent.length===1?reply({code:1600200,result:false,message:'Too Many Requests'},429):success([]);});

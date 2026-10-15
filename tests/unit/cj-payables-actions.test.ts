@@ -1,5 +1,6 @@
 import {describe,it,expect,vi,beforeEach} from 'vitest';
-const mocks=vi.hoisted(()=>({access:vi.fn(),prepare:vi.fn(),refresh:vi.fn(),setting:vi.fn(),authorize:vi.fn(),batch:vi.fn(),supplierRead:vi.fn(),cardPrepare:vi.fn()}));
+const mocks=vi.hoisted(()=>({access:vi.fn(),prepare:vi.fn(),refresh:vi.fn(),setting:vi.fn(),authorize:vi.fn(),batch:vi.fn(),supplierRead:vi.fn(),cardPrepare:vi.fn(),unified:vi.fn()}));
+vi.mock('@/lib/cj/settlements/unified-card',()=>({prepareUnifiedCjSettlement:mocks.unified}));
 vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw Error(url);}}));
 vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:mocks.access}));
@@ -9,6 +10,7 @@ vi.mock('@/lib/cj/fulfillment',()=>({reconcileCjFulfillmentPayment:mocks.supplie
 import {prepareSettlement,saveSettlementWait,authorizeWalletSettlement,refreshSettlement,prepareUnpaidSupplierOrder} from '@/app/admin/suppliers/cj/payables/actions';
 function form(){const data=new FormData();data.append('fulfillmentId','2');data.set('reviewed','1');data.set('requestKey','12345678-1234-4234-8234-123456789abc');return data;}
 describe('CJ settlement actions authority',()=>{
+  it('prepares one shared parent after reserving the batch without any wallet authorization',async()=>{mocks.batch.mockResolvedValue({id:'8',lines:[{id:'2'},{id:'3'}]});mocks.unified.mockResolvedValue({payId:'ONE'});await expect(prepareSettlement(form())).rejects.toThrow('?batch=8#');expect(mocks.unified).toHaveBeenCalledExactlyOnceWith('8');expect(mocks.authorize).not.toHaveBeenCalled();expect(mocks.cardPrepare).not.toHaveBeenCalled();});
   beforeEach(()=>{vi.clearAllMocks();mocks.access.mockResolvedValue({uid:7});mocks.prepare.mockResolvedValue({id:'8'});});
   it('requires order view/edit and financial view before recording batch',async()=>{
     await expect(prepareSettlement(form())).rejects.toThrow('?batch=8');

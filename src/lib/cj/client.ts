@@ -118,7 +118,7 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
   // POST freightCalculate is a quote; order/payment POSTs must stay single-send.
   const retryableRead = (request.method === 'GET' && [
     '/product/query','/product/variant/query','/product/stock/queryByVid','/product/stock/getInventoryByPid',
-  ].includes(path)) || (request.method === 'POST' && path === '/logistic/freightCalculate');
+  ].includes(path)) || (request.method === 'POST' && ['/logistic/freightCalculate','/shopping/order/getOrderDetailBatch'].includes(path));
   let response:{status:number;body:unknown};
   for(let attempt=0;;attempt++){
     response=await fetchJson(`${cfg.base}${path}${qs}`,request).catch(()=>({status:0,body:null}));
@@ -219,6 +219,14 @@ export async function getInventoryByVid(vid: string): Promise<CjResult<CjInvento
   if (!r.ok) return r;
   const list = Array.isArray(r.data) ? r.data : [];
   return { ok: true, data: list.map((s) => mapInventory(s as Record<string, unknown>)) };
+}
+/** Authenticated reconciliation only. Missing members remain unverified. */
+export async function getCjOrderDetailBatch(orderIds:string[]):Promise<CjResult<Record<string,unknown>[]>>{
+ if(!orderIds.length||orderIds.length>100||new Set(orderIds).size!==orderIds.length||orderIds.some(id=>!/^[A-Za-z0-9_-]{1,100}$/.test(id)))return {ok:false,error:'cj_batch_ids_invalid'};
+ const result=await call<unknown>('/shopping/order/getOrderDetailBatch',{method:'POST',body:{orderIds}});
+ if(!result.ok)return result;
+ if(!Array.isArray(result.data)||result.data.some(r=>!r||typeof r!=='object'||Array.isArray(r)))return {ok:false,error:'cj_batch_response_invalid'};
+ return {ok:true,data:result.data as Record<string,unknown>[]};
 }
 
 export async function getInventoryByPid(pid: string): Promise<CjResult<CjInventory[]>> {

@@ -35,9 +35,12 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
   const items = await prisma.$queryRaw<Item[]>`SELECT id,title,quantity,unit_price_minor,list_unit_price_minor,discount_minor,total_minor,variant_snapshot FROM commerce_order_items WHERE order_id=${order.id} ORDER BY id LIMIT 100`;
   const suppliers = keys.has('settlements:view') ? await prisma.$queryRaw<SupplierSnapshot[]>`SELECT product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor FROM commerce_order_suppliers WHERE order_id=${order.id} ORDER BY product_id LIMIT 100` : [];
   const shipping: ShippingSnapshot = typeof order.shipping === 'string' ? JSON.parse(order.shipping) : order.shipping;
+  const objections=order.fulfillment_status==='action_required'&&keys.has('shipping:view')?await prisma.$queryRaw<{payload:unknown}[]>`SELECT payload FROM commerce_audit_events WHERE order_id=${order.id} AND event='cj_customer_dispute' LIMIT 1`:[];
+  const objectionReasons=objections.flatMap(row=>{try{const p=(typeof row.payload==='string'?JSON.parse(row.payload):row.payload) as {reason?:unknown};return typeof p?.reason==='string'?[p.reason.slice(0,1000)]:[];}catch{return [];}});
   return <section className="card-3d space-y-4 rounded-xl p-5">
     <AccessPage href="/admin/orders"><Link href="/admin/orders" className="text-primary underline">العودة إلى السلع والطلبات</Link></AccessPage>
     <h1 className="text-xl font-bold text-primary">تفاصيل الطلب #{order.id.toString()}</h1>
+    {objectionReasons.map((reason,i)=><section key={i} className="rounded-lg border border-red-300 p-3"><h2 className="font-bold">اعتراض العميل — يتطلب مراجعة</h2><p>{reason}</p><p>الإقفال محجوب. تُراجع الأدلة ويُتابع الاعتراض مع CJ؛ لا استرداد أو سداد إضافي تلقائي.</p></section>)}
     <p className="text-sm">رقم العضو: {order.member_id.toString()}</p>
     <p>حالة دفع العميل: {paymentLabels[order.status] ?? 'حالة غير معروفة — راجع المسؤول'}</p>
     <p>حالة التنفيذ الداخلي: {fulfillmentLabels[order.fulfillment_status] ?? 'حالة غير معروفة — راجع المسؤول'}</p>

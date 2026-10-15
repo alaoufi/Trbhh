@@ -10,9 +10,9 @@ vi.mock('@/lib/commerce/runtime',()=>({getCommerceGateway:mock.gateway}));
 vi.mock('@/lib/cj/live-quote-builder',()=>({buildLiveCjQuote:mock.liveQuote}));
 vi.mock('@/lib/roles',()=>({requireAnyAdmin:mock.admin}));
 vi.mock('@/lib/cj/checkout-renewal',()=>({resolveCjCheckoutRequestKey:mock.renew}));
-vi.mock('@/lib/cj/destination',()=>({getCjDestinationAddress:async()=>({postalCode:'23455',fullName:'عنوان محفوظ',phone:'0500000000',city:'جدة',district:'حي محفوظ',street:'شارع محفوظ',buildingNumber:'1',region:'مكة'})}));
+vi.mock('@/lib/cj/destination',()=>({getCjDestinationAddress:async()=>({postalCode:'23455',fullName:'عنوان محفوظ',phone:'+966500000000',city:'جدة',district:'حي محفوظ',street:'شارع محفوظ',buildingNumber:'1',shortAddress:'ABCD1234',region:'مكة'})}));
 import {placeCjTrialOrder} from '@/app/cj/cart/actions';
-const form=(qty=1)=>{const data=new FormData();for(const [key,value] of Object.entries({items:JSON.stringify([{id:4,qty,variantId:'blue-s',snapshot:{checkedAt:'2026-10-12T00:00:00Z'}}]),shipName:'عنوان محفوظ',shipPhone:'0500000000',shipCity:'جدة',shipRegion:'مكة',shipAddress1:'حي محفوظ، شارع محفوظ، 1',shipAddress2:'الرمز البريدي 23455'}))data.set(key,value);return data;};
+const form=(qty=1)=>{const data=new FormData();for(const [key,value] of Object.entries({items:JSON.stringify([{id:4,qty,variantId:'blue-s',snapshot:{checkedAt:'2026-10-12T00:00:00Z'}}]),shipName:'عنوان محفوظ',shipPhone:'+966500000000',shipCity:'جدة',shipRegion:'مكة',shipAddress1:'حي محفوظ، شارع محفوظ، 1',shipAddress2:'الرمز البريدي 23455'}))data.set(key,value);return data;};
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('SUPPLIER_ALLOW_LIVE_ORDERS','false');vi.stubEnv('CJ_ALLOW_LIVE_ORDERS','false');mock.admin.mockResolvedValue({uid:9});mock.renew.mockResolvedValue('fixture-renewed-private-request');mock.config.mockResolvedValue({purchasingEnabled:false});mock.create.mockResolvedValue({id:1n,created:true});mock.quote.mockResolvedValue({totalMinor:2200,rejected:[],lines:[{id:4,qty:1,title:'سلعة',variantId:'blue-s',variantSku:'SKU',unitMinor:1500,vatMinor:0,shippingName:'Standard'}]});});
 afterEach(()=>vi.unstubAllEnvs());
 describe('CJ trial order intent',()=>{

@@ -5,7 +5,7 @@ const messages:Record<string,string>={
  warehouse:'تعذر تحديد مستودع واحد يوفّر الكمية ومسار الشحن المختار. لم يبدأ الدفع.',
  changed:'تغير السعر أو الشحن أو الضريبة. راجع المنتج وأعد إضافته بالسعر الجديد قبل الدفع.',
  provider:'تعذر التحقق من بيانات المورد الآن. لم يبدأ الدفع؛ حاول لاحقًا.',
- address:'عنوان الشحن ناقص أو تغير. راجع عنوانك قبل الدفع.',
+ address:'راجع عنوان الشحن قبل الدفع: الجوال السعودي والشارع ورقم المبنى والعنوان الوطني المختصر (4 أحرف و4 أرقام) مطلوبة.',
  invalid:'بيانات السلة غير صالحة. أعد إضافة المنتج قبل الدفع.',
 };
 export function cjCheckoutFeedback(value:unknown):string|null{return typeof value==='string'&&Object.hasOwn(messages,value)?messages[value]:null;}

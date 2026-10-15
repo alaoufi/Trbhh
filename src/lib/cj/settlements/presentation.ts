@@ -1,4 +1,15 @@
 /** Read-only display extraction. A newer quote never silently changes the settlement. */
+export function unifiedSettlementPaymentUrl(id:string,total:number,rows:{status:string;fulfillment_status:string;last_error:string|null;pay_id:string|null;pay_expires_at:Date|null;total_usd_minor:number;evidence_json:unknown;wallet_authorized:bigint}[]):string|null{
+ try{
+  if(!rows.length||rows.reduce((n,r)=>n+r.total_usd_minor,0)!==total)return null;
+  const metas=rows.map(r=>typeof r.evidence_json==='string'?JSON.parse(r.evidence_json):r.evidence_json);
+  if(metas.some(m=>m?.exception?.actionRequired))return null;
+  const payments=metas.map(m=>m?.payment);
+  const first=payments[0];if(!first||!/^[A-Za-z0-9_-]{1,100}$/.test(first.payId)||first.batchId!==id||first.batchPayableUsdMinor!==total||first.expiresAt<=Date.now())return null;
+  if(!rows.every((r,i)=>r.status==='pending'&&r.fulfillment_status==='payment_ready'&&!r.last_error&&!Number(r.wallet_authorized)&&r.pay_id===first.payId&&r.pay_expires_at?.getTime()===first.expiresAt&&payments[i]?.batchId===id&&payments[i].payId===first.payId&&payments[i].shipmentOrderId===first.shipmentOrderId&&payments[i].batchPayableUsdMinor===total&&payments[i].payableUsdMinor===r.total_usd_minor))return null;
+  return `https://www.cjdropshipping.com/mine/payment?pid=${encodeURIComponent(first.payId)}`;
+ }catch{return null;}
+}
 export function cjSettlementFreshnessAmount(evidence:unknown):number|null {
   try {
     const data = (typeof evidence==='string'?JSON.parse(evidence):evidence) as {freshness?:{actualUsdMinor?:unknown};proof?:{freshness?:{actualUsdMinor?:unknown}}}|null;

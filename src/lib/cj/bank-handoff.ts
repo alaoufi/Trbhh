@@ -2,7 +2,7 @@ import 'server-only';
 import type {Prisma} from '@prisma/client';
 import {createHash} from 'node:crypto';
 import {validateLiveCjQuote,type LiveCjQuote} from './live-quote';
-import {canonicalCjDestination} from './live-destination';
+import {canonicalCjDestination,assertSaudiCjCheckoutAddress} from './live-destination';
 type Tx=Prisma.TransactionClient;
 function canonical(value:unknown):unknown{if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)]));return value;}
 function quoteHash(value:LiveCjQuote):string{return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');}
@@ -31,6 +31,7 @@ export async function requireLiveCjQuotesAtPayment(tx:Tx,orderId:bigint,now:Date
   const quote=(typeof row.quote_json==='string'?JSON.parse(row.quote_json):row.quote_json) as LiveCjQuote;
   if(quoteHash(quote)!==row.quote_hash)throw new Error('cj_quote_snapshot_changed');
   validateLiveCjQuote(quote,quote.destination,now);lines.push(...quote.lines);
+  assertSaudiCjCheckoutAddress(shipping);
   const expected=canonicalCjDestination(shipping);
   if(Object.entries(expected).some(([key,value])=>quote.destination[key]!==value))throw new Error('cj_quote_destination_changed');
   customerTotal+=quote.customerSarMinor;

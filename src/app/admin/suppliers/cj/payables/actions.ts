@@ -6,7 +6,7 @@ import {setSetting} from '@/lib/settings';
 import {prepareCjSettlementBatch,reconcileCjSettlementBatch,getCjSettlementBatch,authorizeCjSettlementWalletBatch} from '@/lib/cj/settlements';
 import {reconcileCjFulfillmentPayment,prepareCjFulfillmentCardPayment} from '@/lib/cj/fulfillment';
 import {settlementSelection,settlementWaitHours,settlementExpectedAmount} from './policy';
-import {prepareSettlementPaymentLinks} from '@/lib/cj/settlements/payment-preparation';
+import {prepareUnifiedCjSettlement} from '@/lib/cj/settlements/unified-card';
 
 const path = '/admin/suppliers/cj/payables';
 async function authorise() {
@@ -44,7 +44,7 @@ export async function prepareSettlement(form: FormData) {
   try{
     const saved=await getCjSettlementBatch(batch.id);
     if(!saved)throw Error('missing');
-    incomplete=(await prepareSettlementPaymentLinks(saved.lines,prepareCjFulfillmentCardPayment)).failedIds.length>0;
+    await prepareUnifiedCjSettlement(batch.id);
   }catch{incomplete=true;}
   revalidatePath(path);
   redirect(`${path}?batch=${encodeURIComponent(batch.id)}${incomplete?'&error=prepare':''}#cj-batch-payment`);

@@ -5,9 +5,9 @@ import {validateAndTransformLiveCjQuoteToCommitment} from './commitment';
 type Row={id:bigint;version:number;status:FulfillmentRecord['status'];quote_json:unknown;supplier_reference:string;cj_order_id:string|null;evidence_json:unknown;last_error:string|null;paid_verified:bigint};
 function json<T>(v:unknown):T {return (typeof v==='string'?JSON.parse(v):v) as T;}
 function record(r:Row|undefined):FulfillmentRecord|null {
- if(!r)return null;const commitment=validateAndTransformLiveCjQuoteToCommitment(json<unknown>(r.quote_json));const meta=r.evidence_json?json<{payment?:FulfillmentRecord['payment'];proof?:unknown;createAcknowledgement?:FulfillmentRecord['createAcknowledgement']}>(r.evidence_json):{};
+ if(!r)return null;const commitment=validateAndTransformLiveCjQuoteToCommitment(json<unknown>(r.quote_json));const meta=r.evidence_json?json<{payment?:FulfillmentRecord['payment'];proof?:unknown;exception?:{actionRequired?:boolean};createAcknowledgement?:FulfillmentRecord['createAcknowledgement']}>(r.evidence_json):{};
  if(commitment.supplierReference!==r.supplier_reference)throw Error('fulfillment_reference_corrupt');
- return {id:r.id.toString(),version:r.version,status:r.status,commitment,customerPaidVerified:Number(r.paid_verified)===1,cjOrderId:r.cj_order_id||undefined,createAcknowledgement:meta.createAcknowledgement,payment:meta.payment,evidence:meta.proof,lastError:r.last_error||undefined};
+ return {id:r.id.toString(),version:r.version,status:r.status,commitment,actionRequired:meta.exception?.actionRequired===true,customerPaidVerified:Number(r.paid_verified)===1,cjOrderId:r.cj_order_id||undefined,createAcknowledgement:meta.createAcknowledgement,payment:meta.payment,evidence:meta.proof,lastError:r.last_error||undefined};
 }
 /** No in-memory locks: version CAS is the durable mutation claim across processes. */
 export const fulfillmentStore:FulfillmentStore={
@@ -24,7 +24,8 @@ export const fulfillmentStore:FulfillmentStore={
   const current=record(rows[0]);if(!current||current.version!==version||!current.customerPaidVerified)return false;
   // Quote/customer receipt/reference cannot be changed through worker updates.
   const next={...current,...patch};const payment=next.payment;
-  const changed=await tx.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET version=version+1,status=${next.status},cj_order_id=${next.cjOrderId||null},shipment_order_id=${payment?.shipmentOrderId||null},pay_id=${payment?.payId||null},pay_expires_at=${payment?new Date(payment.expiresAt):null},evidence_json=${JSON.stringify({payment,proof:next.evidence,createAcknowledgement:next.createAcknowledgement})},last_error=${next.lastError||null},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${BigInt(id)} AND version=${version}`;
+  const existingMeta=rows[0].evidence_json?json<Record<string,unknown>>(rows[0].evidence_json):{};
+  const changed=await tx.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET version=version+1,status=${next.status},cj_order_id=${next.cjOrderId||null},shipment_order_id=${payment?.shipmentOrderId||null},pay_id=${payment?.payId||null},pay_expires_at=${payment?new Date(payment.expiresAt):null},evidence_json=${JSON.stringify({...existingMeta,payment,proof:next.evidence,createAcknowledgement:next.createAcknowledgement})},last_error=${next.lastError||null},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${BigInt(id)} AND version=${version}`;
   if(changed!==1)return false;
   if(['blocked','parent_uncertain'].includes(next.status)&&order.fulfillment_status!=='completed'){
    // A bank-paid hold must be visible even when no dispatcher can resume it.

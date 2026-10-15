@@ -13,7 +13,7 @@ import { applyCjStatus, setOrderTracking } from './store';
 export function extractCjStatusEvent(payload: Record<string, unknown>): {
   cjOrderId: string; orderNumber: string; rawStatus: string; trackNumber: string;
 } {
-  const data = (payload && typeof payload.data === 'object' && payload.data) ? payload.data as Record<string, unknown> : payload;
+  const data = payload?.params&&typeof payload.params==='object'?payload.params as Record<string,unknown>:(payload && typeof payload.data === 'object' && payload.data) ? payload.data as Record<string, unknown> : payload;
   const pick = (...keys: string[]): string => {
     for (const k of keys) {
       const v = data?.[k] ?? payload?.[k];

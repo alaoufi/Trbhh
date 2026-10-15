@@ -10,7 +10,10 @@ export function cjUtcTimestamp(value:unknown):number {
  const parsed=Date.parse(normalized);return Number.isFinite(parsed)&&new Date(parsed).toISOString().slice(0,19)===normalized.slice(0,19)?parsed:NaN;
 }
 export function parseCjParentPayment(parent:Record<string,unknown>,shipmentOrderId:string,code:string,now=Date.now()) {
- if(parent.submitSuccess!==true||!Array.isArray(parent.successOrders)||parent.successOrders.length!==1||parent.successOrders[0]!==code||['unMatchOrderCodes','unMatchProductCodes','interceptOrders'].some(k=>parent[k]!==undefined&&(!Array.isArray(parent[k])||(parent[k] as unknown[]).length)))throw Error('parent_membership_invalid');
+ return parseCjBatchParentPayment(parent,shipmentOrderId,[code],now);
+}
+export function parseCjBatchParentPayment(parent:Record<string,unknown>,shipmentOrderId:string,codes:string[],now=Date.now()) {
+ if(!codes.length||codes.length>20||new Set(codes).size!==codes.length||parent.submitSuccess!==true||!Array.isArray(parent.successOrders)||JSON.stringify([...parent.successOrders].sort())!==JSON.stringify([...codes].sort())||['unMatchOrderCodes','unMatchProductCodes','interceptOrders'].some(k=>parent[k]!==undefined&&(!Array.isArray(parent[k])||(parent[k] as unknown[]).length)))throw Error('parent_membership_invalid');
  const payId=str(parent.payId);if(!/^[A-Za-z0-9_-]{1,200}$/.test(payId)||!/^[A-Za-z0-9_-]{1,200}$/.test(shipmentOrderId))throw Error('payment_identity_invalid');
  const expiresAt=cjUtcTimestamp(parent.payExpireTime);if(!Number.isFinite(expiresAt)||expiresAt<=now)throw Error('payment_expiry_invalid');
  const payment=parent.paymentInformation as Record<string,unknown>|undefined;
@@ -19,27 +22,39 @@ export function parseCjParentPayment(parent:Record<string,unknown>,shipmentOrder
  if(top!==null&&nested!==null&&top!==nested)throw Error('payment_amount_conflict');
  return {shipmentOrderId,payId,expiresAt,payableUsdMinor:top??nested,paymentUrl:`https://www.cjdropshipping.com/mine/payment?pid=${encodeURIComponent(payId)}`};
 }
+/** Exact CJ order membership; no financial debit and no automatic mutation retry. */
+export async function prepareCjBatchParent(codes:string[],transport=request){
+ if(!codes.length||codes.length>20||codes.some(c=>!/^[A-Za-z0-9_-]{1,100}$/.test(c))||new Set(codes).size!==codes.length)throw Error('batch_codes_invalid');
+ const cart=await transport('/shopping/order/addCart',{cjOrderIdList:codes});
+ if(cart.successCount!==codes.length||!Array.isArray(cart.addSuccessOrders)||JSON.stringify([...cart.addSuccessOrders].sort())!==JSON.stringify([...codes].sort())||cart.interceptOrders!==undefined&&(!Array.isArray(cart.interceptOrders)||cart.interceptOrders.length))throw Error('cart_proof_invalid');
+ const confirmed=await transport('/shopping/order/addCartConfirm',{cjOrderIdList:codes});
+ if(confirmed.submitSuccess!==true||confirmed.successCount!==codes.length||confirmed.interceptOrders!==undefined&&(!Array.isArray(confirmed.interceptOrders)||confirmed.interceptOrders.length))throw Error('parent_confirm_invalid');
+ const shipmentOrderId=str(confirmed.shipmentsId);if(!shipmentOrderId)throw Error('shipment_id_missing');
+ return parseCjBatchParentPayment(await transport('/shopping/order/saveGenerateParentOrder',{shipmentOrderId}),shipmentOrderId,codes);
+}
 /** Card receipt is independently queried from CJ, never inferred from return-to-site or wallet history. */
 export function isCjCardPaymentConfirmed(detail:Record<string,unknown>,now=Date.now()):boolean {
  const paid=cjUtcTimestamp(detail.paymentDate);
- return detail.currency==='USD'&&Number.isFinite(paid)&&paid<=now&&['UNSHIPPED','PENDING','PROCESSING','SHIPPED','DELIVERED'].includes(str(detail.orderStatus));
+ return detail.currency==='USD'&&Number.isFinite(paid)&&paid<=now&&['UNSHIPPED','PENDING','PROCESSING','SHIPPED','DELIVERED','COMPLETED'].includes(str(detail.orderStatus));
 }
 export function exactUsdMinor(v:unknown):number|null {if(typeof v!=='number'&&!(typeof v==='string'&&/^\d+(?:\.\d{1,2})?$/.test(v)))return null;const n=Number(v);return Number.isFinite(n)&&n>=0&&Math.abs(n*100-Math.round(n*100))<0.000001&&Number.isSafeInteger(Math.round(n*100))?Math.round(n*100):null;}
 async function request(path:string,body:unknown){const r=await cjFulfillmentTransport(path,body);if(!r.ok)throw Error(r.error);return r.data;}
 export function shippingPayload(c:Commitment):Record<string,string> {
  const d=c.destination;
- return {shippingCountryCode:d.country,shippingCountry:d.countryName||'Saudi Arabia',shippingProvince:d.region,shippingCity:d.city,shippingPhone:d.phone,shippingCustomerName:d.name,shippingAddress:d.address1,shippingAddress2:d.address2||'',shippingZip:d.postalCode};
+ return {shippingCountryCode:d.country,shippingCountry:d.countryName||'Saudi Arabia',shippingProvince:d.region,shippingCity:d.city,shippingPhone:d.phone,shippingCustomerName:d.name,shippingAddress:d.address1,shippingAddress2:d.address2||'',shippingZip:d.postalCode,...(d.houseNumber?{houseNumber:d.houseNumber}:{})};
 }
-export function makeFulfillmentProvider(c:Commitment):FulfillmentProvider {
+export function makeFulfillmentProvider(c:Commitment,snapshot?:Record<string,unknown>):FulfillmentProvider {
  return {
   async createUnpaid(){const payload={...shippingPayload(c),orderNumber:c.supplierReference,payType:3,orderFlow:1,shopLogisticsType:2,fromCountryCode:c.originCountry,logisticName:c.logisticName,products:c.lines.map(x=>({vid:x.vid,quantity:x.quantity}))};const d=await request('/shopping/order/createOrderV3',payload);const id=str(d.orderId);if(!id||str(d.orderNumber)!==c.supplierReference)throw Error('create_identity_missing');return {orderId:id,acknowledgement:{requestHash:createHash('sha256').update(JSON.stringify(payload)).digest('hex'),requestPayload:payload,orderId:id,reference:c.supplierReference,response:d}};},
   async findByReference(reference){try{const d=await request('/shopping/order/getOrderDetail',{orderId:reference});return str(d.orderNum)===reference&&str(d.orderId)?[str(d.orderId)]:[];}catch{return []; }},
-  async detail(id){const d=await request('/shopping/order/getOrderDetail',{orderId:id});const rows=Array.isArray(d.productList)?d.productList as Record<string,unknown>[]:[];
+  async detail(id){const d=snapshot&&str(snapshot.orderId)===id?snapshot:await request('/shopping/order/getOrderDetail',{orderId:id});const rows=Array.isArray(d.productList)?d.productList as Record<string,unknown>[]:[];
    // Query product variants to establish PID ownership instead of inventing PID from the quote.
    const ownership=new Map<string,string>();for(const pid of new Set(c.lines.map(x=>x.pid))){const variants=await getVariants(pid);if(!variants.ok)throw Error('variant_ownership_unavailable');for(const v of variants.data)ownership.set(v.vid,pid);}
    const address=str(d.shippingAddress),postalMatch=address.match(/، الرمز البريدي (\d{5})$/),extraMatch=address.match(/، العنوان الإضافي: (.*)، الرمز البريدي \d{5}$/);
    // Extract only text CJ actually echoed. No quote fallback for unreturned ZIP/address2.
-   const destination={country:str(d.shippingCountryCode),region:str(d.shippingProvince),city:str(d.shippingCity),phone:str(d.shippingPhone),name:str(d.shippingCustomerName),address1:address,address2:str(d.shippingAddress2)||extraMatch?.[1]||'',postalCode:str(d.shippingZip)||postalMatch?.[1]||''};
+   const destination:Record<string,string>={country:str(d.shippingCountryCode),region:str(d.shippingProvince),city:str(d.shippingCity),phone:str(d.shippingPhone),name:str(d.shippingCustomerName),address1:address,address2:str(d.shippingAddress2)||extraMatch?.[1]||'',postalCode:str(d.shippingZip)||postalMatch?.[1]||''};
+   if(c.destination.houseNumber)destination.houseNumber=str(d.houseNumber)||(address.split('، ').includes(c.destination.houseNumber)?c.destination.houseNumber:'');
+   if(c.destination.shortAddress)destination.shortAddress=address.match(/(?:^|[\s،,])([A-Z]{4}\d{4})(?=$|[\s،,])/)?.[1]||'';
    const physicalStorageId=str(d.storageId);let originAreaId='';
    if(physicalStorageId){const warehouse=await getCjWarehouseDetail(physicalStorageId);if(!warehouse.ok||str(warehouse.data.id)!==physicalStorageId||str(warehouse.data.areaCountryCode)!==str(d.fromCountryCode))throw Error('warehouse_identity_unverified');originAreaId=String(warehouse.data.areaId??'');}
    const proof:OrderProof & {orderStatus:string;currency:string}={orderStatus:str(d.orderStatus),currency:str(d.currency),orderId:str(d.orderId),reference:str(d.orderNum),cjOrderCode:str(d.cjOrderCode)||null,billingOrderId:str(d.cjOrderId)||null,payableUsdMinor:exactUsdMinor(d.orderAmount),paymentDate:str(d.paymentDate)||null,originAreaId,physicalStorageId:physicalStorageId||null,originCountry:str(d.fromCountryCode),logisticName:str(d.logisticName),destination,lines:rows.map(x=>({pid:ownership.get(str(x.vid))||'',vid:str(x.vid),quantity:Number(x.quantity)}))};return proof;

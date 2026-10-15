@@ -13,7 +13,7 @@ import {buildLiveCjQuote} from '@/lib/cj/live-quote-builder';
 import {formatAddressLine} from '@/lib/commerce/addresses';
 import {requireAnyAdmin} from '@/lib/roles';
 import {resolveCjCheckoutRequestKey} from '@/lib/cj/checkout-renewal';
-import {canonicalCjDestination} from '@/lib/cj/live-destination';
+import {canonicalCjDestination,assertSaudiCjCheckoutAddress} from '@/lib/cj/live-destination';
 import {requireCjLiveTrialAuthority} from '@/lib/cj/private-trial';
 import {cjPrivateRuntimeEnabled} from '@/lib/cj/live-gates';
 import {cjCheckoutFailure} from '@/lib/cj/checkout-feedback';
@@ -64,7 +64,7 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
     if(!config.paymentsEnabled||!gateway?.ready)redirect('/cj/cart?order=unavailable');
     const shipping={name:destination.fullName,phone:destination.phone,addressLine:formatAddressLine(destination),city:destination.city,postalCode:destination.postalCode,country:'SA' as const,region:destination.region,district:destination.district,street:destination.street,buildingNumber:destination.buildingNumber,secondaryNumber:destination.secondaryNumber,alternatePhone:destination.alternatePhone,email:destination.email,shortAddress:destination.shortAddress,deliveryNotes:destination.deliveryNotes};
     let cjDestination:ReturnType<typeof canonicalCjDestination>;
-    try{cjDestination=canonicalCjDestination(shipping);}catch{redirect('/cj/cart?order=address');}
+    try{assertSaudiCjCheckoutAddress(shipping);cjDestination=canonicalCjDestination(shipping);}catch{redirect('/cj/cart?order=address');}
     let commerceOrderId:bigint;
     try{
       const requestKey=await resolveCjCheckoutRequestKey(prisma,BigInt(session.uid),internalRef,new Date());

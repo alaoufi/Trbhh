@@ -8,6 +8,12 @@ const db=await vi.hoisted(async()=>{
 });
 vi.mock('@/lib/prisma',()=>({prisma:db.client}));
 vi.mock('server-only',()=>({}));
+const unified=vi.hoisted(()=>({parent:vi.fn(),fresh:vi.fn()}));
+vi.mock('@/lib/cj/live-gates',()=>({cjPrivateFinancialOperationsAllowed:async()=>true}));
+vi.mock('@/lib/cj/fulfillment/freshness',()=>({verifyCjCommitmentFresh:unified.fresh}));
+vi.mock('@/lib/cj/fulfillment/provider',async original=>({...await original<typeof import('@/lib/cj/fulfillment/provider')>(),prepareCjBatchParent:unified.parent,makeFulfillmentProvider:(c:{supplierReference:string;supplierUsdMinor:number})=>({detail:async(id:string)=>({...c,orderId:id,reference:c.supplierReference,payableUsdMinor:c.supplierUsdMinor,paymentDate:null,cjOrderCode:'SD'+id,orderStatus:'UNPAID'})})}));
+vi.mock('@/lib/cj/fulfillment/store',()=>({fulfillmentStore:{read:async(id:string)=>{const [r]=await db.client!.$queryRaw<Record<string,unknown>[]>`SELECT * FROM commerce_cj_fulfillment_outbox WHERE id=${BigInt(id)}`;const meta=(typeof r.evidence_json==='string'?JSON.parse(r.evidence_json):r.evidence_json) as {payment?:unknown};return {...r,id,status:r.status,version:r.version,customerPaidVerified:true,cjOrderId:r.cj_order_id,payment:meta?.payment,lastError:r.last_error||undefined,commitment:{supplierReference:r.supplier_reference,supplierUsdMinor:1300,lines:[{pid:'P',vid:'V'+id,quantity:2}],destination:{country:'SA'},originAreaId:'W',originCountry:'CN',logisticName:'CJ'}};}}}));
+import {prepareUnifiedCjSettlement} from '@/lib/cj/settlements/unified-card';
 import {COMMERCE_DDL} from '@/lib/commerce/schema';
 import {prepareCjSettlementBatch,authorizeCjSettlementWalletBatch,reconcileCjSettlementBatch,getCjSettlementWalletAuthorization} from '@/lib/cj/settlements';
 describe.skipIf(!db.client)('CJ settlement accounting on disposable MySQL',()=>{
@@ -20,16 +26,25 @@ describe.skipIf(!db.client)('CJ settlement accounting on disposable MySQL',()=>{
   await client.$executeRawUnsafe('CREATE TABLE commerce_orders(id BIGINT UNSIGNED PRIMARY KEY,status VARCHAR(24),currency VARCHAR(3),total_minor INT) ENGINE=InnoDB');
   await client.$executeRawUnsafe('CREATE TABLE commerce_receipts(order_id BIGINT UNSIGNED PRIMARY KEY,amount_minor INT,currency VARCHAR(3),recorded_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)) ENGINE=InnoDB');
   await client.$executeRawUnsafe('CREATE TABLE commerce_cj_fulfillment_outbox(id BIGINT UNSIGNED PRIMARY KEY,commerce_order_id BIGINT UNSIGNED,status VARCHAR(32),cj_order_id VARCHAR(100),pay_id VARCHAR(100),shipment_order_id VARCHAR(100),pay_expires_at DATETIME(3),quote_json JSON,evidence_json JSON,last_error VARCHAR(191) NULL) ENGINE=InnoDB');
+  await client.$executeRawUnsafe('ALTER TABLE commerce_cj_fulfillment_outbox ADD version INT NOT NULL DEFAULT 0, ADD supplier_reference VARCHAR(100), ADD updated_at DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3)');
  },20000);
  beforeEach(async()=>{
+  unified.parent.mockReset();unified.fresh.mockReset();unified.fresh.mockResolvedValue({ok:true});
   for(const table of ['commerce_cj_settlement_wallet_grants','commerce_cj_settlement_lines','commerce_cj_settlement_batches','commerce_cj_fulfillment_outbox','commerce_receipts','commerce_orders'])await client.$executeRawUnsafe(`DELETE FROM ${table}`);
   for(let i=1;i<=10;i++){
    const quote=JSON.stringify({lines:[{quantity:2,supplierUnitUsdMinor:500}],supplierFreightUsdMinor:250,supplierTaxUsdMinor:50,supplierUsdMinor:1300});const proof=JSON.stringify({payment:{payId:`pay${i}`,shipmentOrderId:`ship${i}`,payableUsdMinor:1300}});
    await client.$executeRaw`INSERT INTO commerce_orders VALUES(${i},'paid','SAR',5000)`;
    await client.$executeRaw`INSERT INTO commerce_receipts(order_id,amount_minor,currency) VALUES(${i},5000,'SAR')`;
-   await client.$executeRaw`INSERT INTO commerce_cj_fulfillment_outbox VALUES(${i},${i},'payment_ready',${`CJ${i}`},${`pay${i}`},${`ship${i}`},${new Date(Date.now()+3600000)},${quote},${proof},NULL)`;
+   await client.$executeRaw`INSERT INTO commerce_cj_fulfillment_outbox(id,commerce_order_id,status,cj_order_id,pay_id,shipment_order_id,pay_expires_at,quote_json,evidence_json,last_error,supplier_reference) VALUES(${i},${i},'payment_ready',${`CJ${i}`},${`pay${i}`},${`ship${i}`},${new Date(Date.now()+3600000)},${quote},${proof},NULL,${'ref'+i})`;
   }
  },20000);
+ async function unparentedBatch(n=10){await client.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET status='created',pay_id=NULL,shipment_order_id=NULL,pay_expires_at=NULL,evidence_json=JSON_OBJECT()`;unified.parent.mockResolvedValue({payId:'ONEPAY',shipmentOrderId:'ONEPARENT',expiresAt:Date.now()+3600000,payableUsdMinor:n*1300,paymentUrl:'https://www.cjdropshipping.com/mine/payment?pid=ONEPAY'});return prepareCjSettlementBatch(Array.from({length:n},(_,i)=>String(i+1)),1n,'unified_request_key_1');}
+ it.each([1,10])('persists one shared card parent for %i independent lines, reusing it on repeated clicks',async n=>{const b=await unparentedBatch(n);await prepareUnifiedCjSettlement(b.id);await prepareUnifiedCjSettlement(b.id);expect(unified.parent).toHaveBeenCalledTimes(1);expect(unified.parent.mock.calls[0][0]).toHaveLength(n);const rows=await client.$queryRaw<{pay_id:string;total_usd_minor:number}[]>`SELECT f.pay_id,l.total_usd_minor FROM commerce_cj_settlement_lines l JOIN commerce_cj_fulfillment_outbox f ON f.id=l.outbox_id WHERE l.batch_id=${BigInt(b.id)}`;expect(rows).toHaveLength(n);expect(rows.every(r=>r.pay_id==='ONEPAY'&&r.total_usd_minor===1300)).toBe(true);});
+ it('concurrent batch clicks cannot generate a second parent',async()=>{const b=await unparentedBatch();const results=await Promise.allSettled([prepareUnifiedCjSettlement(b.id),prepareUnifiedCjSettlement(b.id)]);expect(results.some(r=>r.status==='fulfilled')).toBe(true);expect(unified.parent).toHaveBeenCalledTimes(1);});
+ it('unknown parent outcome remains held and is never resubmitted',async()=>{const b=await unparentedBatch();unified.parent.mockRejectedValue(Error('connection_lost'));await expect(prepareUnifiedCjSettlement(b.id)).rejects.toThrow('requires_review');await expect(prepareUnifiedCjSettlement(b.id)).rejects.toThrow();expect(unified.parent).toHaveBeenCalledTimes(1);const rows=await client.$queryRaw<{status:string;pay_id:string|null}[]>`SELECT status,pay_id FROM commerce_cj_fulfillment_outbox`;expect(rows.every(r=>r.status==='parent_uncertain'&&!r.pay_id)).toBe(true);});
+ it('rejects a different parent total without exposing a payment URL',async()=>{const b=await unparentedBatch();unified.parent.mockResolvedValue({payId:'WRONG',shipmentOrderId:'S',expiresAt:Date.now()+60000,payableUsdMinor:13001});await expect(prepareUnifiedCjSettlement(b.id)).rejects.toThrow('requires_review');expect((await client.$queryRaw<{n:bigint}[]>`SELECT COUNT(*) n FROM commerce_cj_fulfillment_outbox WHERE pay_id IS NOT NULL`)[0].n).toBe(0n);});
+ it('never reparents existing individual payIds or proceeds after stock failure',async()=>{const b=await prepareCjSettlementBatch(['1'],1n,'individual_link_key_1');await expect(prepareUnifiedCjSettlement(b.id)).rejects.toThrow('unparented');expect(unified.parent).not.toHaveBeenCalled();});
+ it('rejects stock changes before claiming or sending a batch',async()=>{const b=await unparentedBatch();unified.fresh.mockResolvedValue({ok:false,reason:'supplier_stock_changed'});await expect(prepareUnifiedCjSettlement(b.id)).rejects.toThrow('stock_changed');expect(unified.parent).not.toHaveBeenCalled();});
  afterAll(async()=>{await client?.$disconnect();try{if(created)await admin.$executeRawUnsafe('DROP DATABASE trbhh_cj_settlement_test');}finally{await admin?.$disconnect();}},15000);
  const ids=Array.from({length:10},(_,i)=>String(i+1));
  const count=async(table:string)=>Number((await client.$queryRawUnsafe<{n:bigint}[]>(`SELECT COUNT(*) AS n FROM ${table}`))[0].n);

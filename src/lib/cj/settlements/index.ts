@@ -2,7 +2,7 @@ import 'server-only';
 import {Prisma} from '@prisma/client';
 import {prisma} from '@/lib/prisma';
 import {settlementIds,supplierAmounts,selectableStatuses,settlementPaymentReady} from './policy';
-import {cjSettlementFreshnessAmount,cjPayableSelectable,cjPayableHoldReason} from './presentation';
+import {cjSettlementFreshnessAmount,cjPayableSelectable,cjPayableHoldReason,unifiedSettlementPaymentUrl} from './presentation';
 /** Records an explicitly approved wallet instruction; this function itself never debits. */
 export async function authorizeCjSettlementWalletBatch(id:string,actorId:bigint,expectedTotalUsdMinor:number){
  const [batchId]=settlementIds([id]);if(actorId<1n)throw Error('cj_batch_actor_invalid');
@@ -14,8 +14,8 @@ export async function authorizeCjSettlementWalletBatch(id:string,actorId:bigint,
   const [count]=await tx.$queryRaw<{n:bigint}[]>`SELECT COUNT(*) AS n FROM commerce_cj_settlement_lines WHERE batch_id=${batchId}`;
   if(rows.length!==Number(count.n)||!Number.isSafeInteger(expectedTotalUsdMinor)||expectedTotalUsdMinor<1||rows.reduce((n,r)=>n+r.total_usd_minor,0)!==expectedTotalUsdMinor)throw Error('cj_batch_not_payable');
   for(const row of rows){
-   const meta=(typeof row.evidence_json==='string'?JSON.parse(row.evidence_json):row.evidence_json) as {payment?:{payableUsdMinor?:number;payId?:string;shipmentOrderId?:string}}|null;
-   if(row.line_status==='paid'||!settlementPaymentReady(row,row.total_usd_minor)||row.status!=='payment_ready'||!row.pay_id||!row.shipment_order_id||!row.pay_expires_at||supplierAmounts(row.quote_json).totalUsdMinor!==row.total_usd_minor||meta?.payment?.payableUsdMinor!==row.total_usd_minor||meta.payment.payId!==row.pay_id||meta.payment.shipmentOrderId!==row.shipment_order_id)throw Error('cj_wallet_instruction_stale');
+   const meta=(typeof row.evidence_json==='string'?JSON.parse(row.evidence_json):row.evidence_json) as {payment?:{batchId?:string;payableUsdMinor?:number;payId?:string;shipmentOrderId?:string}}|null;
+   if(meta?.payment?.batchId||row.line_status==='paid'||!settlementPaymentReady(row,row.total_usd_minor)||row.status!=='payment_ready'||!row.pay_id||!row.shipment_order_id||!row.pay_expires_at||supplierAmounts(row.quote_json).totalUsdMinor!==row.total_usd_minor||meta?.payment?.payableUsdMinor!==row.total_usd_minor||meta.payment.payId!==row.pay_id||meta.payment.shipmentOrderId!==row.shipment_order_id)throw Error('cj_wallet_instruction_stale');
    // Repeating the same authorization is harmless; an expired grant cannot bind a refreshed payment silently.
    const grants=await tx.$queryRaw<{pay_id:string;shipment_order_id:string;expected_usd_minor:number;status:string}[]>`SELECT pay_id,shipment_order_id,expected_usd_minor,status FROM commerce_cj_settlement_wallet_grants WHERE outbox_id=${row.outbox_id} FOR UPDATE`;
    if(grants.length){if(grants[0].status!=='authorized'||grants[0].pay_id!==row.pay_id||grants[0].shipment_order_id!==row.shipment_order_id||grants[0].expected_usd_minor!==row.total_usd_minor)throw Error('cj_wallet_instruction_conflict');continue;}
@@ -64,11 +64,12 @@ export async function getCjSettlementBatch(id:string){
  const [batch]=await prisma.$queryRaw<{id:bigint;status:string;total_usd_minor:number;created_at:Date}[]>`SELECT id,status,total_usd_minor,created_at FROM commerce_cj_settlement_batches WHERE id=${batchId}`;
  if(!batch)return null;
  const lines=await prisma.$queryRaw<{outbox_id:bigint;commerce_order_id:bigint;cj_order_id:string;status:string;product_usd_minor:number;shipping_usd_minor:number;tax_usd_minor:number;total_usd_minor:number;pay_id:string|null;pay_expires_at:Date|null;fulfillment_status:string;last_error:string|null;evidence_json:unknown;wallet_authorized:bigint}[]>`SELECT l.*,f.pay_id,f.pay_expires_at,f.status AS fulfillment_status,f.last_error,f.evidence_json,EXISTS(SELECT 1 FROM commerce_cj_settlement_wallet_grants g WHERE g.outbox_id=f.id AND g.status='authorized') AS wallet_authorized FROM commerce_cj_settlement_lines l JOIN commerce_cj_fulfillment_outbox f ON f.id=l.outbox_id AND f.cj_order_id=l.cj_order_id WHERE l.batch_id=${batchId} ORDER BY l.outbox_id`;
- return {id:String(batch.id),status:batch.status,totalUsdMinor:batch.total_usd_minor,createdAt:batch.created_at,lines:lines.map(l=>{
+ const sharedCard=lines.some(l=>{try{const meta=typeof l.evidence_json==='string'?JSON.parse(l.evidence_json):l.evidence_json;return !!(meta as {payment?:{batchId?:string}})?.payment?.batchId;}catch{return false;}});
+ return {id:String(batch.id),status:batch.status,totalUsdMinor:batch.total_usd_minor,createdAt:batch.created_at,sharedCard,unifiedPaymentUrl:unifiedSettlementPaymentUrl(id,batch.total_usd_minor,lines),lines:lines.map(l=>{
   const actualUsdMinor=cjSettlementFreshnessAmount(l.evidence_json);
   const walletAuthorized=Number(l.wallet_authorized)===1;
   const freshAmount=actualUsdMinor===null||actualUsdMinor===l.total_usd_minor;
-  return {id:String(l.outbox_id),commerceOrderId:String(l.commerce_order_id),cjOrderId:l.cj_order_id,status:l.status,productUsdMinor:l.product_usd_minor,shippingUsdMinor:l.shipping_usd_minor,taxUsdMinor:l.tax_usd_minor,totalUsdMinor:l.total_usd_minor,lastError:l.last_error,actualUsdMinor,walletAuthorized,holdReason:cjPayableHoldReason(l.fulfillment_status,l.last_error),fulfillmentStatus:l.fulfillment_status,payExpiresAt:l.pay_expires_at,paymentUrl:l.status!=='paid'&&!walletAuthorized&&!l.last_error&&freshAmount&&l.fulfillment_status==='payment_ready'&&l.pay_id&&/^[A-Za-z0-9_-]{1,200}$/.test(l.pay_id)&&l.pay_expires_at&&new Date(l.pay_expires_at).getTime()>Date.now()?`https://www.cjdropshipping.com/mine/payment?pid=${encodeURIComponent(l.pay_id)}`:null};
+  return {id:String(l.outbox_id),commerceOrderId:String(l.commerce_order_id),cjOrderId:l.cj_order_id,status:l.status,productUsdMinor:l.product_usd_minor,shippingUsdMinor:l.shipping_usd_minor,taxUsdMinor:l.tax_usd_minor,totalUsdMinor:l.total_usd_minor,lastError:l.last_error,actualUsdMinor,walletAuthorized,holdReason:cjPayableHoldReason(l.fulfillment_status,l.last_error),fulfillmentStatus:l.fulfillment_status,payExpiresAt:l.pay_expires_at,paymentUrl:!sharedCard&&l.status!=='paid'&&!walletAuthorized&&!l.last_error&&freshAmount&&l.fulfillment_status==='payment_ready'&&l.pay_id&&/^[A-Za-z0-9_-]{1,200}$/.test(l.pay_id)&&l.pay_expires_at&&new Date(l.pay_expires_at).getTime()>Date.now()?`https://www.cjdropshipping.com/mine/payment?pid=${encodeURIComponent(l.pay_id)}`:null};
  })};
 }
 /** Reflect only independently reconciled worker proof; a redirect is never payment evidence. */

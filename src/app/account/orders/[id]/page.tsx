@@ -9,7 +9,7 @@ import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { formatSar } from '@/lib/commerce/money';
 import { memberOrderTracking } from '@/lib/suppliers/tracking';
 import { payCommerceOrder, cancelCommerceOrder, checkCommercePayment } from '../actions';
-import {confirmCjReceipt} from '../receipt-action';
+import {confirmCjReceipt,disputeCjDelivery} from '../receipt-action';
 import {OrderVariantDetails} from '@/components/commerce/order-variant-details';
 import {memberCjOrderTracking} from '@/lib/cj/fulfillment/status';
 import type {MemberTracking} from '@/lib/suppliers/tracking';
@@ -102,6 +102,7 @@ export default async function MemberOrder({ params, searchParams }: {
       <label className="block"><input type="checkbox" name="confirm" value="1" required/> أؤكد استلام جميع سلع هذا الطلب.</label>
       <button className="rounded-lg bg-primary px-4 py-2 font-bold text-white">تأكيد الاستلام وإغلاق العملية</button>
     </form>}
+    {query.dispute==="recorded"&&<p role="status">سُجّل الاعتراض للمراجعة، وأوقفت متابعة الإقفال. لم ينفّذ أي استرداد مالي تلقائي.</p>}{query.dispute==="failed"&&<p role="alert">تعذر تسجيل الاعتراض؛ اكتب سببًا من 10 إلى 1000 حرف.</p>}{order.status==="paid"&&tracking.some(s=>s.id.startsWith("cj-"))&&<details className="rounded-lg border p-3"><summary>اعتراض على التسليم أو الشحنة</summary><form action={disputeCjDelivery} className="space-y-2"><input type="hidden" name="orderId" value={id}/><textarea name="reason" required minLength={10} maxLength={1000} aria-label="سبب الاعتراض" className="w-full rounded border p-2"/><button className="rounded border px-3 py-2">تسجيل الاعتراض للمراجعة</button></form></details>}
     {canPay && <form action={payCommerceOrder} className="space-y-2">
       <input type="hidden" name="orderId" value={id} />
       <label className="block text-sm"><input type="checkbox" name="confirm" value="1" required /> أوافق على دفع إجمالي هذا الطلب.</label>

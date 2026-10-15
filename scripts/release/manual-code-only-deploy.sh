@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-candidate=2b334cd12a9be19578017831a627e5d2d82034f7
+candidate=682aa7c5cd19a47bc5758726e2d9abd8c1a84663
 baseline=cb558f72a930d4de12fbe33b3b8328839be1bdf8
 branch=codex/admin-navigation-complete-20261014
 [[ $(id -u) == 0 ]]

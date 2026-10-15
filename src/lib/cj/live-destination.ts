@@ -3,6 +3,12 @@ export function assertSaudiCjCheckoutAddress(address:Record<string,unknown>):voi
  const text=(k:string)=>typeof address[k]==='string'?(address[k] as string).trim():'';
  if(text('country')!=='SA'||!/^\+?9665\d{8}$/.test(text('phone'))||!text('street')||!text('buildingNumber')||!/^[A-Za-z]{4}\d{4}$/.test(text('shortAddress')))throw Error('cj_saudi_national_address_required');
 }
+/** Recheck persisted destinations before supplier creation or cashier preparation.
+ * Historical paid quotes are not silently edited to invent missing address data. */
+export function assertSaudiCjSupplierAddress(destination:Record<string,string>):void{
+ assertSaudiCjCheckoutAddress({country:destination.country,phone:destination.phone,street:destination.address1,buildingNumber:destination.houseNumber,shortAddress:destination.shortAddress});
+ if(!destination.address1.includes(destination.shortAddress))throw Error('cj_saudi_national_address_required');
+}
 /** One exact supplier-address contract shared by quote, bank gate and CJ request.
  * Preserve additional address content; never silently truncate a paid destination. */
 export function canonicalCjDestination(input:Record<string,unknown>,options:{alreadyCanonical?:boolean}={}){

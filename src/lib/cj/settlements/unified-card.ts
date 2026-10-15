@@ -7,6 +7,7 @@ import {makeFulfillmentProvider,prepareCjBatchParent} from '../fulfillment/provi
 import {matchesCommitment,type FulfillmentRecord,type PaymentProof} from '../fulfillment/worker';
 import {verifyCjCommitmentFresh} from '../fulfillment/freshness';
 import {settlementIds} from './policy';
+import {assertSaudiCjSupplierAddress} from '../live-destination';
 
 type Member={id:string;orderId:bigint;cjOrderId:string;amount:number};
 /** A persisted claim covers every member before the first cart mutation. Existing
@@ -28,6 +29,7 @@ export async function prepareUnifiedCjSettlement(id:string){
  if(existing)return existing;
  for(const row of rows){
   if(row.status!=='created'||row.payment||row.lastError)throw Error('batch_requires_unparented_orders');
+  assertSaudiCjSupplierAddress(row.commitment.destination);
   const provider=makeFulfillmentProvider(row.commitment),proof=await provider.detail(row.cjOrderId!);
   if(proof.orderId!==row.cjOrderId||!matchesCommitment(row.commitment,proof)||proof.paymentDate||proof.payableUsdMinor!==row.commitment.supplierUsdMinor||!proof.cjOrderCode||!['CREATED','IN_CART','UNPAID'].includes(proof.orderStatus||''))throw Error('batch_order_changed');
   const fresh=await verifyCjCommitmentFresh(row.commitment);if(!fresh.ok)throw Error(fresh.reason);

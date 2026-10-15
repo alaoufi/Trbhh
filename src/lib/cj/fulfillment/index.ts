@@ -5,10 +5,14 @@ import {makeFulfillmentProvider} from './provider';
 import {runFulfillment} from './worker';
 import {verifyCjCommitmentFresh} from './freshness';
 import {getCjSettlementWalletAuthorization} from '../settlements';
+import {assertSaudiCjSupplierAddress} from '../live-destination';
 /** Called by an authenticated staff/cron dispatcher, never a bank return page. */
 export async function processCjFulfillment(id:string,options:{cardOnly?:boolean;deferPayment?:boolean}={}):Promise<void>{
  if(!(await cjPrivateFinancialOperationsAllowed()))throw Error('cj_fulfillment_disabled');
  const row=await fulfillmentStore.read(id);if(!row?.customerPaidVerified||row.actionRequired)return;
+ if(['pending','created'].includes(row.status)){
+  try{assertSaudiCjSupplierAddress(row.commitment.destination);}catch{await fulfillmentStore.cas(id,row.version,{status:'blocked',lastError:'cj_saudi_national_address_required'});return;}
+ }
  const provider=makeFulfillmentProvider(row.commitment);
  if(row.status==='parent_claimed'&&(row.evidence as {batchClaim?:string}|undefined)?.batchClaim)return;
  // Prove already-paid external card orders before checking current available

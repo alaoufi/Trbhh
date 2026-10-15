@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 077
 [[ $EUID -eq 0 && ${1:-} =~ ^[a-f0-9]{40}$ ]]
 revision=$1
-candidate=e9ffc5b266b13137d7a8252635445a5b43e3c032
+candidate=770635a11ecdb8562158113cb955aafe504d6ea0
 cd /root/trbhh
 [[ $(pwd -P) == /root/trbhh ]]
 exec 8>/run/lock/trbhh-finance-deploy.lock

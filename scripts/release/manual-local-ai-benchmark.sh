@@ -5,7 +5,7 @@ umask 077
 [[ $EUID -eq 0 && ${1:-} =~ ^[a-f0-9]{40}$ ]]
 revision=$1
 mode=${2:---measure-9b}
-[[ $mode == --measure-9b || $mode == --compare ]]
+[[ $mode == --measure-9b || $mode == --compare || $mode == --verify-purpose ]]
 cd /root/trbhh
 [[ $(pwd -P) == /root/trbhh ]]
 exec 8>/run/lock/trbhh-finance-deploy.lock

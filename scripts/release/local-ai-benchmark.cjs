@@ -56,9 +56,30 @@ async function measure(call,protocol,log=console.log){
  }finally{await call('chat',{model,messages:[],stream:false,keep_alive:0});}
  return {status:'LOCAL_AI_MEASUREMENT_COMPLETE',model,proof,activated:false,accepted:false};
 }
-module.exports={compare,api,measure};
+const PURPOSE_TASK='Name the product that fulfills the described function, not just mentioned objects.';
+async function verifyPurpose(call,gate,log=console.log){
+ const model='qwen3.5:9b',initial=await call('tags');
+ if(initial.models?.some(item=>item.name==='trbhh-local:active'))throw Error('benchmark_existing_active_model_requires_review');
+ if(!initial.models?.some(item=>item.name===model))throw Error('benchmark_installed_model_missing_no_download_attempted');
+ const wrapped=async(path,body)=>{
+  if(path!=='chat'||body?.model!==model)throw Error('benchmark_mutation_blocked');
+  let requestBody=body;
+  if(body.format?.properties?.queries){
+   requestBody={...body,messages:body.messages.map(message=>message.role==='user'?{...message,content:message.content.replace('\nInput data: ',` ${PURPOSE_TASK}\nInput data: `)}:message)};
+  }
+  const started=Date.now(),response=await call(path,requestBody);
+  if(body.messages?.length)log(JSON.stringify({event:'BENCHMARK_PURPOSE_ANSWER',elapsedMs:Date.now()-started,answer:response.message?.content,done:response.done,reason:response.done_reason}));
+  return response;
+ };
+ try{
+  const proof=await gate(wrapped,model);
+  return {status:'LOCAL_AI_PURPOSE_PROBE_PASSED',model,proof,accepted:true,activated:false};
+ }catch(error){return {status:'LOCAL_AI_PURPOSE_PROBE_REJECTED',model,error:String(error.message).slice(0,400),proof:error.proof||[],accepted:false,activated:false};
+ }finally{await call('chat',{model,messages:[],stream:false,keep_alive:0});}
+}
+module.exports={compare,api,measure,verifyPurpose,PURPOSE_TASK};
 if(module.id==='[stdin]'){
  if(typeof globalThis.__trbhhLocalGate!=='function')throw Error('benchmark_gate_missing');
- const measuring=process.argv[2]==='--measure-9b';
- (measuring?measure(api,globalThis.__trbhhLocalProtocol):compare(api,globalThis.__trbhhLocalGate)).then(result=>{console.log(JSON.stringify(measuring?{status:result.status,model:result.model,samples:result.proof.length,activated:false,accepted:false}:result));if(!measuring&&result.status!=='LOCAL_AI_CANDIDATE_PASSED')process.exitCode=1;}).catch(error=>{console.error(String(error.message).slice(0,400));process.exitCode=1;});
+ const measuring=process.argv[2]==='--measure-9b',purpose=process.argv[2]==='--verify-purpose';
+ (purpose?verifyPurpose(api,globalThis.__trbhhLocalGate):measuring?measure(api,globalThis.__trbhhLocalProtocol):compare(api,globalThis.__trbhhLocalGate)).then(result=>{console.log(JSON.stringify(measuring?{status:result.status,model:result.model,samples:result.proof.length,activated:false,accepted:false}:result));if(!measuring&&!(purpose?result.accepted:result.status==='LOCAL_AI_CANDIDATE_PASSED'))process.exitCode=1;}).catch(error=>{console.error(String(error.message).slice(0,400));process.exitCode=1;});
 }

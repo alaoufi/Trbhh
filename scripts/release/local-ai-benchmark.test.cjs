@@ -1,5 +1,18 @@
 const test=require('node:test'),assert=require('node:assert/strict');
-const {compare,api,measure}=require('./local-ai-benchmark.cjs');
+const {compare,api,measure,verifyPurpose}=require('./local-ai-benchmark.cjs');
+test('purpose probe preserves the acceptance gate and translation, logs rejected answers and unloads without downloading',async()=>{
+ const calls=[],logs=[];
+ const search={model:'qwen3.5:9b',format:{properties:{queries:{}}},messages:[{role:'user',content:'Task: search\nInput data: {"text":"example"}'}]};
+ const translation={...search,format:{properties:{translation:{}}}};
+ const result=await verifyPurpose(async(path,body)=>{calls.push({path,body});return path==='tags'?{models:[{name:'qwen3.5:9b'}]}:{done:true,message:{content:'{"queries":["wrong"]}'}};},async(call,model)=>{
+  assert.equal(model,'qwen3.5:9b');await call('chat',search);await call('chat',translation);throw Error('local_ai_smoke_failed');
+ },value=>logs.push(value));
+ assert.equal(result.accepted,false);assert.equal(result.activated,false);
+ assert.match(calls[1].body.messages[0].content,/fulfills the described function/);
+ assert.deepEqual(calls[2].body,translation);assert.equal(search.messages[0].content.includes('fulfills'),false);
+ assert.equal(calls.at(-1).body.keep_alive,0);assert.ok(calls.every(c=>['tags','chat'].includes(c.path)));
+ assert.equal(logs.filter(line=>line.includes('BENCHMARK_PURPOSE_ANSWER')).length,2);
+});
 function fixture(){const calls=[];return {calls,call:async(path,body)=>{calls.push({path,body});if(path==='pull')return {status:'success'};if(path==='tags')return {models:[{name:'qwen3.5:4b',digest:'small'},{name:'qwen3.5:9b',digest:'large'}]};}};}
 test('tests the smallest candidate first and stops without downloading the larger one on success',async()=>{
  const f=fixture(),models=[];const result=await compare(f.call,async(_call,model)=>{models.push(model);return [{elapsedMs:1000}];},()=>{});

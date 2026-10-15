@@ -9,6 +9,7 @@ it('uses one shared grounded conversation protocol for runtime and acceptance te
  expect(body.messages[1].content).toContain(searchTask);
  expect(body.messages[1].content).toContain(JSON.stringify({text:'نص غير موثوق'}));
  expect(searchTask).toContain('noun phrase');
+ expect(searchTask).toContain('Name the product that fulfills the described function, not just mentioned objects.');
  expect(searchFormat.properties.queries.items.pattern).toBe('^[ -~]+$');
  expect(searchFormat.properties.queries.minItems).toBe(1);
  expect(searchFormat.properties.queries.maxItems).toBe(1);
@@ -17,7 +18,7 @@ it('uses one shared grounded conversation protocol for runtime and acceptance te
 it('bounds fixed instruction overhead while retaining the schema and constraints',()=>{
  const search=request('test','sample',searchTask,searchFormat),translation=request('test','sample',translationTask('ar'),translationFormat);
  const bytes=(body:{messages:{content:string}[]})=>body.messages.reduce((sum,m)=>sum+Buffer.byteLength(m.content),0);
- expect(bytes(search)).toBeLessThan(450);expect(bytes(translation)).toBeLessThan(320);
+ expect(bytes(search)).toBeLessThan(500);expect(bytes(translation)).toBeLessThan(320);
  for(const word of ['brand','model','accessory','material','size','voltage','quantities','negations'])expect(searchTask).toContain(word);
  expect(translationTask('ar')).toContain('naturally');expect(translationTask('ar')).toContain('negations');
  expect(translation.options.num_predict).toBe(512);

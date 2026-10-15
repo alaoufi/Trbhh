@@ -1,18 +1,21 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-vi.mock('@/lib/settings',()=>({getSetting:async(_key:string,fallback:string)=>fallback}));
-import {localGenerate,localSearchQueries,localTranslation,localServiceUrl} from '@/lib/ai/local';
+const settings=vi.hoisted(()=>({enabled:'1'}));
+vi.mock('@/lib/settings',()=>({getSetting:async()=>settings.enabled}));
+import {clearLocalInferenceCache,localGenerate,localSearchQueries,localTranslation,localServiceUrl} from '@/lib/ai/local';
 const fetcher=vi.fn();
-beforeEach(()=>{fetcher.mockReset();vi.stubGlobal('fetch',fetcher);});
-afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
-const answer=(value:unknown)=>new Response(JSON.stringify({done:true,response:JSON.stringify(value)}));
+beforeEach(()=>{settings.enabled='1';clearLocalInferenceCache();fetcher.mockReset();vi.stubGlobal('fetch',fetcher);});
+afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs();});
+const answer=(value:unknown)=>new Response(JSON.stringify({done:true,message:{content:JSON.stringify(value)}}));
 describe('local intelligence boundary',()=>{
  it.each(['https://cloud.example','http://user:pass@ollama:11434','http://169.254.169.254','http://ollama.evil:11434','http://ollama:11434/remote'])('rejects non-local endpoint %s',url=>{expect(localServiceUrl(url,'ollama')).toBeNull();});
  it('accepts only named local service or loopback',()=>{expect(localServiceUrl('http://ollama:11434','ollama')).toBe('http://ollama:11434');expect(localServiceUrl('http://localhost:11434','ollama')).toBe('http://localhost:11434');});
  it('requests structured local inference without tools, redirects or cloud models',async()=>{
   fetcher.mockResolvedValue(answer({translation:'قميص قطني'}));
   expect(await localTranslation('Cotton shirt','ar')).toBe('قميص قطني');
-  const [url,init]=fetcher.mock.calls[0];expect(url).toBe('http://ollama:11434/api/generate');expect(init.redirect).toBe('error');
+  const [url,init]=fetcher.mock.calls[0];expect(url).toBe('http://ollama:11434/api/chat');expect(init.redirect).toBe('error');
   expect(JSON.parse(init.body)).toMatchObject({model:'trbhh-local:active',stream:false,think:false});
+  const body=JSON.parse(init.body);expect(body.messages.map((m:{role:string})=>m.role)).toEqual(['system','user']);
+  expect(body.messages[0].content).toContain('untrusted');expect(body.messages[1].content).toContain('Cotton shirt');
  });
  it('returns intent alternatives without a phone vocabulary table',async()=>{
   fetcher.mockResolvedValue(answer({queries:['cordless drill 18V','18V cordless drill','cordless drill 18V']}));
@@ -21,6 +24,12 @@ describe('local intelligence boundary',()=>{
  it('rejects alternatives that lose model numbers',async()=>{
   fetcher.mockResolvedValue(answer({queries:['phone case','Samsung S24 case']}));
   expect(await localSearchQueries('غطاء Samsung S24')).toEqual(['Samsung S24 case']);
+ });
+ it('preserves quantities when catalog units use a different space convention',async()=>{
+  fetcher.mockResolvedValueOnce(answer({queries:['18 V cordless drill']}));
+  expect(await localSearchQueries('دريل بدون سلك 18V')).toEqual(['18 V cordless drill']);
+  fetcher.mockResolvedValueOnce(answer({queries:['750ml steel bottle']}));
+  expect(await localSearchQueries('قارورة فولاذ 750 ml')).toEqual(['750ml steel bottle']);
  });
  it('does not expose invalid or interrupted model output',async()=>{
   fetcher.mockResolvedValue(new Response(JSON.stringify({done:false,response:'{}'})));
@@ -39,10 +48,41 @@ describe('local intelligence boundary',()=>{
  it('bounds concurrent model requests',async()=>{
   const resolvers:((response:Response)=>void)[]=[];
   fetcher.mockImplementation(()=>new Promise<Response>(resolve=>resolvers.push(resolve)));
-  const first=localTranslation('first','ar'),second=localTranslation('second','ar');
+  const first=localTranslation('first','ar');
+  await vi.waitFor(()=>expect(fetcher).toHaveBeenCalledOnce());
+  const second=localTranslation('second','ar');
+  expect(await second).toBeNull();
   expect(await localTranslation('third','ar')).toBeNull();
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher).toHaveBeenCalledOnce();
   for(const resolve of resolvers)resolve(answer({translation:'ترجمة عربية'}));
-  expect(await Promise.all([first,second])).toEqual(['ترجمة عربية','ترجمة عربية']);
+  expect(await first).toBe('ترجمة عربية');
+ });
+ it('reuses successful output within the bounded cache',async()=>{
+  fetcher.mockResolvedValue(answer({translation:'مطرقة اختبار'}));
+  expect(await localTranslation('cache-test hammer','ar')).toBe('مطرقة اختبار');
+  expect(await localTranslation('cache-test hammer','ar')).toBe('مطرقة اختبار');
+  expect(fetcher).toHaveBeenCalledOnce();
+ });
+ it('expires cached inference after one hour',async()=>{
+  const clock=vi.spyOn(Date,'now').mockReturnValue(1000);
+  fetcher.mockImplementation(async()=>answer({translation:'قميص قطني'}));
+  await localTranslation('expiry shirt','ar');clock.mockReturnValue(3_601_001);
+  await localTranslation('expiry shirt','ar');expect(fetcher).toHaveBeenCalledTimes(2);
+ });
+ it('evicts the oldest output after 128 entries instead of growing without bound',async()=>{
+  fetcher.mockImplementation(async()=>answer({translation:'قميص قطني'}));
+  for(let i=0;i<129;i++)await localTranslation(`bounded shirt ${i}`,'ar');
+  await localTranslation('bounded shirt 0','ar');expect(fetcher).toHaveBeenCalledTimes(130);
+ });
+ it('honors disabling even for a cached result and clears it before re-enabling',async()=>{
+  fetcher.mockImplementation(async()=>answer({translation:'قميص قطني'}));
+  await localTranslation('disable shirt','ar');settings.enabled='0';
+  expect(await localTranslation('disable shirt','ar')).toBeNull();expect(fetcher).toHaveBeenCalledOnce();
+  settings.enabled='1';await localTranslation('disable shirt','ar');expect(fetcher).toHaveBeenCalledTimes(2);
+ });
+ it('does not cache a failed request',async()=>{
+  fetcher.mockResolvedValueOnce(new Response('offline',{status:503})).mockResolvedValueOnce(answer({translation:'قميص قطني'}));
+  expect(await localTranslation('retry shirt','ar')).toBeNull();
+  expect(await localTranslation('retry shirt','ar')).toBe('قميص قطني');expect(fetcher).toHaveBeenCalledTimes(2);
  });
 });

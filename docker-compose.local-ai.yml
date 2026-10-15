@@ -10,7 +10,13 @@ services:
       trbhh.local-ai: "1"
     restart: unless-stopped
     mem_limit: 10g
+    memswap_limit: 10g
     cpus: 4
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_NO_CLOUD: "1"

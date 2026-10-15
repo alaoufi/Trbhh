@@ -6,10 +6,11 @@ const db=vi.hoisted(()=>({findMany:vi.fn(),upsert:vi.fn()}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:db}}));
 import {getCachedArabic,isArabicText,learnTranslation,translateManyCached,translateToArabic,translateToArabicCached} from '@/lib/cj/translate';
 
+import {clearLocalInferenceCache} from '@/lib/ai/local';
 const fetchMock=vi.fn();let clock=Date.now();
 const cache=new Map<string,string>();
 const legacyKey=(s:string)=>createHash('sha1').update('en:ar:'+s.slice(0,480)).digest('hex');
-const memory=(translatedText:string)=>new Response(JSON.stringify({done:true,response:JSON.stringify({translation:translatedText})}),{status:200});
+const memory=(translatedText:string)=>new Response(JSON.stringify({done:true,message:{content:JSON.stringify({translation:translatedText})}}),{status:200});
 type CacheWrite={where:{source_key:string};create:{source_key:string;target_ar:string};update:{target_ar?:string}};
 function persist(arg:CacheWrite){
   const key=arg.where.source_key;
@@ -18,7 +19,7 @@ function persist(arg:CacheWrite){
   return{source_key:key,target_ar:cache.get(key)};
 }
 beforeEach(()=>{
-  vi.clearAllMocks();clock+=100000;vi.spyOn(Date,'now').mockImplementation(()=>clock+=400);
+  clearLocalInferenceCache();vi.clearAllMocks();clock+=100000;vi.spyOn(Date,'now').mockImplementation(()=>clock+=400);
   cache.clear();
   db.findMany.mockImplementation(async(arg:{where:{source_key:{in:string[]}}})=>arg.where.source_key.in.filter(key=>cache.has(key)).map(key=>({source_key:key,target_ar:cache.get(key)!})));
   db.upsert.mockImplementation(async(arg:CacheWrite)=>persist(arg));
@@ -57,13 +58,13 @@ describe('CJ Arabic translation integrity',()=>{
     const source=('Detailed cotton shirt specification '.repeat(22)+'UNIQUE END').trim();
     const result=await translateToArabic(source);
     expect(result).not.toBeNull();expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
-    const chunks=fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.prompt?JSON.parse(b.prompt).text:b.q;});
+    const chunks=fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.messages?JSON.parse(b.messages[1].content.split('Input data: ')[1]).text:b.q;});
     expect(chunks.join('')).toBe(source);expect(chunks.every(chunk=>Buffer.byteLength(chunk,'utf8')<=480)).toBe(true);
   });
   it('bounds multibyte source chunks by UTF8 bytes without losing text',async()=>{
-    const source='منتج '.repeat(120)+'English description';
+    const source=Array.from({length:120},(_,i)=>`منتج ${i} `).join('')+'English description';
     expect(await translateToArabic(source)).not.toBeNull();
-    const chunks=fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.prompt?JSON.parse(b.prompt).text:b.q;});
+    const chunks=fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.messages?JSON.parse(b.messages[1].content.split('Input data: ')[1]).text:b.q;});
     expect(chunks.join('')).toBe(source.trim());expect(chunks.every(chunk=>Buffer.byteLength(chunk,'utf8')<=480)).toBe(true);
   });
   it('never caches a partial translation when a later source chunk fails',async()=>{
@@ -153,6 +154,6 @@ describe('CJ Arabic translation integrity',()=>{
     const source='a long English description '.repeat(30)+'tail';const mixed='منتج English name';
     const result=await translateManyCached([source,mixed],2);
     expect(result.has(source)).toBe(true);expect(result.get(mixed)).toBe('ترجمة عربية مكتملة');
-    expect(fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.prompt?JSON.parse(b.prompt).text:b.q;}).join('')).toContain('tail');
+    expect(fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.messages?JSON.parse(b.messages[1].content.split('Input data: ')[1]).text:b.q;}).join('')).toContain('tail');
   });
 });

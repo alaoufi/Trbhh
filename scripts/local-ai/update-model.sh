@@ -12,4 +12,4 @@ docker_root=$(docker info --format '{{.DockerRootDir}}')
 [[ -d "$docker_root" ]] || exit 1
 free_kib=$(df -Pk "$docker_root" | awk 'NR==2 {print $4}')
 (( free_kib >= 12 * 1024 * 1024 )) || { echo 'Local AI: insufficient disk space; previous model retained.' >&2; exit 1; }
-docker exec -i trbhh-app node < "$assets_root/scripts/local-ai/update-model.cjs"
+bash "$assets_root/scripts/local-ai/run-model.sh"

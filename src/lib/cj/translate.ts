@@ -238,7 +238,7 @@ export async function learnTranslation(source: string | null | undefined, arabic
 }
 
 /** يترجم قائمة نصوص (المفقود منها فقط) ويخزّنها؛ يعيد خريطة نص→عربي شاملة المخزَّن.
- *  ينفّذ المفقود على دفعات متوازية محدودة لتقليل زمن الانتظار. */
+ *  ينفّذ المفقود بالتتابع حتى لا تتراكم طلبات النموذج المحلي. */
 export async function translateManyCached(texts: (string | null | undefined)[], max = 30): Promise<Map<string, string>> {
   const map = await getCachedArabic(texts);
   const candidates = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !isArabicText(t) && !map.has(t)))];
@@ -250,7 +250,7 @@ export async function translateManyCached(texts: (string | null | undefined)[], 
     missing.push(src);
   }
   const limited = missing.slice(0, Math.max(0, Math.floor(max)));
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 1;
   for (let i = 0; i < limited.length; i += CONCURRENCY) {
     const batch = limited.slice(i, i + CONCURRENCY);
     const results = await Promise.all(batch.map(async (src) => [src, await translateRaw(src)] as const));
@@ -313,7 +313,7 @@ export async function translateManyForDisplay(texts: (string | null | undefined)
     } catch { /* المخزن غير جاهز */ }
   }
   const missing = clean.filter((s) => !map.has(s)).slice(0, Math.max(0, Math.floor(max)));
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 1;
   for (let i = 0; i < missing.length; i += CONCURRENCY) {
     const batch = missing.slice(i, i + CONCURRENCY);
     const results = await Promise.all(batch.map(async (s) => [s, await translateEnToArLoose(s).catch(() => null)] as const));

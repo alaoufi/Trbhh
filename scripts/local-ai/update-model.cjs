@@ -39,7 +39,7 @@ async function smoke(call,model){
   const elapsedMs=Date.now()-started;
   if(!result||result.done!==true||result.done_reason==='length')throw Error('local_ai_smoke_incomplete');
   const parsed=JSON.parse(result.message?.content||'{}');
-  if(!test.check(parsed[test.key])||(test.key==='queries'&&parsed.queries.some(q=>!/^[ -~]+$/.test(q)))){
+  if(!test.check(parsed[test.key])||(test.key==='queries'&&(parsed.queries.length!==1||parsed.queries.some(q=>!/^[ -~]+$/.test(q))))){
    const error=Error('local_ai_smoke_failed');error.proof=[...proof,{input:test.text,elapsedMs,result:parsed[test.key],passed:false}];throw error;
   }
   // Every inference, including the first after preparation, must fit app deadlines.

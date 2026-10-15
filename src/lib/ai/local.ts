@@ -65,7 +65,7 @@ const joinedUnits=(text:string)=>text.replace(/(\d)\s+(V|W|mAh|Ah|ml|mm|cm|kg|GB
 export async function localSearchQueries(query:string):Promise<string[]> {
  const text=asciiDigits(query.trim().slice(0,100));
  const result=await localGenerate(text,searchTask,searchFormat) as {queries?:unknown}|null;
- if(!Array.isArray(result?.queries))return [];
+ if(!Array.isArray(result?.queries)||result.queries.length!==1)return [];
  const constraints=joinedUnits(text);
  const required=(constraints.match(/[A-Za-z]*\d+[A-Za-z\d.-]*|\d+(?:\.\d+)?/g)||[]).map(word=>word.toLowerCase());
  const brands=/\p{Script=Arabic}/u.test(text)?constraints.match(/\b[A-Za-z][A-Za-z0-9-]*\b/g)||[]:[];

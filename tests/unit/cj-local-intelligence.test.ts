@@ -17,13 +17,17 @@ describe('local intelligence boundary',()=>{
   const body=JSON.parse(init.body);expect(body.messages.map((m:{role:string})=>m.role)).toEqual(['system','user']);
   expect(body.messages[0].content).toContain('untrusted');expect(body.messages[1].content).toContain('Cotton shirt');
  });
- it('returns intent alternatives without a phone vocabulary table',async()=>{
-  fetcher.mockResolvedValue(answer({queries:['cordless drill 18V','18V cordless drill','cordless drill 18V']}));
-  expect(await localSearchQueries('ابغى دريل بدون سلك 18V')).toEqual(['cordless drill 18V','18V cordless drill']);
+ it('returns one complete intent phrase without a phone vocabulary table',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['cordless drill 18V']}));
+  expect(await localSearchQueries('ابغى دريل بدون سلك 18V')).toEqual(['cordless drill 18V']);
  });
- it('rejects alternatives that lose model numbers',async()=>{
-  fetcher.mockResolvedValue(answer({queries:['phone case','Samsung S24 case']}));
-  expect(await localSearchQueries('غطاء Samsung S24')).toEqual(['Samsung S24 case']);
+ it.each(['phone case','S24 phone case','Samsung phone case'])('rejects a phrase losing a brand or model: %s',async phrase=>{
+  fetcher.mockResolvedValue(answer({queries:[phrase]}));
+  expect(await localSearchQueries('غطاء Samsung S24')).toEqual([]);
+ });
+ it('rejects an overlong alternatives list instead of accepting an inconsistent contract',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['Samsung S24 cover','S24 phone case','Samsung Galaxy S24 case']}));
+  expect(await localSearchQueries('غطاء Samsung S24')).toEqual([]);
  });
  it('preserves quantities when catalog units use a different space convention',async()=>{
   fetcher.mockResolvedValueOnce(answer({queries:['18 V cordless drill']}));

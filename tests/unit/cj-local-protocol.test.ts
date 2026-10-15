@@ -8,6 +8,9 @@ it('uses one shared grounded conversation protocol for runtime and acceptance te
  expect(body.messages[0].content).toContain(JSON.stringify(searchFormat));
  expect(body.messages[1].content).toContain(searchTask);
  expect(body.messages[1].content).toContain(JSON.stringify({text:'نص غير موثوق'}));
- expect(searchTask).toContain('noun phrases');
+ expect(searchTask).toContain('noun phrase');
  expect(searchFormat.properties.queries.items.pattern).toBe('^[ -~]+$');
+ expect(searchFormat.properties.queries.minItems).toBe(1);
+ expect(searchFormat.properties.queries.maxItems).toBe(1);
+ expect(body.options.num_predict).toBe(128);
 });

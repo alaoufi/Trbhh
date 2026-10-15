@@ -191,7 +191,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">إعدادات الذكاء والترجمة المحلية</summary>
         <form action={saveCjTranslationSettings} className="mt-3 space-y-3">
           <input type="hidden" name="back" value="/admin/suppliers/cj/browse" />
-          <p className="text-sm">فهم معنى البحث وصياغة بدائله وترجمة النصوص داخل خادم تربح. لا تُستخدم خدمات ذكاء أو ترجمة خارجية. النموذج النشط يُحدّث بعد اجتياز فحصه، وتبقى التصحيحات اليدوية محفوظة.</p>
+          <p className="text-sm">فهم معنى البحث وصياغة عبارة تصف السلعة وترجمة النصوص داخل خادم تربح. لا تُستخدم خدمات ذكاء أو ترجمة خارجية. النموذج النشط يُحدّث بعد اجتياز فحصه، وتبقى التصحيحات اليدوية محفوظة.</p>
           <label className="block">محرك الذكاء المحلي <select name="localAiEnabled" defaultValue={localAiEnabled} className="rounded-lg border p-2"><option value="1">مفعّل عند جاهزية الخدمة المحلية</option><option value="0">معطّل — استخدام المسرد والمترجم المحلي فقط</option></select></label>
           <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ</SubmitButton>
         </form>

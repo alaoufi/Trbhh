@@ -1,59 +1,21 @@
-import {afterEach,describe,expect,it,vi} from 'vitest';
-// Provider tests use deterministic settings and glossary data, never a real DB.
-vi.mock('@/lib/settings',()=>({getSetting:async()=>''}));
-vi.mock('@/lib/prisma',()=>({prisma:{cj_glossary:{findMany:async()=>[]}}}));
-import {translateArabicCjSearch} from '@/lib/cj/search';
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+const state=vi.hoisted(()=>({queries:vi.fn(),translate:vi.fn(),rows:[] as {source:string;target_ar:string}[]}));
+vi.mock('@/lib/ai/local',()=>({localSearchQueries:state.queries}));
+vi.mock('@/lib/cj/translate',async(original)=>({...await original<typeof import('@/lib/cj/translate')>(),translateArabicToEnglish:state.translate}));
+vi.mock('@/lib/prisma',()=>({prisma:{cj_glossary:{findMany:async()=>state.rows}}}));
+import {cjSearchQueries,translateArabicCjSearch} from '@/lib/cj/search';
 import {normalizeArabicForSearch} from '@/lib/cj/translate';
-
+beforeEach(()=>{state.rows=[];state.queries.mockReset().mockResolvedValue([]);state.translate.mockReset().mockResolvedValue(null);});
 afterEach(()=>vi.unstubAllGlobals());
-
-describe('توحيد العربية للبحث',()=>{
-  it('يهمل الهمزات والتشكيل والتطويل ويوحّد ة→ه و ى→ي',()=>{
-    expect(normalizeArabicForSearch('أحمــد')).toBe('احمد');
-    expect(normalizeArabicForSearch('شاشة')).toBe('شاشه');
-    expect(normalizeArabicForSearch('شاشه')).toBe('شاشه');
-    expect(normalizeArabicForSearch('مُستلزَمات')).toBe('مستلزمات');
-    expect(normalizeArabicForSearch('إلكترونيّات')).toBe('الكترونيات');
-  });
-});
-
-describe('CJ Arabic catalog search',()=>{
-  it('converts an Arabic product name to the source-language term CJ indexes',async()=>{
-    const fetcher=vi.fn(async(_input:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'diamond ring'}}),{status:200}));
-    vi.stubGlobal('fetch',fetcher);
-    await expect(translateArabicCjSearch('خاتم ألماس')).resolves.toBe('diamond ring');
-    // يُجرَّب مزوّد ar→en؛ لا نقيّد الترتيب أو المزوّد، لكن لا بد أن أحد النداءات طلب الاتجاه ar→en.
-    const calledArToEn=fetcher.mock.calls.some(c=>{const u=String(c[0]);const b=String((c[1] as RequestInit|undefined)?.body??'');return /langpair=ar(%7C|\|)en/i.test(u)||/\bsl=ar\b/i.test(u)||/"source"\s*:\s*"ar"/i.test(b)||/source_lang=AR/i.test(b);});
-    expect(calledArToEn).toBe(true);
-  });
-
-  it('passes through a query already written in the source language without a network request',async()=>{
-    const fetcher=vi.fn(async(_input:RequestInfo|URL)=>new Response('{}',{status:200}));vi.stubGlobal('fetch',fetcher);
-    await expect(translateArabicCjSearch('diamond ring')).resolves.toBe('diamond ring');
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-
-  it('returns null when translation providers fail instead of searching a fabricated term',async()=>{
-    vi.stubGlobal('fetch',vi.fn(async(_input:RequestInfo|URL)=>new Response('unavailable',{status:503})));
-    await expect(translateArabicCjSearch('خاتم ألماس')).resolves.toBeNull();
-  });
-
-  it('ينظّف ناتج الترجمة فيزيل أداة التعريف والترقيم (A screen → screen)',async()=>{
-    const fetcher=vi.fn(async(_input:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'A screen.'}}),{status:200}));
-    vi.stubGlobal('fetch',fetcher);
-    await expect(translateArabicCjSearch('شاشة')).resolves.toBe('screen');
-  });
-});
-
-describe('Arabic phone search aliases',()=>{
-  it.each(['الهواتف','الهواتف النقالة','هواتف نقالة','الهَوَاتِف النَّقَّالة','الجوالات'])('searches %s without depending on translation availability',async(query)=>{
-    const fetcher=vi.fn(async()=>new Response('unavailable',{status:503}));vi.stubGlobal('fetch',fetcher);
-    await expect(translateArabicCjSearch(query)).resolves.toBe('mobile phone');
-    expect(fetcher).not.toHaveBeenCalled();
-  });
-});
-
-it('preserves a specific phone accessory query rather than broadening it to phones',async()=>{
-  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText:'mobile phone case'}}),{status:200})));
-  await expect(translateArabicCjSearch('غطاء الهواتف النقالة')).resolves.toBe('mobile phone case');
+describe('local intent-aware catalog search',()=>{
+ it('normalizes only for matching',()=>{expect(normalizeArabicForSearch('أحمــد')).toBe('احمد');expect(normalizeArabicForSearch('شاشة')).toBe('شاشه');});
+ it.each(['اريد أدوات تساعدني في ترتيب المطبخ','أبغى دريل بدون سلك','حذاء للمشي تحت المطر'])('understands general intent for %s through local inference',async(query)=>{
+  state.queries.mockResolvedValue(['catalog intent','same intent alternative']);expect(await cjSearchQueries(query)).toEqual(['catalog intent','same intent alternative']);expect(state.queries).toHaveBeenCalledWith(query);
+ });
+ it('keeps exact SKU identity without model reinterpretation',async()=>{expect(await cjSearchQueries('CJLX324417101AZ')).toEqual(['CJLX324417101AZ']);expect(state.queries).not.toHaveBeenCalled();});
+ it('uses local translation if intent model returns no valid alternatives',async()=>{state.translate.mockResolvedValue('diamond ring');expect(await translateArabicCjSearch('خاتم ألماس')).toBe('diamond ring');});
+ it('uses exact taught synonyms when the model is unavailable',async()=>{state.rows=[{source:'rain boots',target_ar:'حذاء المطر'}];expect(await cjSearchQueries('حذاء المطر')).toEqual(['rain boots']);});
+ it('never drops qualifiers through glossary substring matching',async()=>{state.rows=[{source:'phone',target_ar:'هاتف'}];expect(await cjSearchQueries('غطاء هاتف أحمر')).toEqual([]);});
+ it('returns no general catalog query when all local services fail',async()=>{expect(await translateArabicCjSearch('خاتم ألماس')).toBeNull();});
+ it('retains English text if local intent service is unavailable',async()=>{expect(await cjSearchQueries('diamond ring')).toEqual(['diamond ring']);});
 });

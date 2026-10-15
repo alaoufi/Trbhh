@@ -1,0 +1,11 @@
+[Unit]
+Description=Validate and update the local Trbhh intelligence model
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/trbhh
+ExecStart=/bin/bash /root/trbhh/scripts/local-ai/update-model.sh
+TimeoutStartSec=45min
+Nice=15

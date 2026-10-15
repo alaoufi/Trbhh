@@ -4,52 +4,18 @@ import { prisma } from '@/lib/prisma';
 import { getSetting } from '@/lib/settings';
 import { glossaryExact, glossarySubstitute } from './glossary';
 
-/**
- * إعدادات مزوّدي الترجمة من لوحة التحكم (جدول settings — لا أسرار في الكود ولا .env):
- *  - cj_deepl_api_key: مفتاح DeepL (المزوّد الأساسي الموثوق، 500 ألف حرف/شهر مجاناً).
- *  - cj_mymemory_email: بريد لرفع حصّة MyMemory المجانية (احتياطي).
- * كاش قصير لتفادي قراءة القاعدة في كل نداء ترجمة.
- */
-/** المزوّد الافتراضي: حاوية LibreTranslate الذاتية على شبكة compose الداخلية.
- *  يجعل الترجمة الآلية تعمل تلقائياً دون أي ضبط يدوي من المشرف. يُتجاوَز بإعداد
- *  cj_libretranslate_url (قيمة مخصّصة) في لوحة الإدارة، ويُعطَّل بحفظ قيمة فارغة،
- *  أو يُضبط عبر LIBRETRANSLATE_URL في البيئة. ليس إعداداً في الكود بل قيمة
- *  افتراضية قابلة للتغيير بالكامل من لوحة الإدارة (القاعدة #1). */
-export const DEFAULT_LIBRETRANSLATE_URL = 'http://libretranslate:5000';
+import {localTranslation,localServiceUrl} from '@/lib/ai/local';
 
-let providerCfg: { at: number; libreUrl: string; libreKey: string; deeplKey: string; email: string } | null = null;
-async function translationProviders(): Promise<{ libreUrl: string; libreKey: string; deeplKey: string; email: string }> {
-  if (providerCfg && Date.now() - providerCfg.at < 60_000) return providerCfg;
-  let libreUrl = (process.env.LIBRETRANSLATE_URL || '').trim();
-  let libreKey = '';
-  let deeplKey = '';
-  let email = (process.env.MYMEMORY_EMAIL || '').trim();
-  try {
-    const [u, lk, k, e] = await Promise.all([
-      getSetting('cj_libretranslate_url', DEFAULT_LIBRETRANSLATE_URL), getSetting('cj_libretranslate_key', ''),
-      getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''),
-    ]);
-    if (u.trim()) libreUrl = u.trim();
-    if (lk.trim()) libreKey = lk.trim();
-    if (k.trim()) deeplKey = k.trim();
-    if (e.trim()) email = e.trim();
-  } catch { /* القاعدة غير جاهزة — نكمل بالقيم الافتراضية */ }
-  providerCfg = { at: Date.now(), libreUrl: libreUrl.replace(/\/+$/, ''), libreKey, deeplKey, email };
-  return providerCfg;
+/** Local-only translation. Existing manual corrections and caches retain precedence. */
+export const DEFAULT_LIBRETRANSLATE_URL='http://libretranslate:5000';
+async function translationProviders():Promise<{libreUrl:string;libreKey:string}> {
+ const raw=await getSetting('cj_libretranslate_url',process.env.LIBRETRANSLATE_URL||DEFAULT_LIBRETRANSLATE_URL).catch(()=>DEFAULT_LIBRETRANSLATE_URL);
+ return {libreUrl:localServiceUrl(raw,'libretranslate')||'',libreKey:await getSetting('cj_libretranslate_key','').catch(()=>'')};
 }
-
-/**
- * ترجمة آلية إلى العربية لمحتوى سلع/تصنيفات CJ (قراءة فقط، لا تمسّ بيانات دفع).
- * المزوّد الأساسي MyMemory (مجاني، مصمّم للاستخدام البرمجي، يُرجع JSON نظيفاً)،
- * مع محاولة احتياطية عبر نقطة Google المجانية إن فشل. أي فشل/تجاوز حصة → null
- * فيبقى النص كما هو ويستطيع المشرف تحريره يدوياً — لا تُوقِف الاستيراد أبداً.
- *
- * لرفع الحصة اليومية المجانية: اضبط MYMEMORY_EMAIL في بيئة الخادم (اختياري).
- */
 
 const TIMEOUT_MS = 9000;
 const TRANSLATION_BUDGET_MS = 25000;
-const MAX_LEN = 480; // حدّ MyMemory بالبايت، وليس عدد محارف JavaScript.
+const MAX_LEN = 480; // حجم دفعة محلية بالبايت للحفاظ على النص كاملاً.
 const MAX_SOURCE_BYTES = 20000;
 const MIN_GAP_MS = 300;
 
@@ -112,7 +78,7 @@ async function fetchJson(url: string, deadline: number, init: RequestInit = {}):
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(TIMEOUT_MS, remaining));
   try {
-    const res = await fetch(url, { ...init, signal: controller.signal, headers: { 'User-Agent': 'Mozilla/5.0', ...(init.headers || {}) } });
+    const res = await fetch(url, { ...init, signal: controller.signal, redirect:'error', headers: { 'User-Agent': 'Trbhh-local-translation', ...(init.headers || {}) } });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -136,49 +102,13 @@ async function viaLibreTranslate(text: string, deadline: number): Promise<string
   return validOutput(t) ? t : null;
 }
 
-/** مزوّد موثوق بمفتاح: DeepL (يُفعَّل عند ضبط المفتاح في لوحة التحكم). */
-async function viaDeepL(text: string, deadline: number): Promise<string | null> {
-  const { deeplKey } = await translationProviders();
-  if (!deeplKey) return null;
-  // مفاتيح DeepL المجانية تنتهي بـ ":fx" وتستخدم نطاق api-free؛ المدفوعة تستخدم api.
-  const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
-  const body = (await fetchJson(`https://${host}/v2/translate`, deadline, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `DeepL-Auth-Key ${deeplKey}` },
-    body: `text=${encodeURIComponent(text)}&source_lang=EN&target_lang=AR`,
-  })) as { translations?: { text?: string }[] } | null;
-  const raw = body?.translations?.[0]?.text;
-  const t = typeof raw === 'string' ? raw.trim() : '';
-  return validOutput(t) ? t : null;
+/** Local model returns structured translation; no external provider fallback. */
+async function viaLocal(text:string,deadline:number):Promise<string|null> {
+ const remaining=deadline-Date.now();if(remaining<=0)return null;
+ const translated=await localTranslation(text,'ar',Math.min(TIMEOUT_MS,remaining));
+ return translated&&validOutput(translated)?translated:null;
 }
 
-/** احتياطي: MyMemory (البريد من لوحة التحكم يرفع الحصّة اليومية). */
-async function viaMyMemory(text: string, deadline: number): Promise<string | null> {
-  const { email } = await translationProviders();
-  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ar${email ? `&de=${encodeURIComponent(email)}` : ''}`;
-  const body = (await fetchJson(url, deadline)) as { responseStatus?: number; quotaFinished?: boolean; responseData?: { translatedText?: string } } | null;
-  if (!body || body.responseStatus !== 200 || body.quotaFinished) return null;
-  const raw = body.responseData?.translatedText;
-  const t = typeof raw === 'string' ? raw.trim() : '';
-  if (!validOutput(t) || /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (EMAIL|LANGUAGE)/i.test(t)) return null;
-  return t;
-}
-
-/** احتياطي: نقطة Google المجانية (قد تُحجب على بعض الشبكات). */
-async function viaGoogle(text: string, deadline: number): Promise<string | null> {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(text)}`;
-  const body = await fetchJson(url, deadline);
-  if (!Array.isArray(body) || !Array.isArray(body[0])) return null;
-  const out = (body[0] as unknown[]).map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : '')).join('').trim();
-  return validOutput(out) ? out : null;
-}
-
-/**
- * ترجمة عبارة البحث من العربية إلى الإنجليزية (CJ يفهرس بالاسم المصدر الإنجليزي).
- * تعيد ترتيب المزوّدات نفسها المُعتمَدة: LibreTranslate الذاتي ← DeepL ← MyMemory ← Google.
- * هذا يجعل البحث العربي يعمل على الخادم حيث يتوفّر LibreTranslate/DeepL، بدل الاعتماد
- * على نقاط عامّة قد تُحجب. لا تخزين (عبارات البحث عابرة).
- */
 const looksEnglish = (t: string) => !!t && /\p{Script=Latin}/u.test(t) && !/\p{Script=Arabic}/u.test(t) && t.length <= 100;
 /**
  * ينظّف ناتج الترجمة قبل إرساله إلى بحث CJ: يزيل أدوات التعريف (a/an/the) وعلامات
@@ -212,35 +142,9 @@ export async function translateArabicToEnglish(text: string | null | undefined):
   const raw = (text ?? '').trim().slice(0, 100);
   if (!raw) return '';
   if (!/\p{Script=Arabic}/u.test(raw)) return raw; // ليست عربية — تُستخدم كما هي
-  const src = normalizeArabicForSearch(raw) || raw; // توحيد يتجاهل الهمزات وة/ه لتحسين المطابقة
-  const deadline = Date.now() + 4500;
-  const { libreUrl, libreKey, deeplKey, email } = await translationProviders();
-  if (libreUrl) {
-    const body = (await fetchJson(`${libreUrl}/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: src, source: 'ar', target: 'en', format: 'text', ...(libreKey ? { api_key: libreKey } : {}) }) })) as { translatedText?: string } | null;
-    const t = cleanEnglishTerm(typeof body?.translatedText === 'string' ? body.translatedText : '');
-    if (t) return t;
-  }
-  if (deeplKey) {
-    const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
-    const body = (await fetchJson(`https://${host}/v2/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `DeepL-Auth-Key ${deeplKey}` }, body: `text=${encodeURIComponent(src)}&source_lang=AR&target_lang=EN` })) as { translations?: { text?: string }[] } | null;
-    const t = cleanEnglishTerm(typeof body?.translations?.[0]?.text === 'string' ? body.translations[0].text! : '');
-    if (t) return t;
-  }
-  {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(src)}&langpair=ar|en${email ? `&de=${encodeURIComponent(email)}` : ''}`;
-    const body = (await fetchJson(url, deadline)) as { responseStatus?: number; responseData?: { translatedText?: string } } | null;
-    const raw = body?.responseStatus === 200 && typeof body.responseData?.translatedText === 'string' ? body.responseData.translatedText : '';
-    if (raw && !/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (EMAIL|LANGUAGE)/i.test(raw)) { const t = cleanEnglishTerm(raw); if (t) return t; }
-  }
-  {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ar&tl=en&dt=t&q=${encodeURIComponent(src)}`;
-    const body = await fetchJson(url, deadline);
-    if (Array.isArray(body) && Array.isArray(body[0])) {
-      const t = cleanEnglishTerm((body[0] as unknown[]).map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : '')).join(''));
-      if (t) return t;
-    }
-  }
-  return null;
+  // Normalize only for matching, never corrupt Arabic spelling sent to a model.
+  const translated=await localTranslation(raw,'en',4500);
+  return translated?cleanEnglishTerm(translated):null;
 }
 
 /** Full-source translation is all-or-nothing; a failed chunk cannot become a cached description. */
@@ -257,7 +161,7 @@ async function translateRaw(text: string): Promise<string | null> {
     if (Date.now() >= deadline) return null;
     await throttle();
     if (Date.now() >= deadline) return null;
-    const result = (await viaLibreTranslate(chunk, deadline)) ?? (await viaDeepL(chunk, deadline)) ?? (await viaMyMemory(chunk, deadline)) ?? (await viaGoogle(chunk, deadline));
+    const result = (await viaLocal(chunk, deadline)) ?? (await viaLibreTranslate(chunk, deadline));
     if (!result || Date.now() >= deadline) return null;
     translated.push(result);
   }
@@ -372,30 +276,11 @@ export async function translateManyCached(texts: (string | null | undefined)[], 
  */
 const displayKeyOf = (src: string) => createHash('sha1').update('en:ar:disp-v1:' + src).digest('hex');
 
-async function translateEnToArLoose(src: string): Promise<string | null> {
-  const deadline = Date.now() + TIMEOUT_MS + 6000;
-  const { libreUrl, libreKey, deeplKey, email } = await translationProviders();
-  const accept = (t: string | undefined | null) => { const v = (t ?? '').trim(); return meaningfulArabic(v) ? v : null; };
-  if (libreUrl) {
-    const b = (await fetchJson(`${libreUrl}/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: src, source: 'en', target: 'ar', format: 'text', ...(libreKey ? { api_key: libreKey } : {}) }) })) as { translatedText?: string } | null;
-    const v = accept(b?.translatedText); if (v) return v;
-  }
-  if (deeplKey) {
-    const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
-    const b = (await fetchJson(`https://${host}/v2/translate`, deadline, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `DeepL-Auth-Key ${deeplKey}` }, body: `text=${encodeURIComponent(src)}&source_lang=EN&target_lang=AR` })) as { translations?: { text?: string }[] } | null;
-    const v = accept(b?.translations?.[0]?.text); if (v) return v;
-  }
-  {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(src)}&langpair=en|ar${email ? `&de=${encodeURIComponent(email)}` : ''}`;
-    const b = (await fetchJson(url, deadline)) as { responseStatus?: number; responseData?: { translatedText?: string } } | null;
-    if (b?.responseStatus === 200) { const raw = b.responseData?.translatedText ?? ''; if (!/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (EMAIL|LANGUAGE)/i.test(raw)) { const v = accept(raw); if (v) return v; } }
-  }
-  {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(src)}`;
-    const b = await fetchJson(url, deadline);
-    if (Array.isArray(b) && Array.isArray(b[0])) { const joined = (b[0] as unknown[]).map((s) => (Array.isArray(s) && typeof s[0] === 'string' ? s[0] : '')).join(''); const v = accept(joined); if (v) return v; }
-  }
-  return null;
+async function translateEnToArLoose(src:string):Promise<string|null> {
+ const deadline=Date.now()+TIMEOUT_MS+6000;
+ const generated=await localTranslation(src,'ar',TIMEOUT_MS);
+ if(generated&&meaningfulArabic(generated))return generated;
+ return viaLibreTranslate(src,deadline);
 }
 
 /** ترجمة نص للعرض (متساهلة) مع تخزين. تُفضّل المخزَّن الصارم (ترجمة يدوية سليمة) ثم العرض. */

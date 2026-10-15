@@ -7,13 +7,13 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
 import { listBrowseProductsPage, getCategories, getCjCatalogSuppliers } from '@/lib/cj/client';
 import { createCjDetailReads } from '@/lib/cj/detail-reads';
-import { translateArabicCjSearch } from '@/lib/cj/search';
+import { cjSearchQueries } from '@/lib/cj/search';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
 import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
 import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
 import {getCjDestinationZip} from '@/lib/cj/destination';
-import { getCachedArabic, translateManyForDisplay, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
+import { getCachedArabic, translateManyForDisplay, isArabicText } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
 import { SubmitButton } from '@/components/cj/submit-button';
@@ -57,17 +57,26 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   }
 
   const [catsRes,supplierRes]=await Promise.all([getCategories(),getCjCatalogSuppliers()]);
-  const [deeplKeySet, memEmail, libreUrl] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''), getSetting('cj_libretranslate_url', DEFAULT_LIBRETRANSLATE_URL)]);
+  const localAiEnabled=await getSetting('local_ai_enabled','1');
   const categories = catsRes.ok ? catsRes.data : [];
   // CJ indexes product names in its source language, while admins commonly
   // search using the saved Arabic display title. Translate only the query;
   // keep the Arabic text in the URL and search box.
-  const sourceQuery = q ? await translateArabicCjSearch(q) : '';
+  const searchQueries = q && !catalogFilters.error ? await cjSearchQueries(q) : [];
+  const sourceQuery=searchQueries[0]||'';
   // CJ يفهرس بالاسم المصدر الإنجليزي. عند فشل ترجمة عبارة عربية لا نرسل العربية إلى CJ
   // (تُرجِع نتائج غير ذات صلة)، بل نوقف الاستعلام ونعرض تنبيهاً للمستخدم.
   const queryIsArabic = !!q && /\p{Script=Arabic}/u.test(q);
-  const searchName = sourceQuery ? sourceQuery : (queryIsArabic ? undefined : (q || undefined));
-  const listing = queryIsArabic && !sourceQuery ? {ok:false as const,error:'cj_search_translation_failed',status:400} : catalogFilters.error?{ok:false as const,error:'cj_catalog_filters_invalid',status:400}:await listBrowseProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined,filters:catalogFilters.values });
+  let searchName = sourceQuery ? sourceQuery : (queryIsArabic ? undefined : (q || undefined));
+  let listing = queryIsArabic && !sourceQuery ? {ok:false as const,error:'cj_search_translation_failed',status:400} : catalogFilters.error?{ok:false as const,error:'cj_catalog_filters_invalid',status:400}:await listBrowseProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined,filters:catalogFilters.values });
+  // Retry alternative wording only when the entire filtered result is empty, never on API errors or an empty later page.
+  if(q&&listing.ok&&listing.data.total===0&&!catalogFilters.error){
+    for(const alternative of searchQueries.slice(1,3)){
+      searchName=alternative;
+      listing=await listBrowseProductsPage(page,PAGE_SIZE,{productName:alternative,categoryId:cat||undefined,filters:catalogFilters.values});
+      if(!listing.ok||listing.data.total>0)break;
+    }
+  }
   const items = listing.ok ? listing.data.items : [];
   // صلاحية العرض تقرأ الترجمات المحفوظة فقط؛ الترجمة والكتابة إجراءات تحرير صريحة.
   const importedList = await listCjProducts(60);
@@ -179,24 +188,12 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       <BrowseFilter suppliers={supplierRes.ok?supplierRes.data:[]} filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: 'كل أقسام المصدر' }, ...categoryOptions]} />
       {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
       <p className="text-xs text-muted-foreground">الترجمة فورية عند التحميل؛ أي كلمة بقيت بلغتها اضغط عليها لجلب ترجمتها. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
-      <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
-        <summary className="cursor-pointer font-bold text-primary">مزوّد الترجمة — {libreUrl ? 'LibreTranslate ذاتي ✅' : deeplKeySet ? 'DeepL مُفعّل ✅' : 'خارجي مجاني (محدود)'}</summary>
-        <form action={saveCjTranslationSettings} className="mt-3 space-y-2">
-          <input type="hidden" name="back" value={backHref} />
-          <p className="text-xs text-muted-foreground">الأفضل: <b>LibreTranslate ذاتي على الخادم</b> — بلا إنترنت/اشتراك/حصّة، أسرع وأكثر أماناً. شغّله على الخادم ثم ضع رابطه هنا (مثل <code>http://libretranslate:5000</code>). عند ضبطه يصبح المزوّد الأساسي. ترتيب المزوّدات: LibreTranslate ← DeepL ← MyMemory.</p>
-          <label className="block">رابط LibreTranslate الذاتي (الأفضل)
-            <input name="libreUrl" type="url" autoComplete="off" defaultValue={libreUrl} placeholder="http://libretranslate:5000" className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
-          </label>
-          <label className="block">مفتاح LibreTranslate (اختياري)
-            <input name="libreKey" type="password" autoComplete="off" placeholder="اتركه فارغاً إن لم يُطلب" className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
-          </label>
-          <label className="block">مفتاح DeepL API {deeplKeySet && <span className="text-emerald-700">(مضبوط — اتركه فارغاً للإبقاء عليه)</span>}
-            <input name="deeplKey" type="password" autoComplete="off" placeholder={deeplKeySet ? '•••••••• (محفوظ)' : 'xxxxxxxx-xxxx-...:fx'} className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
-          </label>
-          <label className="block">بريد MyMemory (اختياري — يرفع الحصّة المجانية للاحتياطي)
-            <input name="mymemoryEmail" type="email" autoComplete="off" defaultValue={memEmail} placeholder="you@example.com" className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
-          </label>
-          <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ إعدادات الترجمة</SubmitButton>
+      <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">إعدادات الذكاء والترجمة المحلية</summary>
+        <form action={saveCjTranslationSettings} className="mt-3 space-y-3">
+          <input type="hidden" name="back" value="/admin/suppliers/cj/browse" />
+          <p className="text-sm">فهم معنى البحث وصياغة بدائله وترجمة النصوص داخل خادم تربح. لا تُستخدم خدمات ذكاء أو ترجمة خارجية. النموذج النشط يُحدّث بعد اجتياز فحصه، وتبقى التصحيحات اليدوية محفوظة.</p>
+          <label className="block">محرك الذكاء المحلي <select name="localAiEnabled" defaultValue={localAiEnabled} className="rounded-lg border p-2"><option value="1">مفعّل عند جاهزية الخدمة المحلية</option><option value="0">معطّل — استخدام المسرد والمترجم المحلي فقط</option></select></label>
+          <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ</SubmitButton>
         </form>
       </details></AccessBoundary>
       <div className="hidden">

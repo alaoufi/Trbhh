@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {renderToStaticMarkup} from 'react-dom/server';
 import type {ReactNode} from 'react';
 
-const state=vi.hoisted(()=>({allowed:true,edit:false,suspend:false,remove:false,cache:new Map<string,string>(),savedRows:new Map<string,string>(),read:vi.fn(),write:vi.fn(),translate:vi.fn(),translateSearch:vi.fn(async()=> 'diamond'),list:vi.fn(async()=>({ok:true as const,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}})),sourceName:'Cotton Summer Shirt',nameAr:'',category:'Summer Clothing',categoryPath:'Clothing > Summer Clothing',variantName:'Blue Large'}));
+const state=vi.hoisted(()=>({allowed:true,edit:false,suspend:false,remove:false,cache:new Map<string,string>(),savedRows:new Map<string,string>(),read:vi.fn(),write:vi.fn(),translate:vi.fn(),alternatives:[] as string[],translateSearch:vi.fn(async(_q?:string)=> 'diamond'),list:vi.fn(async()=>({ok:true as const,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}})),sourceName:'Cotton Summer Shirt',nameAr:'',category:'Summer Clothing',categoryPath:'Clothing > Summer Clothing',variantName:'Blue Large'}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:{
   findMany:async(arg:{where:{source_key:{in:string[]}}})=>{
     const saved=new Map([...state.cache].map(([source,target])=>[createHash('sha1').update('en:ar:'+source).digest('hex'),target]));
@@ -23,7 +23,7 @@ vi.mock('@/lib/cj/config',()=>({cjConfig:()=>({configured:true})}));
 vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({shippingMinor:500,usdToSarX100:375})}));
 vi.mock('@/lib/cj/pricing',()=>({defaultMarginBps:async()=>3000,computePrice:()=>({salePriceMinor:5525})}));
 vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listBrowseProductsPage:state.list,getCjCatalogSuppliers:async()=>({ok:true,data:[{id:'SUP-1',name:'Supplier One'}]}),getInventoryByPid:async()=>({ok:true,data:[{vid:'VID-1',cjInventoryQuantity:7,countryCode:'CN',areaId:'CN',areaName:'CN'}]})}));
-vi.mock('@/lib/cj/search',()=>({translateArabicCjSearch:state.translateSearch}));
+vi.mock('@/lib/cj/search',()=>({cjSearchQueries:async(q:string)=>{const value=await state.translateSearch(q);return value?[value,...state.alternatives]:[];}}));
 vi.mock('@/lib/cj/sample',()=>({sampleOneCjProduct:async()=>({ok:true,data:{name:state.sourceName,category:state.category,priceUsd:10,totalStock:7,images:[],variants:[{vid:'VID-1',sku:'SKU-BLUE',name:state.variantName,priceUsd:10,weight:100,stock:7}]}})}));
 vi.mock('@/lib/cj/mapping',()=>{
   const row=()=>({id:1,cj_product_id:'PID-1',cj_sku:'SKU-1',name:state.sourceName,name_ar:state.nameAr,trbhh_category:state.category,image:'',sale_price_minor:5525,sale_price_override_minor:null,supplier_cost_minor:3750,shipping_cost_minor:500,hidden:0,status:'draft',source_description:null,display_description_ar:null});
@@ -50,7 +50,7 @@ import Review from '@/app/admin/suppliers/cj/review/[id]/page';
 import {learnTranslation} from '@/lib/cj/translate';
 const withoutSourceDetails=(html:string)=>html.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g,'');
 async function browse(params:Record<string,string|undefined>={}){return renderToStaticMarkup(await Browse({searchParams:Promise.resolve(params)}));}
-beforeEach(()=>{vi.clearAllMocks();state.allowed=true;state.edit=false;state.suspend=false;state.remove=false;state.cache=new Map();state.savedRows.clear();state.sourceName='Cotton Summer Shirt';state.nameAr='';state.category='Summer Clothing';state.categoryPath='Clothing > Summer Clothing';state.variantName='Blue Large';state.list.mockImplementation(async()=>({ok:true,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}}));state.translateSearch.mockResolvedValue('diamond');});
+beforeEach(()=>{vi.clearAllMocks();state.allowed=true;state.edit=false;state.suspend=false;state.remove=false;state.cache=new Map();state.savedRows.clear();state.sourceName='Cotton Summer Shirt';state.nameAr='';state.category='Summer Clothing';state.categoryPath='Clothing > Summer Clothing';state.variantName='Blue Large';state.list.mockImplementation(async()=>({ok:true,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}}));state.translateSearch.mockResolvedValue('diamond');state.alternatives=[];});
 
 describe('CJ admin Arabic display uses only saved translations on GET',()=>{
   it('translates Arabic product-name searches to the CJ source language before querying the catalog',async()=>{
@@ -157,4 +157,17 @@ it('does not discard an Arabic name filter when translation fails',async()=>{
   expect(state.list).not.toHaveBeenCalled();
   expect(html).not.toContain(state.sourceName);
   expect(html).toContain('تعذّرت ترجمة');
+});
+
+it('tries bounded intent alternatives with identical catalog filters only for a zero total',async()=>{
+ state.alternatives=['second intent','third intent'];
+ state.list.mockResolvedValueOnce({ok:true,data:{total:0,items:[]}});
+ await browse({q:'ابغى منتج',minPrice:'2',supplier:'SUP-1'});
+ expect(state.list).toHaveBeenCalledTimes(2);
+ expect(state.list).toHaveBeenNthCalledWith(2,1,24,{productName:'second intent',categoryId:undefined,filters:{minPrice:'2',supplier:'SUP-1'}});
+});
+it('does not broaden search after a supplier error or an empty later page with a positive total',async()=>{
+ state.alternatives=['second intent'];
+ state.list.mockResolvedValueOnce({ok:false,error:'offline'} as never);await browse({q:'منتج'});expect(state.list).toHaveBeenCalledTimes(1);
+ state.list.mockClear();state.list.mockResolvedValueOnce({ok:true,data:{total:100,items:[]}});await browse({q:'منتج',page:'9'});expect(state.list).toHaveBeenCalledTimes(1);
 });

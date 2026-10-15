@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 
+vi.mock('@/lib/settings',()=>({getSetting:async(_key:string,fallback:string)=>fallback}));
 const db=vi.hoisted(()=>({findMany:vi.fn(),upsert:vi.fn()}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:db}}));
 import {getCachedArabic,isArabicText,learnTranslation,translateManyCached,translateToArabic,translateToArabicCached} from '@/lib/cj/translate';
@@ -8,7 +9,7 @@ import {getCachedArabic,isArabicText,learnTranslation,translateManyCached,transl
 const fetchMock=vi.fn();let clock=Date.now();
 const cache=new Map<string,string>();
 const legacyKey=(s:string)=>createHash('sha1').update('en:ar:'+s.slice(0,480)).digest('hex');
-const memory=(translatedText:string)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText}}),{status:200});
+const memory=(translatedText:string)=>new Response(JSON.stringify({done:true,response:JSON.stringify({translation:translatedText})}),{status:200});
 type CacheWrite={where:{source_key:string};create:{source_key:string;target_ar:string};update:{target_ar?:string}};
 function persist(arg:CacheWrite){
   const key=arg.where.source_key;
@@ -45,24 +46,24 @@ describe('CJ Arabic translation integrity',()=>{
     expect(await translateToArabic('قميص Summer Cotton Shirt')).toBe('ترجمة عربية مكتملة');expect(fetchMock).toHaveBeenCalledOnce();
   });
   it('rejects provider output that is English or retains untranslated English prose',async()=>{
-    fetchMock.mockImplementation(async(url:string)=>url.includes('mymemory')?memory('قميص Summer Cotton Shirt'):new Response(JSON.stringify([[['Summer Cotton Shirt','source']]])));
+    fetchMock.mockImplementation(async(url:string)=>url.includes('ollama')?memory('قميص Summer Cotton Shirt'):new Response(JSON.stringify({translatedText:'Summer Cotton Shirt'})));
     expect(await translateToArabicCached('Summer Cotton Shirt')).toBeNull();expect(db.upsert).not.toHaveBeenCalled();
   });
   it('tries the fallback when the first provider returns an untranslated English result',async()=>{
-    fetchMock.mockImplementation(async(url:string)=>url.includes('mymemory')?memory('Summer shirt'):new Response(JSON.stringify([[['قميص صيفي','Summer shirt']]])));
+    fetchMock.mockImplementation(async(url:string)=>url.includes('ollama')?memory('Summer shirt'):new Response(JSON.stringify({translatedText:'قميص صيفي'})));
     expect(await translateToArabic('Summer shirt')).toBe('قميص صيفي');expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it('translates every character of a long source using bounded requests',async()=>{
     const source=('Detailed cotton shirt specification '.repeat(22)+'UNIQUE END').trim();
     const result=await translateToArabic(source);
     expect(result).not.toBeNull();expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
-    const chunks=fetchMock.mock.calls.map(([url])=>new URL(url).searchParams.get('q')!);
+    const chunks=fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.prompt?JSON.parse(b.prompt).text:b.q;});
     expect(chunks.join('')).toBe(source);expect(chunks.every(chunk=>Buffer.byteLength(chunk,'utf8')<=480)).toBe(true);
   });
   it('bounds multibyte source chunks by UTF8 bytes without losing text',async()=>{
     const source='منتج '.repeat(120)+'English description';
     expect(await translateToArabic(source)).not.toBeNull();
-    const chunks=fetchMock.mock.calls.map(([url])=>new URL(url).searchParams.get('q')!);
+    const chunks=fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.prompt?JSON.parse(b.prompt).text:b.q;});
     expect(chunks.join('')).toBe(source.trim());expect(chunks.every(chunk=>Buffer.byteLength(chunk,'utf8')<=480)).toBe(true);
   });
   it('never caches a partial translation when a later source chunk fails',async()=>{
@@ -152,6 +153,6 @@ describe('CJ Arabic translation integrity',()=>{
     const source='a long English description '.repeat(30)+'tail';const mixed='منتج English name';
     const result=await translateManyCached([source,mixed],2);
     expect(result.has(source)).toBe(true);expect(result.get(mixed)).toBe('ترجمة عربية مكتملة');
-    expect(fetchMock.mock.calls.map(([url])=>new URL(url).searchParams.get('q')).join('')).toContain('tail');
+    expect(fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.prompt?JSON.parse(b.prompt).text:b.q;}).join('')).toContain('tail');
   });
 });

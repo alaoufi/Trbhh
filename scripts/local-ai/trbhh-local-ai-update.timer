@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily local model update check
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 Asia/Riyadh
+RandomizedDelaySec=30min
+Persistent=true
+Unit=trbhh-local-ai-update.service
+
+[Install]
+WantedBy=timers.target

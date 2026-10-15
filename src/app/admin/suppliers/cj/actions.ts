@@ -767,19 +767,12 @@ export async function processAllCjImported() {
   redirect(`/admin/suppliers/cj/browse?bulk=1&processed=${processed}&shipped=${shipped}&tr=${translated}&failed=${failed}&remaining=${remaining}&done=${wrapped ? 1 : 0}`);
 }
 
-/** حفظ مفاتيح مزوّدي الترجمة من لوحة التحكم (لا أسرار في الكود/‏.env). المفتاح الفارغ
- *  يُبقي القيمة الحالية (تفادي مسح المفتاح بالخطأ)؛ البريد يُحفظ كما هو (غير سرّي). */
+/** إعداد الذكاء المحلي فقط؛ مفاتيح الخدمات الخارجية القديمة لا تستخدم. */
 export async function saveCjTranslationSettings(form: FormData) {
   await requireCjAccess('integrations', 'manage_settings');
   const { setSetting } = await import('@/lib/settings');
-  const libreUrl = String(form.get('libreUrl') || '').trim();
-  const libreKey = String(form.get('libreKey') || '').trim();
-  const deeplKey = String(form.get('deeplKey') || '').trim();
-  const email = String(form.get('mymemoryEmail') || '').trim();
-  await setSetting('cj_libretranslate_url', libreUrl.slice(0, 300));
-  if (libreKey) await setSetting('cj_libretranslate_key', libreKey.slice(0, 200));
-  if (deeplKey) await setSetting('cj_deepl_api_key', deeplKey.slice(0, 200));
-  await setSetting('cj_mymemory_email', email.slice(0, 120));
+  const enabled=String(form.get('localAiEnabled')||'0');
+  await setSetting('local_ai_enabled',enabled==='1'?'1':'0');
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), 'transcfg=1'));
 }

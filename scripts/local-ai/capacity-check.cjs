@@ -28,9 +28,16 @@ async function releaseExploratory(model,fetcher=fetch){
  try{const response=await fetcher('http://ollama:11434/api/chat',{method:'POST',redirect:'error',signal:AbortSignal.timeout(3000),headers:{'Content-Type':'application/json'},body:JSON.stringify({model,messages:[],stream:false,keep_alive:0})});return response.ok;}
  catch{return false;}
 }
+function assessPublicIntent(protocol,text,response,check){
+ let rawAnswer;try{rawAnswer=JSON.parse(response.message?.content||'{}');}catch{return {rawAnswer:response.message?.content,answer:[],passed:false,rejection:'invalid_json'};}
+ const answer=protocol.validateIntentQueries(text,rawAnswer,true);
+ const rejection=response.done!==true||response.done_reason==='length'?'incomplete':!answer.length?'runtime_validation':!check(answer[0])?'meaning_check':null;
+ return {rawAnswer,answer,passed:rejection===null,rejection};
+}
 async function run(){
  const protocol=globalThis.__trbhhCapacityProtocol,poolFactory=globalThis.__trbhhCapacityPool;
  if(!protocol||!poolFactory)throw Error('capacity_shared_code_missing');
+ const qualityOnly=process.argv[3]==='--quality-only';
  const controller=new AbortController(),started=Date.now(),memoryStart=cgroupMemory();
  const timer=setTimeout(()=>controller.abort(Error('safety_stop_time_budget')),240000);
  let monitor,checking=false,modelBusy=false,model,modelCalls=0,minAvailable=Infinity,maxLoad=0,maxAppGrowth=0,maxHealthMs=0;
@@ -65,8 +72,8 @@ async function run(){
   monitor=setInterval(()=>{if(checking)return;checking=true;guard().catch(error=>controller.abort(error)).finally(()=>{checking=false;});},2000);
   // Warm only four fixed synthetic searches. No account cookie, write endpoint or supplier API is used.
   let productSearchAvailable=true;
-  for(let i=0;i<4;i++){const warm=await httpWorker(i);if(warm.searchUnavailable){productSearchAvailable=false;log({event:'PUBLIC_HTTP_NOT_TESTED',reason:'product_search_not_deployed_or_store_closed'});break;}if(!warm.ok)throw Error('safety_stop_public_warmup');}
-  for(const size of productSearchAvailable?[1,5,10,20,40]:[]){
+  if(!qualityOnly)for(let i=0;i<4;i++){const warm=await httpWorker(i);if(warm.searchUnavailable){productSearchAvailable=false;log({event:'PUBLIC_HTTP_NOT_TESTED',reason:'product_search_not_deployed_or_store_closed'});break;}if(!warm.ok)throw Error('safety_stop_public_warmup');}
+  for(const size of !qualityOnly&&productSearchAvailable?[1,5,10,20,40]:[]){
    await guard();const begin=Date.now(),items=await burst(size,httpWorker,controller.signal),result={event:'PUBLIC_HTTP_STAGE',workload:'four warmed synthetic phrases',concurrency:size,...summary(items,Date.now()-begin)};http.push(result);log(result);
    const limit=result.intelligent===size?10000:2500;
    if(result.errors||result.p95Ms>limit){log({event:'PUBLIC_HTTP_STOP',reason:'error_or_latency_budget',nextStagesSkipped:true});break;}
@@ -84,12 +91,12 @@ async function run(){
   if((await chat(preparation,120000)).done!==true)throw Error('model_preload_incomplete');
   const fixtures=[['أبغى كفر Samsung S24',value=>/Samsung/i.test(value)&&/S24/i.test(value)&&/غطاء|حافظ|جراب|كفر/.test(value)],['شي يرتب لي أدوات المطبخ',value=>/مطبخ/.test(value)&&/منظم|تنظيم|رف|حامل/.test(value)],['أبغى دريل بدون سلك 18V',value=>/دريل|مثقاب/.test(value)&&/لاسلك|لا سلك|بدون سلك/.test(value)&&/18\s*V/i.test(value)],['جزمة للمشي ضد الموية مقاس 42',value=>/حذاء|أحذية|حذ[اأء]|جزمة/.test(value)&&/مشي/.test(value)&&/ماء|مياه/.test(value)&&/42/.test(value)]];
   for(const [text,check] of fixtures){
-   await guard();const begin=Date.now();let answer,ok=false;
-   try{const response=await chat(protocol.request(model,text,protocol.publicSearchTask,protocol.publicSearchFormat),8500);answer=protocol.validateIntentQueries(text,JSON.parse(response.message?.content||'{}'),true);
-    ok=response.done===true&&response.done_reason!=='length'&&Array.isArray(answer)&&answer.length===1&&typeof answer[0]==='string'&&answer[0].length<=100&&check(answer[0]);
-   }catch(error){answer=String(error.message).slice(0,100);}
-   publicQuality=publicQuality&&ok;log({event:'PUBLIC_INTENT_QUALITY',input:text,answer,ms:Date.now()-begin,passed:ok});
+   await guard();const begin=Date.now();let assessment;
+   try{const response=await chat(protocol.request(model,text,protocol.publicSearchTask,protocol.publicSearchFormat),8500);assessment=assessPublicIntent(protocol,text,response,check);
+   }catch(error){assessment={passed:false,rejection:'transport',error:String(error.message).slice(0,100)};}
+   publicQuality=publicQuality&&assessment.passed;log({event:'PUBLIC_INTENT_QUALITY',input:text,...assessment,ms:Date.now()-begin});
   }
+  if(qualityOnly){log({event:'PUBLIC_QUALITY_COMPLETE',model,applicationModelReady,publicQualityPassed:publicQuality,pressureTest:false,deployed:false});return;}
   const pool=poolFactory(),phrase='شي يرتب لي أدوات المطبخ';
   async function semantic(text){
    const begin=Date.now(),body=protocol.request(model,text,protocol.searchTask,protocol.searchFormat);
@@ -110,5 +117,5 @@ async function run(){
    minHostAvailableGiB:Math.round(minAvailable/1024**3*100)/100,maxHostLoad:maxLoad,maxAppGrowthMiB:Math.round(maxAppGrowth/1024**2),maxHealthMs,elapsedSeconds:Math.round((Date.now()-started)/1000),deployed:false,scope:'short local burst, not sustained capacity or public-network latency'});
  }finally{clearTimeout(timer);clearInterval(monitor);controller.abort();if(!await releaseExploratory(model))console.error('CAPACITY_CLEANUP_WARN — exploratory model memory release unconfirmed.');}
 }
-module.exports={summary,burst,readSmall,assertResources,releaseExploratory,run};
+module.exports={summary,burst,readSmall,assertResources,releaseExploratory,assessPublicIntent,run};
 if(module.id==='[stdin]')run().catch(error=>{console.error(JSON.stringify({event:'CAPACITY_STOPPED',reason:String(error.message).slice(0,200),deployed:false}));process.exitCode=1;});

@@ -3,7 +3,14 @@ import {expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-const {summary,burst,readSmall,assertResources,releaseExploratory}=createRequire(import.meta.url)('../../scripts/local-ai/capacity-check.cjs');
+const {summary,burst,readSmall,assertResources,releaseExploratory,assessPublicIntent}=createRequire(import.meta.url)('../../scripts/local-ai/capacity-check.cjs');
+it('preserves rejected raw answers so validation failures are distinguishable from bad meaning',()=>{
+ const protocol=createRequire(import.meta.url)('../../scripts/local-ai/protocol.cjs');
+ const result=assessPublicIntent(protocol,'أبغى كفر Samsung S24',{done:true,message:{content:JSON.stringify({queries:['غطاء SamsungS24']})}},()=>true);
+ expect(result).toMatchObject({rawAnswer:{queries:['غطاء SamsungS24']},answer:[],passed:false,rejection:'runtime_validation'});
+ const semantic=assessPublicIntent(protocol,'شي يرتب لي أدوات المطبخ',{done:true,message:{content:JSON.stringify({queries:['أدوات مطبخ']})}},()=>false);
+ expect(semantic).toMatchObject({answer:['أدوات مطبخ'],passed:false,rejection:'meaning_check'});
+});
 it('releases only the exploratory model, never unloading the active application alias',async()=>{
  const fetcher=vi.fn(async(_url:string,_init:{body:string})=>Response.json({done:true}));
  await releaseExploratory('trbhh-local:active',fetcher);expect(fetcher).not.toHaveBeenCalled();
@@ -60,4 +67,7 @@ globalThis.fetch=async(url,options)=>{
  const end=lines.find(line=>line.event==='CAPACITY_COMPLETE');
  expect(end).toMatchObject({publicQualityPassed:true,candidateSharedBurstPassed:true,publicHttpObservedConcurrency:40,publicHttpIntelligentConcurrency:0,deployed:false});
  expect(lines.find(line=>line.scenario==='distinct_cold')).toMatchObject({concurrency:40,intelligent:1,literal:39,modelExecutions:1});
+ const qualityPrelude=prelude+`const noLoadFetch=globalThis.fetch;globalThis.fetch=(url,options)=>{assert.equal(String(url).includes('/shop'),false);return noLoadFetch(url,options);};\n`;
+ const quality=spawnSync(process.execPath,['-','b'.repeat(40),'--quality-only'],{input:qualityPrelude+script,encoding:'utf8',timeout:5000});
+ expect(quality.status,quality.stderr).toBe(0);expect(quality.stdout).not.toContain('PUBLIC_HTTP_STAGE');expect(quality.stdout).not.toContain('STAGED_MODEL_POOL');expect(quality.stdout).toContain('PUBLIC_QUALITY_COMPLETE');expect(quality.stdout).toContain('rawAnswer');
 },15000);

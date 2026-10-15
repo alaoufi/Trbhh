@@ -1,12 +1,27 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 const settings=vi.hoisted(()=>({enabled:'1'}));
 vi.mock('@/lib/settings',()=>({getSetting:async()=>settings.enabled}));
-import {clearLocalInferenceCache,localGenerate,localSearchQueries,localTranslation,localServiceUrl} from '@/lib/ai/local';
+import {clearLocalInferenceCache,localGenerate,localSearchQueries,localPublicSearchQueries,localTranslation,localServiceUrl} from '@/lib/ai/local';
 const fetcher=vi.fn();
 beforeEach(()=>{settings.enabled='1';clearLocalInferenceCache();fetcher.mockReset();vi.stubGlobal('fetch',fetcher);});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs();});
 const answer=(value:unknown)=>new Response(JSON.stringify({done:true,message:{content:JSON.stringify(value)}}));
 describe('local intelligence boundary',()=>{
+ it('shares one intelligent answer across forty simultaneous visitors',async()=>{
+  let release!:(response:Response)=>void;fetcher.mockImplementation(()=>new Promise<Response>(resolve=>{release=resolve;}));
+  const jobs=Array.from({length:40},()=>localSearchQueries('شي يرتب لي أدوات المطبخ'));
+  await vi.waitFor(()=>expect(fetcher).toHaveBeenCalledOnce());release(answer({queries:['kitchen organizer']}));
+  expect((await Promise.all(jobs)).every(result=>result[0]==='kitchen organizer')).toBe(true);
+ });
+ it('uses a local Arabic catalog interpretation for public search, retaining brand and model',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['غطاء Samsung S24']}));
+  expect(await localPublicSearchQueries('أبغى كفر Samsung S24')).toEqual(['غطاء Samsung S24']);
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).messages[1].content).toContain('Arabic catalog noun phrase');
+ });
+ it('rejects a public interpretation losing a model, returning no expansion',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['غطاء Samsung']}));
+  expect(await localPublicSearchQueries('أبغى كفر Samsung S24')).toEqual([]);
+ });
  it.each(['https://cloud.example','http://user:pass@ollama:11434','http://169.254.169.254','http://ollama.evil:11434','http://ollama:11434/remote'])('rejects non-local endpoint %s',url=>{expect(localServiceUrl(url,'ollama')).toBeNull();});
  it('accepts only named local service or loopback',()=>{expect(localServiceUrl('http://ollama:11434','ollama')).toBe('http://ollama:11434');expect(localServiceUrl('http://localhost:11434','ollama')).toBe('http://localhost:11434');});
  it('requests structured local inference without tools, redirects or cloud models',async()=>{

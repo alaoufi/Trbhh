@@ -1,6 +1,12 @@
 import {createRequire} from 'node:module';
 import {expect,it} from 'vitest';
-const {request,searchTask,searchFormat,translationTask,translationFormat}=createRequire(import.meta.url)('../../scripts/local-ai/protocol.cjs');
+const {request,searchTask,searchFormat,translationTask,translationFormat,validateIntentQueries}=createRequire(import.meta.url)('../../scripts/local-ai/protocol.cjs');
+it('shares runtime intent validation with the capacity probe rather than counting malformed output',()=>{
+ expect(validateIntentQueries('أبغى كفر Samsung S24',{queries:['غطاء SamsungS24']},true)).toEqual([]);
+ expect(validateIntentQueries('منظم أدوات مطبخ 12',{queries:['kitchen organizer']})).toEqual([]);
+ expect(validateIntentQueries('منظم',{queries:[42]})).toEqual([]);
+ expect(validateIntentQueries('أبغى كفر Samsung S24',{queries:['غطاء Samsung S24']},true)).toEqual(['غطاء Samsung S24']);
+});
 it('uses one shared grounded conversation protocol for runtime and acceptance tests',()=>{
  const body=request('local:test','نص غير موثوق',searchTask,searchFormat);
  expect(body).toMatchObject({model:'local:test',stream:false,think:false,format:searchFormat});

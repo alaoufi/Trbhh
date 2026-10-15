@@ -503,6 +503,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
 
 type SearchParamsT = {
   q?: string;
+  qVariants?: string[];
   categoryId?: number;
   countryId?: number;
   cityId?: number;
@@ -537,18 +538,22 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
+async function buildSearchWhere({ q, qVariants, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
   // مع توحيد أشكال الألف (أ إ آ ← ا) والتاء المربوطة (ة/ه) والياء (ى/ي)
   const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
-  const tokens = (q || '').trim().split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
-  if (!tokens.length && (q || '').trim()) tokens.push((q as string).trim());
-  const textClauses = tokens.map((t) => {
+  const phraseClauses=(phrase:string)=>{
+  const tokens = phrase.trim().split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
+  if (!tokens.length && phrase.trim()) tokens.push(phrase.trim());
+  return tokens.map((t) => {
     const variants = Array.from(new Set([t, norm(t), t.replace(/ه$/, 'ة'), t.replace(/ة$/, 'ه'), t.replace(/ي$/, 'ى'), t.replace(/ى$/, 'ي')]));
     return { OR: variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]) };
   });
+  };
+  const alternatives=q?.trim()?(qVariants||[]).filter(value=>typeof value==='string'&&value.trim()&&value.length<=100).slice(0,1):[];
+  const textClauses=alternatives.length?[{OR:[{AND:phraseClauses(q||'')},...alternatives.map(phrase=>({AND:phraseClauses(phrase)}))]}]:phraseClauses(q||'');
   return {
     ...visibility,
     AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textClauses],

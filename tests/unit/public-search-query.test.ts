@@ -18,6 +18,14 @@ vi.mock('@/lib/packages', () => ({
   getPackages: async () => [], getDefaultPackage: async () => ({ adDays: 0 }), FREE_FALLBACK: { adDays: 0 },
 }));
 import { countSearchAds, searchAds } from '@/lib/data';
+it('keeps eligibility, location and price outside intelligent text alternatives',async()=>{
+ db.ads.count.mockResolvedValue(0);
+ await countSearchAds({q:'شي يرتب لي أدوات المطبخ',qVariants:['منظم أدوات المطبخ'],cityId:1,minPrice:10,maxPrice:90});
+ const where=db.ads.count.mock.calls.at(-1)![0].where;
+ expect(where).toMatchObject({status:1,city_id:1n,price:{gte:10,lte:90}});
+ const alternatives=where.AND.find((clause:Record<string,unknown>)=>Array.isArray(clause.OR)&&clause.OR.length===2&&clause.OR.every((part:Record<string,unknown>)=>Array.isArray(part.AND)));
+ expect(alternatives).toBeDefined();expect(JSON.stringify(alternatives)).toContain('منظم');
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

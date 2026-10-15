@@ -13,6 +13,7 @@ const sources = [
   'src/lib/suppliers/crypto.ts',
   'src/lib/suppliers/http.ts',
   'src/lib/commerce/config.ts',
+  'src/lib/commerce/customer-fulfillment.ts',
   'src/lib/commerce/money.ts',
 ];
 function build() {

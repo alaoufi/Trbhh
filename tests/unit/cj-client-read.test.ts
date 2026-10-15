@@ -41,6 +41,18 @@ afterEach(() => {
 });
 
 describe('CJ authentication and verified connection', () => {
+  it('queries the complete V2 catalog with filters and maps its nested paginated response',async()=>{
+    mock.fetch.mockResolvedValueOnce(success({totalRecords:90,content:[{productList:[{id:'P1',nameEn:'Ring',sku:'SKU',bigImage:'https://example.com/ring.jpg',sellPrice:'2.50',threeCategoryName:'Rings'}]}]}));
+    const {listBrowseProductsPage}=await import('@/lib/cj/client');
+    const result=await finish(listBrowseProductsPage(2,24,{productName:'ring',categoryId:'CAT',filters:{minPrice:'2',platform:'tiktok',sort:'price_asc'}}));
+    expect(result).toMatchObject({ok:true,data:{total:90,pageNum:2,items:[{pid:'P1',productName:'Ring',sellPrice:2.5,categoryName:'Rings'}]}});
+    const url=new URL(mock.fetch.mock.calls[0][0]);expect(url.pathname).toContain('/product/listV2');expect(Object.fromEntries(url.searchParams)).toMatchObject({page:'2',size:'24',keyWord:'ring',categoryId:'CAT',startSellPrice:'2',zonePlatform:'tiktok',orderBy:'2',sort:'asc'});
+  });
+  it('rejects invalid catalog filters without network calls and malformed V2 data without inventing results',async()=>{
+    const {listBrowseProductsPage}=await import('@/lib/cj/client');
+    expect(await listBrowseProductsPage(1,24,{filters:{minPrice:'10',maxPrice:'1'}})).toMatchObject({ok:false});expect(mock.fetch).not.toHaveBeenCalled();
+    mock.fetch.mockResolvedValueOnce(success({totalRecords:90,list:[]}));expect(await finish(listBrowseProductsPage(1,24))).toMatchObject({ok:false,error:'cj_invalid_response'});
+  });
   it('uses the documented orderIds batch schema with at most 100 ids, and retries only a read limit',async()=>{
     mock.fetch.mockResolvedValueOnce(reply({code:1600200,result:false,message:'Too Many Requests'},429)).mockResolvedValueOnce(success([{orderId:'O1',orderNum:'R1'}]));
     const {getCjOrderDetailBatch}=await import('@/lib/cj/client');

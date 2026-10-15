@@ -22,7 +22,7 @@ vi.mock('@/components/access-boundary',()=>({AccessBoundary:({children,action}:{
 vi.mock('@/lib/cj/config',()=>({cjConfig:()=>({configured:true})}));
 vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({shippingMinor:500,usdToSarX100:375})}));
 vi.mock('@/lib/cj/pricing',()=>({defaultMarginBps:async()=>3000,computePrice:()=>({salePriceMinor:5525})}));
-vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listProductsPage:state.list,getInventoryByPid:async()=>({ok:true,data:[{vid:'VID-1',cjInventoryQuantity:7,countryCode:'CN',areaId:'CN',areaName:'CN'}]})}));
+vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listBrowseProductsPage:state.list,getInventoryByPid:async()=>({ok:true,data:[{vid:'VID-1',cjInventoryQuantity:7,countryCode:'CN',areaId:'CN',areaName:'CN'}]})}));
 vi.mock('@/lib/cj/search',()=>({translateArabicCjSearch:state.translateSearch}));
 vi.mock('@/lib/cj/sample',()=>({sampleOneCjProduct:async()=>({ok:true,data:{name:state.sourceName,category:state.category,priceUsd:10,totalStock:7,images:[],variants:[{vid:'VID-1',sku:'SKU-BLUE',name:state.variantName,priceUsd:10,weight:100,stock:7}]}})}));
 vi.mock('@/lib/cj/mapping',()=>{
@@ -56,7 +56,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
   it('translates Arabic product-name searches to the CJ source language before querying the catalog',async()=>{
     const html=await browse({q:'الماس'});
     expect(state.translateSearch).toHaveBeenCalledWith('الماس');
-    expect(state.list).toHaveBeenCalledWith(1,24,{productName:'diamond',categoryId:undefined});
+    expect(state.list).toHaveBeenCalledWith(1,24,{productName:'diamond',categoryId:undefined,filters:{}});
     expect(html).toContain('بحث بالاسم');
   });
   it.each([{}, {ar:'0'}, {detail:'PID-1'}])('reading browse %j never translates or writes on the server',async params=>{
@@ -135,3 +135,12 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     expect(html).toContain('حفظ المراجعة');expect(html).toContain('إخفاء من المعاينة');expect(html).toContain('تأكيد الحذف');expect(html).toContain('حذف السلعة من تربح');
   });
 });
+
+it('retains active catalog filters in paging, detail and import return links',async()=>{
+ state.list.mockResolvedValueOnce({ok:true,data:{total:100,items:[{pid:'PID-1',productSku:'SKU-1',productName:'Ring',categoryName:'Rings',productImage:null,sellPrice:10}]}});
+ const html=await browse({page:'2',minPrice:'2.50',platform:'tiktok',sort:'price_asc'});
+ expect(state.list).toHaveBeenCalledWith(2,24,{productName:undefined,categoryId:undefined,filters:{minPrice:'2.50',platform:'tiktok',sort:'price_asc'}});
+ expect(html).toContain('page=3&amp;minPrice=2.50&amp;platform=tiktok&amp;sort=price_asc');
+ expect(html).toContain('name="platform"');expect(html).toContain('name="minPrice"');expect(html).not.toContain('value="aliexpress"');
+});
+it('does not call the catalog for an invalid price range',async()=>{expect(await browse({minPrice:'100',maxPrice:'2'})).toContain('السعر الأدنى يجب ألا يتجاوز السعر الأعلى');expect(state.list).not.toHaveBeenCalled();});

@@ -1,9 +1,10 @@
+import {parseCjCatalogFilters} from '@/lib/cj/catalog-filters';
 import { AccessBoundary } from '@/components/access-boundary';
 import { CjProductImage } from '@/components/cj/product-image';
 import Link from 'next/link';
 import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
-import { listProductsPage, getCategories } from '@/lib/cj/client';
+import { listBrowseProductsPage, getCategories } from '@/lib/cj/client';
 import { createCjDetailReads } from '@/lib/cj/detail-reads';
 import { translateArabicCjSearch } from '@/lib/cj/search';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
@@ -45,8 +46,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const translationNotice = typeof sp.page_translation === 'string' && Object.hasOwn(translationFeedback, sp.page_translation) ? translationFeedback[sp.page_translation as keyof typeof translationFeedback] : null;
   const q = typeof sp.q === 'string' ? sp.q.slice(0, 100) : '';
   const cat = typeof sp.cat === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(sp.cat) ? sp.cat : '';
-  const page = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1);
+  const page = Math.min(1000,Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1));
   const detailPid = typeof sp.detail === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(sp.detail) ? sp.detail : '';
+  const catalogFilters=parseCjCatalogFilters(sp);
   const cfg = cjConfig();
 
   if (!cfg.configured) {
@@ -64,7 +66,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   // (تُرجِع نتائج غير ذات صلة)، بل نُلغي فلتر الاسم ونعرض تنبيهاً للمستخدم.
   const queryIsArabic = !!q && /\p{Script=Arabic}/u.test(q);
   const searchName = sourceQuery ? sourceQuery : (queryIsArabic ? undefined : (q || undefined));
-  const listing = await listProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined });
+  const listing = catalogFilters.error?{ok:false as const,error:'cj_catalog_filters_invalid',status:400}:await listBrowseProductsPage(page, PAGE_SIZE, { productName: searchName, categoryId: cat || undefined,filters:catalogFilters.values });
   const items = listing.ok ? listing.data.items : [];
   // صلاحية العرض تقرأ الترجمات المحفوظة فقط؛ الترجمة والكتابة إجراءات تحرير صريحة.
   const importedList = await listCjProducts(60);
@@ -95,7 +97,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return [c.id, label];
   }));
   const total = listing.ok ? listing.data.total : 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.min(1000,Math.max(1, Math.ceil(total / PAGE_SIZE)));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detailReads = createCjDetailReads(detailPid);
   const detail = detailPid ? await sampleOneCjProduct(detailPid, detailReads) : null;
@@ -128,7 +130,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     ? await verifyCjVariantForSaudi(detailPid, { vid: liveVariant.vid, variantSku: liveVariant.sku, variantName: liveVariant.name, variantKey: null, variantSellPrice: liveVariant.priceUsd, variantImage: null, variantWeight: liveVariant.weight, attributes: {} }, 1, { getVariants: detailReads.getVariants }, pricing.usdToSarX100, { marginBps:pricing.marginBps },destinationZip).catch(() => null)
     : null;
   const liveShip = detailLive?.status === 'available' ? [...detailLive.shippingOptions].sort((a, b) => (a.priceMinor + a.additionalMinor) - (b.priceMinor + b.additionalMinor))[0] : null;
-  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
+  const keep = (catalogFilters.params.size?'&'+catalogFilters.params.toString():'')+`${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
   const backHref = `/admin/suppliers/cj/browse?page=${page}${keep}`;
   const activeCat = categories.find((c) => c.id === cat);
@@ -166,10 +168,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {typeof sp.imported === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم استيراد المنتج {sp.imported} إلى التخزين الوسيط ✓ (لم يُعرض للعامة).</p>}
       {typeof sp.imperr === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر استيراد المنتج. أعد المحاولة من إجراء الاستيراد.</p>}
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
-      {!listing.ok && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
+      {catalogFilters.error&&<p role="alert" className="rounded border border-red-300 p-3 text-red-700">{catalogFilters.error}</p>}
+      {!listing.ok&&!catalogFilters.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
 
       {/* بحث + فلترة بأقسام البضائع — القسم يُطبَّق فوراً عند الاختيار (بلا زر عرض) */}
-      <BrowseFilter q={q} cat={cat} categories={[{ id: '', label: `كل الأقسام${total ? ` (${total.toLocaleString('en')})` : ''}` }, ...categories.map((c) => ({ id: c.id, label: categoryLabels.get(c.id) || c.path }))]} />
+      <BrowseFilter filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: `كل الأقسام${total ? ` (${total.toLocaleString('en')})` : ''}` }, ...categories.map((c) => ({ id: c.id, label: categoryLabels.get(c.id) || c.path }))]} />
       {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
       <p className="text-xs text-muted-foreground">الترجمة فورية عند التحميل؛ أي كلمة بقيت بلغتها اضغط عليها لجلب ترجمتها. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
@@ -235,6 +238,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         <form method="get" className="flex items-center gap-1">
           {q && <input type="hidden" name="q" value={q} />}
           {cat && <input type="hidden" name="cat" value={cat} />}
+          {Array.from(catalogFilters.params).map(([key,value])=><input key={key} type="hidden" name={key} value={value}/>)}
           <input className={`${input} w-16 text-center`} name="page" type="number" min={1} max={totalPages} defaultValue={page} aria-label="رقم الصفحة" />
           <span className="text-sm text-muted-foreground">/ {totalPages.toLocaleString('en')}</span>
           <button className={btn}>اذهب</button>

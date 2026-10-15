@@ -1,4 +1,5 @@
 import 'server-only';
+import {parseCjCatalogFilters,type CatalogFilterValues} from './catalog-filters';
 import { cjConfig, type CjConfig } from './config';
 import { readCjAuth, writeCjAuth } from './store';
 import { getCommerceConfig } from '@/lib/commerce/settings';
@@ -117,7 +118,7 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST' | 'PATCH'; 
   // Only proven non-mutating catalog reads may be replayed. In particular,
   // POST freightCalculate is a quote; order/payment POSTs must stay single-send.
   const retryableRead = (request.method === 'GET' && [
-    '/product/query','/product/variant/query','/product/stock/queryByVid','/product/stock/getInventoryByPid',
+    '/product/listV2','/product/query','/product/variant/query','/product/stock/queryByVid','/product/stock/getInventoryByPid',
   ].includes(path)) || (request.method === 'POST' && ['/logistic/freightCalculate','/shopping/order/getOrderDetailBatch'].includes(path));
   let response:{status:number;body:unknown};
   for(let attempt=0;;attempt++){
@@ -166,6 +167,19 @@ export async function listProductsPage(pageNum = 1, pageSize = 20, filters: { pr
   const list = Array.isArray(r.data?.list) ? r.data!.list! : [];
   const total = num(r.data?.total) ?? list.length;
   return { ok: true, data: { items: list.map((p) => mapSummary(p as Record<string, unknown>)), total, pageNum, pageSize } };
+}
+
+/** Interactive import catalog uses documented V2 filtering; existing sync callers keep their contract. */
+export async function listBrowseProductsPage(pageNum=1,pageSize=24,options:{productName?:string;categoryId?:string;filters?:CatalogFilterValues}={}):Promise<CjResult<CjProductPage>>{
+ const filters=parseCjCatalogFilters(options.filters||{});
+ if(filters.error||!Number.isInteger(pageNum)||pageNum<1||pageNum>1000||!Number.isInteger(pageSize)||pageSize<1||pageSize>100)return {ok:false,error:'cj_catalog_filters_invalid',status:400};
+ const r=await call<{content?:unknown;totalRecords?:unknown}>('/product/listV2',{query:{page:pageNum,size:pageSize,keyWord:options.productName,categoryId:options.categoryId,...filters.query}});
+ if(!r.ok)return r;
+ if(!Array.isArray(r.data?.content)||!r.data.content.every(group=>group&&typeof group==='object'&&Array.isArray(group.productList)))return {ok:false,error:'cj_invalid_response',status:200};
+ const list=r.data.content.flatMap(group=>group.productList) as unknown[];
+ const total=num(r.data.totalRecords);
+ if(total===null||!Number.isSafeInteger(total)||total<0||list.some(p=>!p||typeof p!=='object'||!String((p as Record<string,unknown>).id||(p as Record<string,unknown>).pid||'')))return {ok:false,error:'cj_invalid_response',status:200};
+ return {ok:true,data:{items:list.map(p=>{const raw=p as Record<string,unknown>;const mapped=mapSummary(raw);return {...mapped,categoryName:str(raw.threeCategoryName)||mapped.categoryName};}),total,pageNum,pageSize}};
 }
 
 // شجرة التصنيفات نادرة التغيّر — نخزّنها في الذاكرة لتفادي حدّ المعدّل عند كل تحميل.

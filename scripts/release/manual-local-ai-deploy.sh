@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-candidate=ed3e010984d0a50bf51de8adaea251b12d08f866
+candidate=7af58600318d1f4b995cb3a4862a21403aac2a6e
 baseline=35ac47b1c0b8768a65a14ca8388e2f4febc53c99
 branch=codex/admin-navigation-complete-20261014
 [[ $(id -u) == 0 ]]
@@ -23,6 +23,13 @@ if [[ ${1:-} != --run ]]; then
   touch "$target/result.log"
   systemd-run --unit="trbhh-local-ai-deploy-$run_id" --property=Type=exec /bin/bash "$target/manual-local-ai-deploy.sh" --run "$target" "$reference"
   printf 'RUN_ID=%s\nRESULT: tail -n 30 %s/result.log\n' "$run_id" "$target"
+  (
+    while systemctl is-active --quiet "trbhh-local-ai-deploy-$run_id.service"; do sleep 3; done
+  ) &
+  watcher=$!
+  tail --pid="$watcher" -n 12 -f "$target/result.log"
+  wait "$watcher"
+  ! systemctl is-failed --quiet "trbhh-local-ai-deploy-$run_id.service"
   exit 0
 fi
 target=${2:?}
@@ -85,7 +92,12 @@ git archive --format=tar "$candidate" docker-compose.local-ai.yml scripts/local-
 bash "$target/ai/scripts/local-ai/install-runtime.sh" --provision-only
 
 echo "BUILDING=$candidate — code only; no new database or media backup."
-git archive --format=tar "$candidate" | docker build --build-arg "TRBHH_RELEASE_COMMIT=$candidate" --tag "trbhh-code:$candidate" -
+if ! git archive --format=tar "$candidate" | docker build --build-arg "TRBHH_RELEASE_COMMIT=$candidate" --tag "trbhh-code:$candidate" - > "$target/build.log" 2>&1; then
+  echo 'APPLICATION_BUILD_FAILED — last build output follows.'
+  tail -n 20 "$target/build.log"
+  exit 1
+fi
+echo APPLICATION_IMAGE_READY
 image=$(docker image inspect -f '{{.Id}}' "trbhh-code:$candidate")
 [[ $(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image") == "$candidate" ]]
 node "$target/code-only-compose.cjs" "$target/config.json" "$target/before.json" "$image" "$target/candidate.json"

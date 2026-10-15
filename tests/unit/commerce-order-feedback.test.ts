@@ -1,3 +1,4 @@
+vi.mock('@/lib/cj/fulfillment/notices',()=>({memberCjOrderNotices:async()=>[]}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { commerceConfigFromRows } from '@/lib/commerce/config';

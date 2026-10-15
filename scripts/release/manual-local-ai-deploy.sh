@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-candidate=7af58600318d1f4b995cb3a4862a21403aac2a6e
+candidate=648a0a8429d7d81bb215f01c48f6d3bdca08d71c
 baseline=35ac47b1c0b8768a65a14ca8388e2f4febc53c99
 branch=codex/admin-navigation-complete-20261014
 [[ $(id -u) == 0 ]]
@@ -127,7 +127,7 @@ curl --fail --silent --show-error --max-time 30 "https://trbhh.sa/api/version?re
 node -e 'if(JSON.parse(require("fs").readFileSync(process.argv[1])).commit!==process.argv[2])process.exit(1)' "$target/version.json" "$candidate"
 [[ $(sha256sum .env | cut -d' ' -f1) == "$env_hash" ]]
 echo "APPLICATION_RUNTIME_VERIFIED — COMMIT=$candidate"
-docker exec -i "$running" node - --verify < "$target/ai/scripts/local-ai/update-model.cjs"
+bash "$target/ai/scripts/local-ai/run-model.sh" --verify
 echo "PUBLIC_VERSION_VERIFIED=$candidate"
 ai_timer_installed=1
 bash "$target/ai/scripts/local-ai/install-runtime.sh" --install-timer-only

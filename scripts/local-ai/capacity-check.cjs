@@ -52,10 +52,11 @@ async function run(){
   }finally{modelBusy=false;}
  }
  async function httpWorker(index){
-  const start=Date.now(),queries=['هاتف','أدوات مطبخ','سيارة','عقار'];
-  try{const response=await fetch('http://127.0.0.1:3000/search?q='+encodeURIComponent(queries[index%queries.length]),{redirect:'error',signal:signal(12000),cache:'no-store'});
+  const start=Date.now(),queries=['هاتف','أدوات مطبخ','حذاء مشي','مثقاب'];
+  try{const response=await fetch('http://127.0.0.1:3000/shop?q='+encodeURIComponent(queries[index%queries.length]),{redirect:'error',signal:signal(12000),cache:'no-store'});
    const text=await readSmall(response),mode=text.match(/data-search-mode="(intent|literal|idle)"/)?.[1]||'unknown';
-   return {ms:Date.now()-start,ok:response.ok&&text.includes('</html>')&&text.includes('النتائج:'),mode};
+   const available=text.includes('data-search-scope="trbhh-products"');
+   return {ms:Date.now()-start,ok:response.ok&&text.includes('</html>')&&available,mode,searchUnavailable:response.ok&&!available};
   }catch(error){return {ms:Date.now()-start,ok:false,mode:'unknown',error:String(error.message).slice(0,100)};}
  }
  const http=[],modelStages=[];let publicQuality=true;
@@ -63,8 +64,9 @@ async function run(){
   const runningCommit=await guard();log({event:'CAPACITY_BEGIN',runningCommit,candidateCommit:process.argv[2],scope:'public HTTP is running release; model pool and public prompt are staged candidate',maxFanout:40,maxDurationSeconds:240});
   monitor=setInterval(()=>{if(checking)return;checking=true;guard().catch(error=>controller.abort(error)).finally(()=>{checking=false;});},2000);
   // Warm only four fixed synthetic searches. No account cookie, write endpoint or supplier API is used.
-  for(let i=0;i<4;i++){const warm=await httpWorker(i);if(!warm.ok)throw Error('safety_stop_public_warmup');}
-  for(const size of [1,5,10,20,40]){
+  let productSearchAvailable=true;
+  for(let i=0;i<4;i++){const warm=await httpWorker(i);if(warm.searchUnavailable){productSearchAvailable=false;log({event:'PUBLIC_HTTP_NOT_TESTED',reason:'product_search_not_deployed_or_store_closed'});break;}if(!warm.ok)throw Error('safety_stop_public_warmup');}
+  for(const size of productSearchAvailable?[1,5,10,20,40]:[]){
    await guard();const begin=Date.now(),items=await burst(size,httpWorker,controller.signal),result={event:'PUBLIC_HTTP_STAGE',workload:'four warmed synthetic phrases',concurrency:size,...summary(items,Date.now()-begin)};http.push(result);log(result);
    const limit=result.intelligent===size?10000:2500;
    if(result.errors||result.p95Ms>limit){log({event:'PUBLIC_HTTP_STOP',reason:'error_or_latency_budget',nextStagesSkipped:true});break;}

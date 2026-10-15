@@ -4,7 +4,9 @@ import { hasAction } from '@/lib/roles';
 import { PLACEHOLDER } from '@/lib/media';
 import { primaryImages } from '@/lib/account';
 import { getCommerceConfig } from '@/lib/commerce/settings';
-import { readPublicCommerceProducts } from '@/lib/commerce/public-product';
+import { readPublicCommerceProducts, searchPublicCommerceProducts } from '@/lib/commerce/public-product';
+import { localPublicSearchQueries } from '@/lib/ai/local';
+import Link from 'next/link';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { CommerceHome, type CommerceHomeSection, type CommerceBanner, type CommerceCategory } from '@/components/commerce/commerce-home';
@@ -81,11 +83,13 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
     return <div className="card-3d rounded-xl p-6 text-sm font-bold leading-7 text-[#16294a]">{msg}</div>;
   }
   await assertCommerceSchemaReady(prisma);
+  const q=typeof sp.q==='string'?sp.q.trim().slice(0,200):'';
+  const qVariants=q?await localPublicSearchQueries(q):[];
   const [candidateIds, gateway] = await Promise.all([
-    prisma.$queryRaw<{id:bigint}[]>`SELECT cp.id FROM commerce_products cp WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' ORDER BY cp.id DESC LIMIT 100`,
+    q?Promise.resolve([]):prisma.$queryRaw<{id:bigint}[]>`SELECT cp.id FROM commerce_products cp WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' ORDER BY cp.id DESC LIMIT 100`,
     getCommerceGateway(),
   ]);
-  const products=[...(await readPublicCommerceProducts(candidateIds.map(row=>row.id))).values()].sort((a,b)=>Number(b.featured)-Number(a.featured)||Number(b.id)-Number(a.id));
+  const products=(q?await searchPublicCommerceProducts(q,qVariants):[...(await readPublicCommerceProducts(candidateIds.map(row=>row.id))).values()]).sort((a,b)=>Number(b.featured)-Number(a.featured)||Number(b.id)-Number(a.id));
   const canCheckout = config.purchasingEnabled && config.enabled && config.paymentsEnabled && gateway?.ready && config.shippingFeeMinor !== null && !!config.text.shippingTerms;
 
   const shortInfo = (d: string): string | null => {
@@ -111,7 +115,7 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
   // معاينة توضيحية فقط: عند خلوّ الكتالوج من سلع معتمدة وكان المتصفِّح مشرفاً في وضع
   // preview، نعرض أحدث إعلانات الموقع الحيّة داخل قالب المتجر «لتوضيح شكل التصميم فقط».
   // لا يُكتب أو يُستورد شيء، ولا يظهر هذا للعامة إطلاقاً، والشراء يبقى معطّلاً.
-  const usingDemoAds = preview && cards.length === 0;
+  const usingDemoAds = preview && !q && cards.length === 0;
   const demoCards = usingDemoAds ? await buildDemoAdCards() : [];
   const sourceCards = usingDemoAds ? demoCards : cards;
 
@@ -166,6 +170,13 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
         <p className="mt-1 text-sm text-muted-foreground">{pageDesc}</p>
        </div>
       </div>
+      <form method="get" action="/shop" role="search" className="flex flex-wrap items-center gap-2">
+        {preview&&<input type="hidden" name="preview" value="1" />}
+        <input name="q" defaultValue={q} maxLength={200} aria-label="ابحث في منتجات تربح" placeholder="ابحث في منتجات تربح…" className="min-h-11 flex-1 rounded-xl border px-4 text-sm" />
+        <button type="submit" className="min-h-11 rounded-xl bg-primary px-5 font-bold text-white">بحث</button>
+        {q&&<Link href={preview?'/shop?preview=1':'/shop'} className="px-3 text-sm underline">مسح البحث</Link>}
+      </form>
+      {q&&<p data-search-scope="trbhh-products" data-search-mode={qVariants.length?'intent':'literal'} className="text-sm text-muted-foreground">نتائج المنتجات: {products.length}</p>}
       {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {sourceCards.length === 0
         ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">{preview ? 'لا توجد إعلانات حيّة مطابقة لعرضها كبيانات توضيحية.' : 'لا توجد منتجات معتمدة للعرض حالياً.'}</p>

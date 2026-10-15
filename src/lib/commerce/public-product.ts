@@ -102,6 +102,18 @@ export async function readPublicCommerceProducts(ids:readonly bigint[]):Promise<
 export async function readPublicCommerceProduct(id:bigint):Promise<PublicCommerceProduct|null>{
  return (await readPublicCommerceProducts([id])).get(id.toString())||null;
 }
+/** Search saved Trbhh products only; reuse every existing public eligibility predicate. */
+export async function searchPublicCommerceProducts(query:string,interpretations:readonly string[]=[]):Promise<PublicCommerceProduct[]>{
+ const source=query.trim().slice(0,200);if(!source)return[];
+ const phrases=[source,...interpretations.filter(value=>typeof value==='string'&&value.trim()&&value.length<=100).slice(0,1)];
+ const clauses=[...new Set(phrases)].map(phrase=>{
+  const tokens=phrase.trim().split(/\s+/),words=tokens.length>12?[phrase.trim()]:tokens;
+  return Prisma.sql`(${Prisma.join(words.map(word=>Prisma.sql`(LOCATE(${word},cp.title)>0 OR LOCATE(${word},sp.description)>0 OR LOCATE(${word},sp.brand)>0)`),' AND ')})`;
+ });
+ await assertCommerceSchemaReady(prisma);
+ const rows=await prisma.$queryRaw<Row[]>(Prisma.sql`${SELECT} AND (${Prisma.join(clauses,' OR ')}) ORDER BY cp.id DESC LIMIT ${100}`);
+ return rows.flatMap(row=>{const value=product(row);return value?[value]:[];});
+}
 export async function readSimilarPublicCommerceProducts(id:bigint,limit=4):Promise<PublicCommerceProduct[]>{
  const take=Math.min(Math.max(1,limit),8);await assertCommerceSchemaReady(prisma);
  const rows=await prisma.$queryRaw<Row[]>(Prisma.sql`${SELECT} AND cp.id<>${id} ORDER BY cp.id DESC LIMIT ${take}`);

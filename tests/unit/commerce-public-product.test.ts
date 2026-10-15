@@ -2,11 +2,25 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 const state=vi.hoisted(()=>({query:vi.fn(),ready:vi.fn()}));
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:state.query}}));
 vi.mock('@/lib/commerce/schema',()=>({assertCommerceSchemaReady:state.ready,COMMERCE_DDL:[]}));
-import {readPublicCommerceProduct} from '@/lib/commerce/public-product';
+import {readPublicCommerceProduct,searchPublicCommerceProducts} from '@/lib/commerce/public-product';
 const row={id:20n,title:'<b>مطرقة اختبار</b>',price_minor:1000,stock_available:10,stock_reserved:1,images:['http://unsafe.test/x.webp','https://images.example/a.webp','/media/b.webp'],description:'<script>bad()</script> وصف صحيح',brand:'علامة',options:[{name:'اللون',values:['أسود','أحمر']}],variants:[{externalId:'variant-4',name:'أسود / XL / 220V / EU',sku:'CJ-XL-BLK',publicPriceMinor:1200,quantity:5,available:true,image:'https://images.example/black-xl.webp',options:{Color:'Black',Size:'XL',Voltage:'220V',Plug:'EU',Material:'Steel'}}],available:1,quantity:8,featured:1,source_id:8n,cj_source_id:null,cj_availability_json:null,cj_details_json:null};
 const cjProof=(vid='VID-1',stock=7)=>JSON.stringify({checkedAt:new Date().toISOString(),stockQuantity:stock,variants:[{vid,stockQuantity:stock,shippingOptions:[{name:'CJ Packet',priceMinor:1575,currency:'SAR',deliveryDays:'8-15 days',originCountry:'CN'}]}],shippingOptions:[{name:'CJ Packet',priceMinor:1575,currency:'SAR',deliveryDays:'8-15 days',originCountry:'CN'}]});
 describe('public commerce product filtering',()=>{
  beforeEach(()=>{vi.resetAllMocks();state.ready.mockResolvedValue(undefined);state.query.mockResolvedValue([row]);});
+ it('searches saved eligible products before the result limit using bound text parameters only',async()=>{
+  const products=await searchPublicCommerceProducts('شي يرتب مطبخ', ['منظم مطبخ']);
+  expect(products).toHaveLength(1);
+  const query=state.query.mock.calls[0][0];
+  expect(query.sql).toContain('cp.approved=1 AND cp.visible=1 AND cp.enabled=1');
+  expect(query.sql).toContain('LOCATE(');expect(query.sql).not.toContain('منظم');
+  expect(query.sql).toContain('sp.description');expect(query.sql).toContain('sp.brand');
+  expect(query.sql).not.toContain('cp.description');expect(query.sql).not.toContain('cp.brand');
+  expect(query.values).toContain('منظم');expect(query.values.at(-1)).toBe(100);
+  expect(query.sql.indexOf('LOCATE(')).toBeLessThan(query.sql.lastIndexOf('LIMIT'));
+ });
+ it('does not search the entire catalog for an empty search phrase',async()=>{
+  expect(await searchPublicCommerceProducts(' ',['منظم'])).toEqual([]);expect(state.query).not.toHaveBeenCalled();
+ });
  it('returns only sanitized customer-facing product data and available variants',async()=>{const product=await readPublicCommerceProduct(20n);expect(product).toMatchObject({id:'20',title:'مطرقة اختبار',priceMinor:1000,stock:5,images:['https://images.example/a.webp','/media/b.webp'],description:'وصف صحيح',brand:'علامة',requiresVariantSelection:true,variants:[{key:'variant-4',name:'أسود / XL / 220V / EU',priceMinor:1200,stock:5}]});expect(JSON.stringify(product)).not.toMatch(/supplier|cost|margin|external_id|commerce_product/i);});
  it('retains every real provider option, SKU, and variant image dynamically without inventing a VID',async()=>{const product=await readPublicCommerceProduct(20n);expect(product?.variants[0]).toMatchObject({key:'variant-4',vid:null,sku:'CJ-XL-BLK',image:'https://images.example/black-xl.webp',attributes:{Color:'Black',Size:'XL',Voltage:'220V',Plug:'EU',Material:'Steel'}});expect(JSON.stringify(product)).not.toMatch(/supplier|cost|margin|external_id|commerce_product/i);});
  it('hides products with options when no verified available variant exists',async()=>{state.query.mockResolvedValue([{...row,variants:'[]'}]);await expect(readPublicCommerceProduct(20n)).resolves.toBeNull();});

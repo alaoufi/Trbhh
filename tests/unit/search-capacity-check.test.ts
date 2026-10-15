@@ -44,7 +44,7 @@ globalThis.__trbhhCapacityProtocol=require(${JSON.stringify(protocol)});
 globalThis.__trbhhCapacityPool=require(${JSON.stringify(pool)}).createInferencePool;
 globalThis.fetch=async(url,options)=>{
  if(url==='http://127.0.0.1:3000/api/version')return Response.json({commit:'a'.repeat(40)});
- if(String(url).startsWith('http://127.0.0.1:3000/search?q='))return new Response('<html><p data-search-mode="literal">النتائج: 1</p></html>');
+ if(String(url).startsWith('http://127.0.0.1:3000/shop?q='))return new Response('<html><p data-search-scope="trbhh-products" data-search-mode="literal">نتائج المنتجات: 1</p></html>');
  if(url==='http://ollama:11434/api/tags')return Response.json({models:[{name:'trbhh-local:active'}]});
  assert.equal(url,'http://ollama:11434/api/chat');assert.equal(options.method,'POST');
  const body=JSON.parse(options.body);assert.equal(body.model,'trbhh-local:active');

@@ -13,7 +13,6 @@ import { getSession } from '@/lib/auth';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { localPublicSearchQueries } from '@/lib/ai/local';
 
 export const metadata = {
   title: 'بحث متقدم',
@@ -35,8 +34,7 @@ export default async function SearchPage({
   // Accept only Saudi regions and a city belonging to that region.
   const cityId = cities.some((item) => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
   const areaId = cityId && areas.some((item) => item.cityId === cityId && item.id === sq.areaId) ? sq.areaId : undefined;
-  const qVariants=sq.q?await localPublicSearchQueries(sq.q):[];
-  const query = { ...sq, cityId, areaId, qVariants };
+  const query = { ...sq, cityId, areaId };
   const PAGE_SIZE = 48;
   const total = await countSearchAds(query);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -86,7 +84,7 @@ export default async function SearchPage({
         </div>
       )}
 
-      <p data-search-mode={qVariants.length?'intent':sq.q?'literal':'idle'} className="text-sm text-muted-foreground">النتائج: {total}</p>
+      <p className="text-sm text-muted-foreground">النتائج: {total}</p>
       {ads.length > 0 ? <AdGrid ads={ads} /> : <div className="rounded-xl border border-dashed p-8 text-center"><p className="font-semibold">لا توجد إعلانات تطابق بحثك.</p><Link href="/search" className="mt-3 inline-block text-sm text-primary underline">امسح الفلاتر لتصفح جميع الإعلانات</Link></div>}
 
       <AdminPager basePath="/search" page={page} pages={pages} total={total} params={params} />

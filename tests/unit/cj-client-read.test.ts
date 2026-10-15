@@ -41,6 +41,15 @@ afterEach(() => {
 });
 
 describe('CJ authentication and verified connection', () => {
+  it('builds a named supplier chooser from actual supplier products, not platform names or invented ids',async()=>{
+    mock.fetch.mockResolvedValueOnce(success({list:[{supplierId:'S2',supplierName:'Supplier Two'},{supplierId:'S2',supplierName:'Supplier Two'},{supplierId:'S1',supplierName:'Supplier One'},{supplierName:'Unknown ID'},{supplierId:'bad&id',supplierName:'Unsafe'},{supplierId:'EMPTY',supplierName:''}]}));
+    const {getCjCatalogSuppliers}=await import('@/lib/cj/client');const result=await finish(getCjCatalogSuppliers());
+    expect(result).toEqual({ok:true,data:[{id:'S1',name:'Supplier One'},{id:'S2',name:'Supplier Two'}]});
+    const url=new URL(mock.fetch.mock.calls[0][0]);expect(url.searchParams.get('productType')).toBe('SUPPLIER_PRODUCT');expect(url.searchParams.get('pageSize')).toBe('200');
+    expect(await getCjCatalogSuppliers()).toEqual(result);expect(mock.fetch).toHaveBeenCalledTimes(1);
+  });
+  it('does not turn supplier API failure into a fabricated supplier list',async()=>{mock.fetch.mockResolvedValueOnce(reply({result:false,code:1600100,message:'Unavailable'},503));const {getCjCatalogSuppliers}=await import('@/lib/cj/client');expect(await finish(getCjCatalogSuppliers())).toMatchObject({ok:false});});
+  it('does not share supplier discovery across API accounts',async()=>{mock.fetch.mockResolvedValueOnce(success({list:[{supplierId:'S1',supplierName:'Supplier One'}]})).mockResolvedValueOnce(success({list:[]}));const {getCjCatalogSuppliers}=await import('@/lib/cj/client');expect(await finish(getCjCatalogSuppliers())).toMatchObject({ok:true,data:[{id:'S1'}]});mock.config.mockReturnValue({...mock.config(),apiKey:'another-account-key'});expect(await finish(getCjCatalogSuppliers())).toEqual({ok:true,data:[]});expect(mock.fetch).toHaveBeenCalledTimes(2);});
   it('queries the complete V2 catalog with filters and maps its nested paginated response',async()=>{
     mock.fetch.mockResolvedValueOnce(success({totalRecords:90,content:[{productList:[{id:'P1',nameEn:'Ring',sku:'SKU',bigImage:'https://example.com/ring.jpg',sellPrice:'2.50',threeCategoryName:'Rings'}]}]}));
     const {listBrowseProductsPage}=await import('@/lib/cj/client');

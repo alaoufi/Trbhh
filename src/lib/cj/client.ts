@@ -1,4 +1,5 @@
 import 'server-only';
+import {createHash} from 'node:crypto';
 import {parseCjCatalogFilters,type CatalogFilterValues} from './catalog-filters';
 import { cjConfig, type CjConfig } from './config';
 import { readCjAuth, writeCjAuth } from './store';
@@ -167,6 +168,21 @@ export async function listProductsPage(pageNum = 1, pageSize = 20, filters: { pr
   const list = Array.isArray(r.data?.list) ? r.data!.list! : [];
   const total = num(r.data?.total) ?? list.length;
   return { ok: true, data: { items: list.map((p) => mapSummary(p as Record<string, unknown>)), total, pageNum, pageSize } };
+}
+
+export type CjCatalogSupplier={id:string;name:string};
+let supplierCache:{account:string;expires:number;data:CjCatalogSupplier[]}|null=null;
+/** Bounded discovery from supplier products, not a claim to enumerate every supplier on CJ. */
+export async function getCjCatalogSuppliers():Promise<CjResult<CjCatalogSupplier[]>>{
+ const cfg=cjConfig(),account=createHash('sha256').update(JSON.stringify([cfg.base,cfg.email,cfg.apiKey,cfg.encryptionKey])).digest('hex');
+ if(supplierCache?.account===account&&supplierCache.expires>Date.now())return {ok:true,data:supplierCache.data};
+ const r=await call<{list?:unknown}>('/product/list',{query:{pageNum:1,pageSize:200,productType:'SUPPLIER_PRODUCT'}});
+ if(!r.ok)return r;
+ if(!Array.isArray(r.data?.list))return {ok:false,error:'cj_invalid_response',status:200};
+ const suppliers=new Map<string,string>();
+ for(const item of r.data.list){if(!item||typeof item!=='object')continue;const id=typeof item.supplierId==='string'?item.supplierId.trim():'',name=typeof item.supplierName==='string'?item.supplierName.trim():'';if(/^[A-Za-z0-9_-]{1,200}$/.test(id)&&name&&name.length<=200&&!/[\u0000-\u001f]/.test(name))suppliers.set(id,name);}
+ const data=Array.from(suppliers,([id,name])=>({id,name})).sort((a,b)=>a.name.localeCompare(b.name));
+ supplierCache={account,expires:Date.now()+10*60*1000,data};return {ok:true,data};
 }
 
 /** Interactive import catalog uses documented V2 filtering; existing sync callers keep their contract. */

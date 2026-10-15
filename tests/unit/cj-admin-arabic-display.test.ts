@@ -22,7 +22,7 @@ vi.mock('@/components/access-boundary',()=>({AccessBoundary:({children,action}:{
 vi.mock('@/lib/cj/config',()=>({cjConfig:()=>({configured:true})}));
 vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({shippingMinor:500,usdToSarX100:375})}));
 vi.mock('@/lib/cj/pricing',()=>({defaultMarginBps:async()=>3000,computePrice:()=>({salePriceMinor:5525})}));
-vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listBrowseProductsPage:state.list,getInventoryByPid:async()=>({ok:true,data:[{vid:'VID-1',cjInventoryQuantity:7,countryCode:'CN',areaId:'CN',areaName:'CN'}]})}));
+vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listBrowseProductsPage:state.list,getCjCatalogSuppliers:async()=>({ok:true,data:[{id:'SUP-1',name:'Supplier One'}]}),getInventoryByPid:async()=>({ok:true,data:[{vid:'VID-1',cjInventoryQuantity:7,countryCode:'CN',areaId:'CN',areaName:'CN'}]})}));
 vi.mock('@/lib/cj/search',()=>({translateArabicCjSearch:state.translateSearch}));
 vi.mock('@/lib/cj/sample',()=>({sampleOneCjProduct:async()=>({ok:true,data:{name:state.sourceName,category:state.category,priceUsd:10,totalStock:7,images:[],variants:[{vid:'VID-1',sku:'SKU-BLUE',name:state.variantName,priceUsd:10,weight:100,stock:7}]}})}));
 vi.mock('@/lib/cj/mapping',()=>{
@@ -144,3 +144,9 @@ it('retains active catalog filters in paging, detail and import return links',as
  expect(html).toContain('name="platform"');expect(html).toContain('name="minPrice"');expect(html).not.toContain('value="aliexpress"');
 });
 it('does not call the catalog for an invalid price range',async()=>{expect(await browse({minPrice:'100',maxPrice:'2'})).toContain('السعر الأدنى يجب ألا يتجاوز السعر الأعلى');expect(state.list).not.toHaveBeenCalled();});
+it('offers suppliers by name without asking for an id and preserves the certification filter',async()=>{
+ const html=await browse({supplier:'SUP-1',certified:'1'});
+ expect(html).toContain('<option value="SUP-1" selected="">Supplier One</option>');
+ expect(html).not.toMatch(/<input(?![^>]*type="hidden")[^>]*name="supplier"/);expect(html).toContain('لديها شهادة حسب CJ');
+ expect(state.list).toHaveBeenCalledWith(1,24,{productName:undefined,categoryId:undefined,filters:{supplier:'SUP-1',certified:'1'}});
+});

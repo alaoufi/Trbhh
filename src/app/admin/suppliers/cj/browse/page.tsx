@@ -4,7 +4,7 @@ import { CjProductImage } from '@/components/cj/product-image';
 import Link from 'next/link';
 import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
-import { listBrowseProductsPage, getCategories } from '@/lib/cj/client';
+import { listBrowseProductsPage, getCategories, getCjCatalogSuppliers } from '@/lib/cj/client';
 import { createCjDetailReads } from '@/lib/cj/detail-reads';
 import { translateArabicCjSearch } from '@/lib/cj/search';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
@@ -55,7 +55,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
-  const catsRes=await getCategories();
+  const [catsRes,supplierRes]=await Promise.all([getCategories(),getCjCatalogSuppliers()]);
   const [deeplKeySet, memEmail, libreUrl] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''), getSetting('cj_libretranslate_url', DEFAULT_LIBRETRANSLATE_URL)]);
   const categories = catsRes.ok ? catsRes.data : [];
   // CJ indexes product names in its source language, while admins commonly
@@ -168,11 +168,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {typeof sp.imported === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم استيراد المنتج {sp.imported} إلى التخزين الوسيط ✓ (لم يُعرض للعامة).</p>}
       {typeof sp.imperr === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر استيراد المنتج. أعد المحاولة من إجراء الاستيراد.</p>}
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
+      {!supplierRes.ok&&<p role="status" className="text-sm">تعذر تحميل أسماء الموردين الآن؛ يمكنك استخدام بقية الفلاتر وإعادة فتح الصفحة لاحقًا.</p>}
+      {supplierRes.ok&&supplierRes.data.length===0&&<p role="status" className="text-sm">لم يعد CJ أسماء موردين مع معرفاتهم في عينة الكتالوج الحالية؛ بقية الفلاتر متاحة.</p>}
       {catalogFilters.error&&<p role="alert" className="rounded border border-red-300 p-3 text-red-700">{catalogFilters.error}</p>}
       {!listing.ok&&!catalogFilters.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
 
       {/* بحث + فلترة بأقسام البضائع — القسم يُطبَّق فوراً عند الاختيار (بلا زر عرض) */}
-      <BrowseFilter filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: `كل الأقسام${total ? ` (${total.toLocaleString('en')})` : ''}` }, ...categories.map((c) => ({ id: c.id, label: categoryLabels.get(c.id) || c.path }))]} />
+      <BrowseFilter suppliers={supplierRes.ok?supplierRes.data:[]} filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: `كل الأقسام${total ? ` (${total.toLocaleString('en')})` : ''}` }, ...categories.map((c) => ({ id: c.id, label: categoryLabels.get(c.id) || c.path }))]} />
       {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
       <p className="text-xs text-muted-foreground">الترجمة فورية عند التحميل؛ أي كلمة بقيت بلغتها اضغط عليها لجلب ترجمتها. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">

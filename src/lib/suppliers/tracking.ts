@@ -1,3 +1,4 @@
+import {customerFulfillmentText} from '@/lib/commerce/customer-fulfillment';
 import 'server-only';
 import type {CommerceDb} from '@/lib/commerce/types';
 import type {SupplierOrder} from './types';
@@ -43,7 +44,7 @@ export async function deliverSupplierNotices(db:CommerceDb,limit=20):Promise<num
   if(!rows.length)return 0;
   const [setting]=await tx.$queryRaw<{v:string|null}[]>`SELECT v FROM site_settings WHERE k='supplier_tracking_notice'`;
   const configured=setting?.v?.trim();
-  const title=configured&&configured.length<=191&&!/[<>\u0000-\u001f]/.test(configured)?configured:'يوجد تحديث على شحن طلبك. راجع تفاصيل الطلب.';
+  const title=configured&&configured.length<=191&&!/[<>\u0000-\u001f]/.test(configured)?customerFulfillmentText(configured,'تربح: يوجد تحديث على شحن طلبك. راجع تفاصيل الطلب.'):'تربح: يوجد تحديث على شحن طلبك. راجع تفاصيل الطلب.';
   for(const row of rows){
    await tx.$executeRaw`INSERT INTO notfications(title,route,user_id,type,model_id,created_at,updated_at) VALUES(${title},${'/account/orders/'+row.order_id},${String(row.member_id)},'other',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`;
    const changed=await tx.$executeRaw`UPDATE commerce_notifications SET status='sent',sent_at=UTC_TIMESTAMP(3),last_error=NULL WHERE id=${row.id} AND status='pending'`;

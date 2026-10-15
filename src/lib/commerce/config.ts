@@ -1,3 +1,4 @@
+import {customerFulfillmentText} from './customer-fulfillment';
 import { parseSar } from './money';
 /** Defaults are editable through the commerce administration, never wallet settings. */
 export const COMMERCE_DEFAULTS = {
@@ -69,8 +70,8 @@ export function commerceConfigFromRows(rows: SettingRow[]) {
       shippingTerms: get('commerce_shipping_terms'), pending: get('commerce_payment_pending_text'),
       confirmed: get('commerce_payment_confirmed_text'), paidMessage: get('commerce_paid_message'),
       paymentActionRequired: get('commerce_payment_action_required_text'),
-      cjFundingRequired: get('commerce_cj_funding_required_text'),
-      cjSupplierPaid:get('commerce_cj_supplier_paid_text'),cjPreparing:get('commerce_cj_preparing_text'),cjShipped:get('commerce_cj_shipped_text'),cjDelivered:get('commerce_cj_delivered_text'),cjTrackingUnavailable:get('commerce_cj_tracking_unavailable_text'),
+      cjFundingRequired: customerFulfillmentText(get('commerce_cj_funding_required_text'),COMMERCE_DEFAULTS.commerce_cj_funding_required_text),
+      cjSupplierPaid:customerFulfillmentText(get('commerce_cj_supplier_paid_text'),COMMERCE_DEFAULTS.commerce_cj_supplier_paid_text),cjPreparing:customerFulfillmentText(get('commerce_cj_preparing_text'),COMMERCE_DEFAULTS.commerce_cj_preparing_text),cjShipped:customerFulfillmentText(get('commerce_cj_shipped_text'),COMMERCE_DEFAULTS.commerce_cj_shipped_text),cjDelivered:customerFulfillmentText(get('commerce_cj_delivered_text'),COMMERCE_DEFAULTS.commerce_cj_delivered_text),cjTrackingUnavailable:customerFulfillmentText(get('commerce_cj_tracking_unavailable_text'),COMMERCE_DEFAULTS.commerce_cj_tracking_unavailable_text),
       paymentRateLimit: get('commerce_payment_rate_limit_text'),
       paymentUnavailable: get('commerce_payment_unavailable_text'),
       checkoutError: get('commerce_checkout_error_text'), rateLimit: get('commerce_rate_limit_text'), locationError: get('commerce_location_error_text'),

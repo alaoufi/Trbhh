@@ -72,6 +72,7 @@ export async function reconcileCjFulfillment(id:string,snapshot?:Record<string,u
   const event=`ship:cj:${createHash('sha256').update(JSON.stringify([id,exception?.actionRequired?'action_required':stage,next.trackingNumber,next.lastTrackNumber])).digest('hex').slice(0,30)}`;
   const payload=JSON.stringify({orderId:String(stored.commerce_order_id),supplierPaymentVerified:true,fulfillmentStatus:exception?.actionRequired?'action_required':stage,sourceException:exception?.orderStatus,carrier:next.carrier,trackingNumber:next.trackingNumber,lastTrackNumber:next.lastTrackNumber,trackingUrl:next.trackingUrl});
   await tx.$executeRaw`INSERT INTO commerce_notifications(order_id,event,channel,recipient,payload) VALUES(${stored.commerce_order_id},${event},'in_app',${'member:'+stored.member_id},${payload}) ON DUPLICATE KEY UPDATE id=id`;
+  await tx.$executeRaw`INSERT INTO commerce_audit_events(order_id,event,payload) VALUES(${stored.commerce_order_id},${event},${payload}) ON DUPLICATE KEY UPDATE id=id`;
  });
 }
 export async function selectCjFulfillmentBatch(limit=20):Promise<string[]> {

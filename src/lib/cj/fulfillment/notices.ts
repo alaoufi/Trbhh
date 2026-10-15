@@ -1,6 +1,6 @@
 import 'server-only';
 import {prisma} from '@/lib/prisma';
-export const cjOrderNoticeText={registered:'استلمنا طلبك ونتابع تنفيذه.',supplier_paid:'طلبك قيد المتابعة؛ سنبلغك بتحديثات التجهيز والشحن.'} as const;
+export const cjOrderNoticeText={registered:'تربح: استلمنا طلبك ونتابع تنفيذه.',supplier_paid:'تربح: طلبك قيد المتابعة؛ سنبلغك بتحديثات التجهيز والشحن.'} as const;
 export async function memberCjOrderNotices(orderId:bigint,memberId:bigint){
  const rows=await prisma.$queryRaw<{id:bigint;event:string;payload:unknown}[]>`SELECT n.id,n.event,n.payload FROM commerce_notifications n JOIN commerce_orders o ON o.id=n.order_id WHERE o.id=${orderId} AND o.member_id=${memberId} AND o.status='paid' AND o.currency='SAR' AND n.channel='in_app' AND n.recipient=${'member:'+memberId} AND (n.event LIKE 'ship:cj:registered:%' OR n.event LIKE 'ship:cj:paid:%') AND EXISTS(SELECT 1 FROM commerce_receipts r WHERE r.order_id=o.id AND r.amount_minor=o.total_minor AND r.currency=o.currency) ORDER BY n.id DESC LIMIT 50`;
  return rows.flatMap(row=>{try{const p=(typeof row.payload==='string'?JSON.parse(row.payload):row.payload) as {source?:string;stage?:string;supplierPaymentVerified?:boolean};if(p.source!=='cj'||!['registered','supplier_paid'].includes(p.stage||'')||!row.event.startsWith('ship:cj:'+(p.stage==='supplier_paid'?'paid':'registered')+':')||(p.stage==='supplier_paid'&&p.supplierPaymentVerified!==true))return [];return [{id:String(row.id),message:cjOrderNoticeText[p.stage as keyof typeof cjOrderNoticeText]}];}catch{return [];}});

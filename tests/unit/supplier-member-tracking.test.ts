@@ -16,6 +16,12 @@ vi.mock('next/navigation',()=>({notFound:()=>{throw new Error('not_found');}}));
 import Page from '@/app/account/orders/[id]/page';
 beforeEach(()=>{vi.resetAllMocks();state.cjTracking.mockResolvedValue([]);});
 describe('member shipment projection',()=>{
+ it('renders shipment progress without supplier branding or a supplier portal',async()=>{
+  state.query.mockResolvedValueOnce([{id:1n,status:'paid',total_minor:100,shipping_fee_minor:0,fulfillment_status:'shipped'}]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+  state.tracking.mockResolvedValue([]);state.cjTracking.mockResolvedValue([{id:'cj-1',carrier:'CJPacket',trackingNumber:'REAL123',trackingUrl:'https://www.cjpacket.com/',status:'shipped'}]);
+  const html=renderToStaticMarkup(await Page({params:Promise.resolve({id:'1'}),searchParams:Promise.resolve({})}));
+  expect(html).not.toMatch(/CJ|cjpacket/);expect(html).toContain('REAL123');expect(html).toContain('تم شحن الطلب');
+ });
  it('passes authenticated owner and escapes tracking text with editable labels',async()=>{
   state.query.mockResolvedValueOnce([{id:1n,status:'paid',total_minor:100,shipping_fee_minor:0}]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
   state.tracking.mockResolvedValue([{id:'1',carrier:'DHL',trackingNumber:'<script>evil</script>',status:'in_transit',fulfillmentStatus:'shipped'}]);

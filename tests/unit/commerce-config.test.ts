@@ -4,6 +4,11 @@ import { commerceConfigFromRows, commerceReadiness, COMMERCE_DEFAULTS } from '@/
 const rows = (values: Record<string, string>) => Object.entries(values).map(([k, v]) => ({ k, v }));
 
 describe('commerce rollout gates', () => {
+  it('does not revive supplier branding from previously saved lifecycle messages',()=>{
+    const cfg=commerceConfigFromRows(rows({commerce_cj_supplier_paid_text:'تم سداد CJ',commerce_cj_preparing_text:'المورد يجهز الطلب'}));
+    expect(cfg.text.cjSupplierPaid).not.toMatch(/CJ|المورد/);
+    expect(cfg.text.cjPreparing).not.toMatch(/CJ|المورد/);
+  });
   it('defaults to disabled without repurposing wallet or OTP switches', () => {
     const cfg = commerceConfigFromRows(rows({ otp_enabled: '1', pay_enabled: '1' }));
     expect(cfg.enabled).toBe(false);

@@ -1,3 +1,4 @@
+import {customerShipment} from '@/lib/commerce/customer-fulfillment';
 import {memberCjOrderNotices} from '@/lib/cj/fulfillment/notices';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -84,7 +85,7 @@ export default async function MemberOrder({ params, searchParams }: {
     <p className="text-lg font-bold">الإجمالي النهائي: {formatSar(order.total_minor)} ر.س</p>
     {tracking.length > 0 && <section aria-labelledby="shipment-tracking-title" className="space-y-3 border-t pt-4">
       <h2 id="shipment-tracking-title" className="font-bold">{trackingLabels[0]}</h2>
-      <ul className="space-y-3">{tracking.map(shipment => <li key={shipment.id} className="rounded-lg border p-3 text-sm">
+      <ul className="space-y-3">{tracking.map(customerShipment).map(shipment => <li key={shipment.id} className="rounded-lg border p-3 text-sm">
         <dl className="space-y-1">
           {shipment.carrier && <div><dt className="inline font-semibold">{trackingLabels[1]}: </dt><dd className="inline">{shipment.carrier}</dd></div>}
           {shipment.trackingNumber && <div><dt className="inline font-semibold">{trackingLabels[2]}: </dt><dd className="inline break-all" dir="ltr">{shipment.trackingNumber}</dd></div>}

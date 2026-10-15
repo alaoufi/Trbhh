@@ -4,7 +4,9 @@ set -Eeuo pipefail
 umask 077
 [[ $EUID -eq 0 && ${1:-} =~ ^[a-f0-9]{40}$ ]]
 revision=$1
-candidate=770635a11ecdb8562158113cb955aafe504d6ea0
+mode=${2:---capacity}
+[[ $mode == --capacity || $mode == --quality-only ]]
+candidate=b1bed68b0a121c2bb747e0f26294aa75797de0b1
 cd /root/trbhh
 [[ $(pwd -P) == /root/trbhh ]]
 exec 8>/run/lock/trbhh-finance-deploy.lock
@@ -27,7 +29,11 @@ for file in protocol.cjs inference-pool.cjs capacity-check.cjs; do
   git show "$candidate:scripts/local-ai/$file" > "$target/$file"
 done
 echo "CAPACITY_LOG=$target/result.log"
-echo 'CAPACITY_TEST — maximum 4 minutes; no deployment, downloads or purchases.'
+if [[ $mode == --quality-only ]]; then
+ echo 'QUALITY_CHECK — four sequential queries only; no pressure test or deployment.'
+else
+ echo 'CAPACITY_TEST — maximum 4 minutes; no deployment, downloads or purchases.'
+fi
 docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}' trbhh-app trbhh-ollama
 {
  printf 'globalThis.__trbhhCapacityProtocol=(()=>{const module={exports:{}};\n'
@@ -36,5 +42,5 @@ docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}'
  cat "$target/inference-pool.cjs"
  printf '\nreturn module.exports.createInferencePool;})();\n'
  cat "$target/capacity-check.cjs"
-} | timeout --signal=TERM --kill-after=10s 270s docker exec -i trbhh-app node - "$candidate" |& tee "$target/result.log"
+} | timeout --signal=TERM --kill-after=10s 270s docker exec -i trbhh-app node - "$candidate" "$mode" |& tee "$target/result.log"
 docker stats --no-stream --format '{{.Name}} CPU={{.CPUPerc}} RAM={{.MemUsage}}' trbhh-app trbhh-ollama

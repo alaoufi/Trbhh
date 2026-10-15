@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {describe,expect,it,vi} from 'vitest';
-const {update,smoke}=createRequire(import.meta.url)('../../scripts/local-ai/update-model.cjs');
+const {update,smoke,apiTimeout}=createRequire(import.meta.url)('../../scripts/local-ai/update-model.cjs');
 function fixture(failCandidate=false,failActive=false,same=false){
  const calls:{path:string;body?:Record<string,unknown>}[]=[];
  let active=same?'new':'old';let rollback='';
@@ -17,6 +17,7 @@ function fixture(failCandidate=false,failActive=false,same=false){
   if(path==='pull')return {status:'success'};
   if(path==='chat'){
    if(failCandidate&&body?.model==='qwen3:8b'||failActive&&body?.model==='trbhh-local:active')throw Error('smoke failure');
+   if((body?.messages as unknown[])?.length===0)return {done:true,done_reason:'load'};
    const text=JSON.parse(String((body?.messages as {content:string}[])[1].content).split('Input data: ')[1]).text;
    return {done:true,message:{content:JSON.stringify(text==='Cotton shirt'?{translation:'قميص قطني'}:text.includes('750ml')?{translation:'زجاجة فولاذ مقاوم للصدأ 750 مل غير معزولة'}:{queries:[text.includes('Samsung')?'Samsung S24 case':text.includes('المطبخ')?'kitchen utensil organizer':text.includes('42')?'waterproof walking shoes size 42':'18V cordless drill']})}};
   }
@@ -24,6 +25,21 @@ function fixture(failCandidate=false,failActive=false,same=false){
  });return {api,calls};
 }
 describe('local model update lifecycle',()=>{
+ it('allows five minutes only for explicit empty-message preparation',()=>{
+  expect(apiTimeout('chat',{messages:[]})).toBe(300000);
+  expect(apiTimeout('chat',{messages:[{role:'user',content:'data'}]})).toBe(120000);
+  expect(apiTimeout('tags')).toBe(120000);
+ });
+ it('preloads weights without a prompt before measuring every inference',async()=>{
+  const f=fixture();const proof=await smoke(f.api,'qwen3:8b');
+  expect(f.calls[0]).toMatchObject({path:'chat',body:{model:'qwen3:8b',messages:[],keep_alive:'24h',options:{num_ctx:2048,num_thread:4}}});
+  expect(proof).toHaveLength(6);
+ });
+ it('stops before any quality inference or promotion when preload is incomplete',async()=>{
+  const f=fixture();const call=async(path:string,body?:Record<string,unknown>)=>path==='chat'&&(body?.messages as unknown[])?.length===0?{done:false}:f.api(path,body);
+  await expect(update(call)).rejects.toThrow('local_ai_preload_incomplete');
+  expect(f.calls.some(c=>c.path==='copy')).toBe(false);
+ });
  it('revalidates an unchanged model with the current protocol without switching it',async()=>{const f=fixture(false,false,true);expect(await update(f.api)).toMatchObject({status:'unchanged'});expect(f.calls.some(c=>c.path==='chat')).toBe(true);expect(f.calls.some(c=>c.path==='copy')).toBe(false);});
  it('validates candidate, backs up active and tests the promoted alias',async()=>{const f=fixture();expect(await update(f.api)).toMatchObject({status:'updated',rollback:true});expect(f.calls.filter(c=>c.path==='copy').map(c=>c.body)).toEqual([{source:'trbhh-local:active',destination:'trbhh-local:rollback'},{source:'qwen3:8b',destination:'trbhh-local:active'}]);});
  it('leaves active untouched if candidate fails',async()=>{const f=fixture(true);await expect(update(f.api)).rejects.toThrow();expect(f.calls.some(c=>c.path==='copy')).toBe(false);});
@@ -40,5 +56,5 @@ it('executes the updater when streamed into container Node stdin',()=>{
  const script=readFileSync(new URL('../../scripts/local-ai/update-model.cjs',import.meta.url),'utf8');
  const prelude=`globalThis.fetch=async(url,init)=>{const text=init?.body?JSON.parse(init.body).messages?.[1]?.content||'':'';return new Response(JSON.stringify(String(url).endsWith('/chat')?{done:true,message:{content:JSON.stringify(text.includes('Cotton shirt')?{translation:'قميص قطني'}:text.includes('750ml')?{translation:'زجاجة فولاذ 750 مل غير معزولة'}:{queries:[text.includes('Samsung')?'Samsung S24 case':text.includes('المطبخ')?'kitchen utensil organizer':text.includes('42')?'waterproof walking shoes 42':'18V cordless drill']})}}:String(url).endsWith('/pull')?{status:'success'}:{models:[{name:'trbhh-local:active',digest:'same'},{name:'qwen3:8b',digest:'same'}]}));};\n`;
  const result=spawnSync(process.execPath,['-'],{input:'globalThis.__trbhhLocalProtocol=require('+JSON.stringify(fileURLToPath(new URL('../../scripts/local-ai/protocol.cjs',import.meta.url)))+');\n'+prelude+script,encoding:'utf8',timeout:5000});
- expect(result.status).toBe(0);expect(JSON.parse(result.stdout)).toMatchObject({status:'unchanged'});
+ expect(result.status).toBe(0);expect(result.stdout).toContain('LOCAL_AI_PRELOAD_READY');expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toMatchObject({status:'unchanged'});
 });

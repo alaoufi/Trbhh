@@ -1,13 +1,28 @@
 /* Model downloads contain no customer text. Inference stays on the Docker network. */
 const ACTIVE='trbhh-local:active',ROLLBACK='trbhh-local:rollback',SOURCE='qwen3:8b';
 const {request,searchTask,searchFormat,translationTask,translationFormat}=globalThis.__trbhhLocalProtocol||require('./protocol.cjs');
+function isPreload(path,body){return path==='chat'&&Array.isArray(body?.messages)&&body.messages.length===0;}
+function apiTimeout(path,body){return path==='pull'?30*60*1000:isPreload(path,body)?5*60*1000:120000;}
 async function api(path,body){
- const response=await fetch(`http://ollama:11434/api/${path}`,{method:path==='delete'?'DELETE':body?'POST':'GET',redirect:'error',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(path==='pull'?30*60*1000:120000)});
+ const loading=isPreload(path,body),started=Date.now();
+ if(loading)console.log('LOCAL_AI_PRELOAD — loading installed weights; maximum 5 minutes.');
+ const progress=loading?setInterval(()=>console.log(`LOCAL_AI_PRELOAD — ${Math.round((Date.now()-started)/1000)} seconds elapsed; waiting for model readiness.`),30000):null;
+ try {
+ const response=await fetch(`http://ollama:11434/api/${path}`,{method:path==='delete'?'DELETE':body?'POST':'GET',redirect:'error',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(apiTimeout(path,body))});
  if(!response.ok)throw Error(`local_ai_${path}_failed`);
  if(response.status===204||path==='copy')return null;
- return response.json();
+ const result=await response.json();
+ if(loading)console.log(`LOCAL_AI_PRELOAD_READY — ${Math.round((Date.now()-started)/1000)} seconds.`);
+ return result;
+ } catch(error){if(error?.name==='TimeoutError'||error?.name==='AbortError')throw Error(loading?'local_ai_preload_timeout':`local_ai_${path}_timeout`);throw error;}
+ finally{if(progress)clearInterval(progress);}
 }
 async function smoke(call,model){
+ // Loading/repacking CPU weights is preparation, not search latency. Use identical
+ // runner options to the application so the first real query does not reload it.
+ const preparation=request(model,'','',{});delete preparation.format;preparation.messages=[];
+ const loaded=await call('chat',preparation);
+ if(loaded?.done!==true)throw Error('local_ai_preload_incomplete');
  const proof=[];
  const cases=[
   {text:'غطاء Samsung S24',key:'queries',check:v=>Array.isArray(v)&&v.length>0&&v.every(q=>typeof q==='string'&&/Samsung/i.test(q)&&/S24/i.test(q)&&/case|cover/i.test(q))},
@@ -27,8 +42,8 @@ async function smoke(call,model){
   if(!test.check(parsed[test.key])||(test.key==='queries'&&parsed.queries.some(q=>!/^[ -~]+$/.test(q)))){
    const error=Error('local_ai_smoke_failed');error.proof=[...proof,{input:test.text,elapsedMs,result:parsed[test.key],passed:false}];throw error;
   }
-  // First request may load the weights. Subsequent requests must fit app deadlines.
-  if(proof.length>0&&elapsedMs>(test.key==='translation'?8500:11500))throw Error('local_ai_too_slow');
+  // Every inference, including the first after preparation, must fit app deadlines.
+  if(elapsedMs>(test.key==='translation'?8500:11500))throw Error('local_ai_too_slow');
   proof.push({input:test.text,elapsedMs,result:parsed[test.key]});
  }
  return proof;
@@ -61,5 +76,5 @@ async function update(call=api){
  }
  return {status:'updated',digest:candidate.digest,rollback:!!old};
 }
-module.exports={update,smoke};
+module.exports={update,smoke,apiTimeout};
 if(require.main===module||module.id==='[stdin]')(process.argv[2]==='--verify'?smoke(api,ACTIVE).then(proof=>({status:'LOCAL_AI_READY',model:SOURCE,proof})):update()).then(result=>console.log(JSON.stringify(result))).catch(error=>{if(error.proof)console.error(JSON.stringify({status:'LOCAL_AI_QUALITY_REJECTED',proof:error.proof}));console.error(error.message==='local_ai_rollback_failed'?'Local AI rollback could not be verified. Manual intervention required.':`Local model not accepted: ${String(error.message).replace(/[^a-z0-9_]/gi,'_').slice(0,80)}. Candidate rejected or previous model restored.`);process.exitCode=1;});

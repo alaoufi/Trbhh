@@ -1,5 +1,5 @@
 /* Model downloads contain no customer text. Inference stays on the Docker network. */
-const ACTIVE='trbhh-local:active',ROLLBACK='trbhh-local:rollback',SOURCE='qwen3:8b';
+const ACTIVE='trbhh-local:active',ROLLBACK='trbhh-local:rollback',SOURCE='qwen3.5:9b';
 const {request,searchTask,searchFormat,translationTask,translationFormat}=globalThis.__trbhhLocalProtocol||require('./protocol.cjs');
 function isPreload(path,body){return path==='chat'&&Array.isArray(body?.messages)&&body.messages.length===0;}
 function apiTimeout(path,body){return path==='pull'?30*60*1000:isPreload(path,body)?5*60*1000:120000;}

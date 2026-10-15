@@ -17,7 +17,7 @@ if [[ $mode == --install-timer-only ]]; then
 fi
 total_kib=$(awk '/MemTotal:/ {print $2}' /proc/meminfo)
 available_kib=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
-(( total_kib >= 15 * 1024 * 1024 && available_kib >= 12 * 1024 * 1024 )) || { echo 'Local AI 8B needs a 16 GB or larger VPS and 12 GB available RAM for first provisioning.' >&2; exit 1; }
+(( total_kib >= 15 * 1024 * 1024 && available_kib >= 12 * 1024 * 1024 )) || { echo 'Local AI needs a 16 GB or larger VPS and 12 GB available RAM for first provisioning.' >&2; exit 1; }
 docker_root=$(docker info --format '{{.DockerRootDir}}')
 [[ -d "$docker_root" ]] || exit 1
 free_kib=$(df -Pk "$docker_root" | awk 'NR==2 {print $4}')

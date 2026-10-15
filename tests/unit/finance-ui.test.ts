@@ -5,7 +5,7 @@ import type { FinanceData, FinanceInvoice, FinanceSection } from '@/lib/finance/
 
 vi.mock('@/app/admin/finance/actions', () => ({
   restoreFinanceDraftInvoice: async () => {},
-  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceReturnReversal: async () => {}, requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
+  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceReturnReversal: async () => {}, saveFinanceTaxDraft:async()=>{},requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
   approveFinanceSettlement: async () => {}, captureFinanceInvoices: async () => {}, closeFinanceMonth: async () => {},
   prepareFinanceSettlement: async () => {}, recordFinanceExpense: async () => {}, releaseFinanceAccrual: async () => {},
   reverseFinanceExpense: async () => {}, reverseFinanceSettlement: async () => {}, saveFinanceBudget: async () => {},
@@ -156,6 +156,11 @@ describe('finance request controls and preserved records',()=>{
   const source=requestData();source.requests![0]={...source.requests![0],status:'approved',checkerId:'10',approvalReason:'checked source',decidedAt:invoice.at,result:{number:'CN-0001',mode:'independent_checker'}};
   const html=workflow('returns',{canApprove:true,canCancel:true},source);
   expect(html).toContain('CN-0001');expect(html).toContain('#10');expect(html).toContain('checked source');expect(html).not.toContain('<form');
+ });
+ it('restores the own pending submission before approval and offers a partial draft save',()=>{
+  const source=data();source.requests=[{id:'91',kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-09-25',issuer:{name:'Saved pending issuer',taxNumber:'',address:'Saved pending address'},vatBps:0,policyReference:'pending-policy',calculationPolicy:{version:2,priceBasis:'exclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:0,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'9',vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}}},status:'pending',makerId:'9',checkerId:null,reason:'saved submission',approvalReason:'',at:invoice.at,decidedAt:null,result:null}];
+  const html=workflow('tax',{canManageTax:true,currentUserId:'9'},source);expect(html).toContain('value="Saved pending issuer"');expect(html).toContain('value="Saved pending address"');expect(html).toContain('value="2026-09-25"');expect(html).toContain('formNoValidate=""');expect(html).toContain('حفظ المسودة — ولو كانت ناقصة');expect(html).toContain('saved submission');
+  const other=workflow('tax',{canManageTax:true,currentUserId:'10'},source);expect(other).not.toContain('value="Saved pending issuer"');
  });
  it('tax settings are not assumed and cannot be changed with approve-only permission',()=>{
   const reader=workflow('tax',{canApprove:true});expect(reader).not.toContain('name="vatPercent"');

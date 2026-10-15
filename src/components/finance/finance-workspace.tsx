@@ -1,3 +1,4 @@
+import type {TaxDraft} from '@/lib/finance/tax-draft-fields';
 import { createHash } from 'node:crypto';
 import Link from 'next/link';
 import { ArrowLeft, ArrowUpLeft, BookOpen, CalendarDays, CheckCircle2, CircleAlert, Download, FileClock, FileText, Layers3, LockKeyhole, ReceiptText, Scale, Search, ShieldCheck, SlidersHorizontal, Store, TrendingUp, Wallet } from 'lucide-react';
@@ -9,7 +10,7 @@ import { FinanceSubmitButton } from './finance-controls';
 import { FinanceWorkflowPanel } from './finance-workflows';
 import styles from './finance.module.css';
 
-export type FinanceWorkspaceProps = { report: FinanceReport; canEdit: boolean; canApprove: boolean; canClose: boolean; canExport: boolean; canRefund?: boolean; canCancel?:boolean; canReconcile?:boolean; canManageTax?:boolean; canReopen?:boolean; currentUserId?:string; visibleSections?: FinanceSection[]; viewFinance?: boolean; viewSettlements?: boolean; viewReconciliation?: boolean; actionKey: string };
+export type FinanceWorkspaceProps = { taxDraft?:TaxDraft|null; report: FinanceReport; canEdit: boolean; canApprove: boolean; canClose: boolean; canExport: boolean; canRefund?: boolean; canCancel?:boolean; canReconcile?:boolean; canManageTax?:boolean; canReopen?:boolean; currentUserId?:string; visibleSections?: FinanceSection[]; viewFinance?: boolean; viewSettlements?: boolean; viewReconciliation?: boolean; actionKey: string };
 type Context = FinanceWorkspaceProps & { writable: boolean };
 const sections: { key: FinanceSection; label: string; icon: typeof Wallet; accountant?: boolean }[] = [
   { key: 'overview', label: 'نظرة عامة', icon: Layers3 }, { key: 'suppliers', label: 'حسابات الموردين', icon: Store },
@@ -195,7 +196,7 @@ export function FinanceWorkspace(props: FinanceWorkspaceProps) {
     <PeriodFilters query={report.query} suppliers={['suppliers','settlements','invoices','reconciliation','returns'].includes(report.query.section) ? report.data.suppliers : []} />
     {props.canExport && <p className={`${styles.muted} ${styles.noPrint}`} style={{ marginBottom: 16 }}>{financeExportScope}</p>}
     {report.query.section === 'overview' && <Overview context={context} />}{report.query.section === 'suppliers' && <Suppliers context={context} />}{report.query.section === 'settlements' && <Settlements context={context} />}{report.query.section === 'budget' && <Budget context={context} />}{report.query.section === 'expenses' && <Expenses context={context} />}{report.query.section === 'invoices' && <InvoiceArchive context={context} />}{report.query.section === 'cashflow' && <Cashflow report={report} />}{report.query.section === 'month-end' && <MonthEnd report={report} />}{report.query.section === 'close' && <CloseMonth context={context} />}{report.query.section === 'reconciliation' && <Reconciliation context={context} />}{report.query.section === 'tax' && <TaxReview report={report} />}{report.query.section === 'ledger' && <Ledger context={context} />}
-    {['returns','tax','close'].includes(report.query.section) && <FinanceWorkflowPanel report={report} actionKey={props.actionKey} currentUserId={props.currentUserId} canCreate={props.canEdit} canApprove={props.canApprove} canCancel={props.canCancel} canManageTax={props.canManageTax} canReopen={props.canReopen}/> }
+    {['returns','tax','close'].includes(report.query.section) && <FinanceWorkflowPanel taxDraft={props.taxDraft} report={report} actionKey={props.actionKey} currentUserId={props.currentUserId} canCreate={props.canEdit} canApprove={props.canApprove} canCancel={props.canCancel} canManageTax={props.canManageTax} canReopen={props.canReopen}/> }
     <footer className={styles.footer}><span>تربح · المتابعة المالية للسلع المعتمدة</span><span>المحفظة وإعلانات الأفراد خارج نطاق هذا التقرير · جميع المبالغ بالريال السعودي</span></footer>
   </div>;
 }

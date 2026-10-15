@@ -1,4 +1,5 @@
 'use server';
+import {saveTaxDraft} from '@/lib/finance/tax-draft';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
@@ -13,7 +14,7 @@ import { approveFinanceChange, cancelFinanceChange, readFinanceChangeKind, reque
 import { validateFiscalVatControl } from '@/lib/finance/fiscal-v2';
 import { DEFAULT_REGISTRATION_THRESHOLD_MINOR } from '@/lib/finance/tax-registration';
 
-async function run(form:FormData,module:AccessModule,permission:AccessAction,work:(actor:bigint)=>Promise<unknown>):Promise<never> {
+async function run(form:FormData,module:AccessModule,permission:AccessAction,work:(actor:bigint)=>Promise<unknown>,successKey='saved'):Promise<never> {
   await requireAccess(module,'view');
   const session=await requireAccess(module,permission);
   const auditActor=await accessActor(session);
@@ -25,7 +26,7 @@ async function run(form:FormData,module:AccessModule,permission:AccessAction,wor
     await withFinanceAuditContext({ip:auditActor.ip,sessionFingerprint:auditActor.sessionFingerprint},()=>work(BigInt(session.uid)));
   }catch(cause){error=publicFinanceError(cause);}
   if(error)params.set('error',error);
-  else{params.set('saved','1');revalidatePath('/admin/finance');}
+  else{params.set('saved','1');if(successKey!=='saved')params.set(successKey,'1');revalidatePath('/admin/finance');}
   redirect('/admin/finance?'+params.toString());
 }
 export async function saveFinanceBudget(form:FormData) {
@@ -96,8 +97,12 @@ function policySelection<T extends string>(form:FormData,name:string,choices:rea
   if(!choices.includes(value as T))throw new Error('finance_calculation_policy_invalid');
   return value as T;
 }
+export async function saveFinanceTaxDraft(form:FormData){
+ return run(form,'tax','manage_settings',actor=>saveTaxDraft(actor,form),'draft');
+}
 export async function requestFinanceTaxSettings(form:FormData) {
-  return run(form,'tax','manage_settings',actor=>{
+  return run(form,'tax','manage_settings',async actor=>{
+    await saveTaxDraft(actor,form);
     const enabled=policySelection(form,'vatEnabled',['off','on'] as const)==='on';
     const vatBps=parseFinanceSar(field(form,'vatPercent')||(enabled?'':'0'));
     if(vatBps>10000)throw new Error('finance_calculation_policy_invalid');
@@ -116,7 +121,7 @@ export async function requestFinanceTaxSettings(form:FormData) {
       vatControl,
     };
     return requestFinanceChange(prisma,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps,policyReference:field(form,'policyReference'),calculationPolicy},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
-  });
+  },'submitted');
 }
 export async function requestFinancePeriodReopen(form:FormData) {
   return run(form,'periods','reopen_period',actor=>{

@@ -1,14 +1,15 @@
 import {beforeEach,describe,it,expect,vi} from 'vitest';
-const mocks=vi.hoisted(()=>({restoreDraftInvoice:vi.fn(),requireAccess:vi.fn(),accessActor:vi.fn(),requestFinanceChange:vi.fn(),readFinanceChangeKind:vi.fn(),approveFinanceChange:vi.fn(),cancelFinanceChange:vi.fn(),recordExpense:vi.fn(),saveBudget:vi.fn(),approveSettlement:vi.fn(),closeMonth:vi.fn(),revalidatePath:vi.fn()}));
+const mocks=vi.hoisted(()=>({saveDraft:vi.fn(),restoreDraftInvoice:vi.fn(),requireAccess:vi.fn(),accessActor:vi.fn(),requestFinanceChange:vi.fn(),readFinanceChangeKind:vi.fn(),approveFinanceChange:vi.fn(),cancelFinanceChange:vi.fn(),recordExpense:vi.fn(),saveBudget:vi.fn(),approveSettlement:vi.fn(),closeMonth:vi.fn(),revalidatePath:vi.fn()}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:mocks.requireAccess,accessActor:mocks.accessActor}));
 vi.mock('@/lib/finance/workflows',()=>({requestFinanceChange:mocks.requestFinanceChange,readFinanceChangeKind:mocks.readFinanceChangeKind,approveFinanceChange:mocks.approveFinanceChange,cancelFinanceChange:mocks.cancelFinanceChange}));
 vi.mock('@/lib/roles',()=>({requireAction:async()=>({uid:9})}));
+vi.mock('@/lib/finance/tax-draft',()=>({saveTaxDraft:mocks.saveDraft}));
 vi.mock('@/lib/prisma',()=>({prisma:{}}));
 vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw new Error('REDIRECT:'+url);}}));
 vi.mock('next/cache',()=>({revalidatePath:mocks.revalidatePath}));
 vi.mock('@/lib/finance/service',async importOriginal=>({...await importOriginal<object>(),restoreDraftInvoice:mocks.restoreDraftInvoice,recordExpense:mocks.recordExpense,saveBudget:mocks.saveBudget,approveSettlement:mocks.approveSettlement,closeMonth:mocks.closeMonth}));
 import {financeAuditContext} from '@/lib/finance/audit-context';
-import {saveFinanceBudget,approveFinanceSettlement,recordFinanceExpense,closeFinanceMonth,requestFinanceReturn,requestFinanceReturnReversal,requestFinanceTaxSettings,requestFinancePeriodReopen,approveFinanceRequest,cancelFinanceRequest,restoreFinanceDraftInvoice} from '@/app/admin/finance/actions';
+import {saveFinanceBudget,approveFinanceSettlement,recordFinanceExpense,closeFinanceMonth,requestFinanceReturn,requestFinanceReturnReversal,requestFinanceTaxSettings,requestFinancePeriodReopen,approveFinanceRequest,cancelFinanceRequest,restoreFinanceDraftInvoice,saveFinanceTaxDraft} from '@/app/admin/finance/actions';
 const form=(values:Record<string,string>)=>{const result=new FormData();for(const [key,value] of Object.entries(values))result.set(key,value);return result;};
 const policyFields={priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatEnabled:'off'};
 const taxFields={month:'2026-09',effectiveFrom:'2026-10-01',issuerName:'Issuer',issuerTaxNumber:'300000000000003',issuerAddress:'Address',vatPercent:'15.25',policyReference:'approved-policy',reason:'policy review',requestKey:'request-test-2',...policyFields};
@@ -134,4 +135,10 @@ it('restoration requires both deletion and creation before restoring the existin
  mocks.requireAccess.mockResolvedValue({uid:9});
  await expect(restoreFinanceDraftInvoice(form({month:'2026-09',invoiceId:'1',reason:'correct mistaken cancellation'}))).rejects.toThrow('saved=1');
  expect(mocks.restoreDraftInvoice).toHaveBeenCalledWith({},9n,1n,'correct mistaken cancellation');
+});
+
+describe('tax draft saves never approve settings',()=>{
+it('saves partial fields for the authenticated actor without policy validation',async()=>{await expect(saveFinanceTaxDraft(form({month:'2026-09',returnTo:'tax',issuerName:'متجر',issuerAddress:''}))).rejects.toThrow('draft=1');expect(mocks.saveDraft).toHaveBeenCalledWith(9n,expect.any(FormData));expect(mocks.requestFinanceChange).not.toHaveBeenCalled();expect(mocks.approveFinanceChange).not.toHaveBeenCalled();});
+it('denies draft writes to a viewer without manage_settings',async()=>{mocks.requireAccess.mockImplementation(async (_module:string,action:string)=>{if(action==='manage_settings')throw Error('DENIED');return {uid:9};});await expect(saveFinanceTaxDraft(form({month:'2026-09'}))).rejects.toThrow('DENIED');expect(mocks.saveDraft).not.toHaveBeenCalled();});
+it('preserves entered fields before rejecting an incomplete approval submission',async()=>{await expect(requestFinanceTaxSettings(form({month:'2026-09',vatEnabled:'on',issuerName:'متجر'}))).rejects.toThrow('error=finance_');expect(mocks.saveDraft).toHaveBeenCalledWith(9n,expect.any(FormData));expect(mocks.requestFinanceChange).not.toHaveBeenCalled();});
 });

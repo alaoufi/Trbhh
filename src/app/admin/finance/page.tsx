@@ -1,3 +1,4 @@
+import {readTaxDraft} from '@/lib/finance/tax-draft';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { financePermissionsFromKeys, requireFinance } from '@/lib/finance/permissions';
@@ -53,15 +54,17 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const session = await requireFinance(query.section);
   const [access, data] = await Promise.all([readActorAccess(session.uid), readFinanceData(prisma)]);
   const permissions = financePermissionsFromKeys(access.keys, query.section);
+  const taxDraft=query.section==='tax'&&permissions.manageTax?await readTaxDraft(BigInt(session.uid)):null;
   const now=new Date();
   const report = buildFinanceReport(redactFinanceAudit(data, access.keys), query, now);
   const taxMonitor=access.keys.has('tax:view')&&['overview','tax'].includes(query.section)
     ? await readTaxRegistrationMonitor(prisma,BigInt(session.uid),now):null;
   const error = typeof params.error === 'string' ? params.error : null;
   return <div className="space-y-3">
-    {params.saved && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.</p>}
+    {params.draft&&<p role="status" className="rounded-xl border p-3">تم حفظ المسودة. يمكنك إكمالها لاحقًا؛ لم تتغير إعدادات الفواتير المعتمدة.</p>}
+    {params.saved&&!params.draft && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{params.submitted?'تم إرسال الطلب للمراجعة؛ لم يُعتمد بعد. راجع قسم طلبات المراجعة والاعتماد أدناه.':'تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.'}</p>}
     {error && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{errorMessages[error] || 'تعذر تنفيذ الإجراء. راجع الحقول المطلوبة والفترة وصلاحيتك وجاهزية المصادر، ثم أعد المحاولة.'}</p>}
     {taxMonitor&&<TaxRegistrationMonitor report={taxMonitor}/>}
-    <FinanceWorkspace report={report} canEdit={permissions.edit} canApprove={permissions.approve} canClose={permissions.close} canExport={permissions.export} canRefund={permissions.refund} canCancel={permissions.cancel} canReconcile={permissions.reconcile} canManageTax={permissions.manageTax} canReopen={permissions.reopen} currentUserId={String(session.uid)} visibleSections={permissions.visibleSections} viewFinance={permissions.viewFinance} viewSettlements={permissions.viewSettlements} viewReconciliation={permissions.viewReconciliation} actionKey={randomUUID()} />
+    <FinanceWorkspace taxDraft={taxDraft} report={report} canEdit={permissions.edit} canApprove={permissions.approve} canClose={permissions.close} canExport={permissions.export} canRefund={permissions.refund} canCancel={permissions.cancel} canReconcile={permissions.reconcile} canManageTax={permissions.manageTax} canReopen={permissions.reopen} currentUserId={String(session.uid)} visibleSections={permissions.visibleSections} viewFinance={permissions.viewFinance} viewSettlements={permissions.viewSettlements} viewReconciliation={permissions.viewReconciliation} actionKey={randomUUID()} />
   </div>;
 }

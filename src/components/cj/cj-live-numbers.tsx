@@ -4,12 +4,12 @@ import {isLiveDisplayPayload,createDisplayReadQueue} from '@/lib/cj/display-fres
 
 /**
  * الأرقام الحقيقية الحيّة لبطاقة سلعة (السعر/الشحن/المخزون/الإجمالي) — تُجلب لحظياً عند
- * ظهور البطاقة (بلا تخزين مسبق). طلبات CJ منظَّمة على الخادم (طلب/ثانية) فتُملأ البطاقات
+ * ظهور البطاقة، مع إعادة استخدام تحقق ناجح لا يتجاوز 30 ثانية على الخادم. طلبات CJ منظَّمة على الخادم (طلب/ثانية) فتُملأ البطاقات
  * تدريجياً. الإجمالي = سعر البيع + أرخص شحن = سعر الشراء الفعلي للعميل. إن تعذّر الجلب
  * تبقى البطاقة قابلة للنقر لإعادة المحاولة.
  */
 const pending = new Map<string,Promise<LivePayload>>();
-const passiveRead=createDisplayReadQueue();
+const passiveRead=createDisplayReadQueue(2);
 
 type LivePayload =
   | { status: 'available'; priceMinor: number; shipMinor: number; stock: number; totalMinor: number; deliveryDays: string | null;checkedAt:string;destinationZip:string }

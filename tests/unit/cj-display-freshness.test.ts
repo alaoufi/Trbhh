@@ -2,6 +2,7 @@ import {describe,expect,it,vi} from 'vitest';
 import {createDisplayReadCache,quoteMatchesSelection,isLiveDisplayPayload,createDisplayReadQueue} from '@/lib/cj/display-freshness';
 
 describe('CJ display reads and quantity identity',()=>{
+  it('allows two passive cards to progress without exceeding the configured bound',async()=>{const schedule=createDisplayReadQueue(2);const release:(()=>void)[]=[];let active=0,max=0;const load=()=>new Promise<number>(resolve=>{active++;max=Math.max(max,active);release.push(()=>{active--;resolve(1);});});const requests=[schedule(load),schedule(load),schedule(load)];await Promise.resolve();expect(release).toHaveLength(2);release[0]();await requests[0];await Promise.resolve();await Promise.resolve();expect(release).toHaveLength(3);release[1]();release[2]();await Promise.all(requests);expect(max).toBe(2);});
   it('limits passive reads to one active request and recovers after a failure',async()=>{
     const schedule=createDisplayReadQueue();let release!:()=>void;
     const first=schedule(()=>new Promise<void>(resolve=>{release=resolve;}));

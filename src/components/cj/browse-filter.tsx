@@ -1,14 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { useId } from 'react';
+import {CjCategoryPicker} from './category-picker';
+import type {CatalogCategoryOption} from '@/lib/cj/category-tree';
 import type {CatalogFilterValues} from '@/lib/cj/catalog-filters';
 
 /**
- * فلترة «أقسام البضائع» تُطبَّق فوراً عند الاختيار (بلا زر عرض) عبر إرسال نموذج GET
- * تلقائياً عند تغيير القسم. البحث بالاسم يبقى بالإدخال ثم Enter أو زر «بحث».
+ * فلترة «أقسام البضائع» تُختار على ثلاثة مستويات محليًا ثم تُطبَّق بنموذج GET
+ * بعد اختيار القسم النهائي. تغيير الرئيسي يمسح الخيارات الفرعية القديمة.
  * نموذج GET بسيط بلا router — يُصيَّر على الخادم بلا اعتماد على سياق التنقّل.
  */
-export function BrowseFilter({ q, cat, categories,suppliers=[],filters={} }: { q: string; cat: string; categories: { id: string; label: string }[];suppliers?:{id:string;name:string}[];filters?:CatalogFilterValues }) {
+export function BrowseFilter({ q, cat, categories,suppliers=[],filters={} }: { q: string; cat: string; categories: CatalogCategoryOption[];suppliers?:{id:string;name:string}[];filters?:CatalogFilterValues }) {
   const id = useId();
   const field='ms-2 min-h-9 w-40 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm';
   return (
@@ -16,11 +18,7 @@ export function BrowseFilter({ q, cat, categories,suppliers=[],filters={} }: { q
       <label className="text-sm" htmlFor={`${id}-q`}>بحث بالاسم
         <input id={`${id}-q`} name="q" defaultValue={q} className="ms-2 w-56 min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm" placeholder="اكتب اسم المنتج بالعربية أو الإنجليزية" />
       </label>
-      <label className="text-sm" htmlFor={`${id}-cat`}>أقسام منتجات CJ
-        <select id={`${id}-cat`} name="cat" defaultValue={cat} onChange={(e) => e.currentTarget.form?.requestSubmit()} className="ms-2 w-72 min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm">
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-        </select>
-      </label>
+      <CjCategoryPicker key={cat} categories={categories} selected={cat}/>
       <label className="text-sm">السعر من ($)<input name="minPrice" type="number" min="0" max="1000000" step="0.01" defaultValue={filters.minPrice} className={field}/></label>
       <label className="text-sm">السعر إلى ($)<input name="maxPrice" type="number" min="0" max="1000000" step="0.01" defaultValue={filters.maxPrice} className={field}/></label>
       <label className="text-sm">ترتيب النتائج<select name="sort" defaultValue={filters.sort||'best'} className={field}><option value="best">الأكثر مطابقة</option><option value="price_asc">السعر: الأقل أولًا</option><option value="price_desc">السعر: الأعلى أولًا</option><option value="newest">الأحدث</option><option value="popular">الأكثر إدراجًا بالمتاجر</option><option value="stock">الأكثر مخزونًا</option></select></label>

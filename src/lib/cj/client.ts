@@ -218,7 +218,7 @@ export async function getCategories(): Promise<CjResult<CjCategory[]>> {
       for (const t of thirds) {
         const id = String(t.categoryId ?? '');
         const name = String(t.categoryName ?? '');
-        if (id && name) out.push({ id, name, path: [fName, sName, name].filter(Boolean).join(' › ') });
+        if (id && name) {const levels=[fName,sName,name].filter(Boolean);out.push({ id, name, path:levels.join(' › '),levels });}
       }
     }
   }

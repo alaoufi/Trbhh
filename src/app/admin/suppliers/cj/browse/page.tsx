@@ -97,7 +97,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     const label = isArabicText(translatedPath) ? translatedPath! : pathParts.length > 1 && pathParts.every(isArabicText) ? pathParts.join(' › ') : isArabicText(translatedName) ? translatedName! : `تصنيف بانتظار الترجمة (${index + 1})`;
     return [c.id, label];
   }));
-  const categoryOptions=cjCategoryOptions(categories,categoryLabels);
+  const categoryOptions=cjCategoryOptions(categories,categoryLabels,catAr);
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.min(1000,Math.max(1, Math.ceil(total / PAGE_SIZE)));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();

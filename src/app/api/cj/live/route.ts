@@ -4,12 +4,12 @@ import { hasAccess } from '@/lib/access-control/guards';
 import { getProduct, getInventoryByPid } from '@/lib/cj/client';
 import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
 import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
-import { createDisplayReadCache } from '@/lib/cj/display-freshness';
+import { createDisplayReadCache,isLiveDisplayPayload } from '@/lib/cj/display-freshness';
 import {getCjDestinationZip} from '@/lib/cj/destination';
 import {getStorefrontCjProduct} from '@/lib/cj/mapping';
 
 /**
- * الأرقام الحقيقية الحيّة لبطاقة سلعة واحدة، تُجلب لحظياً عند تحميل الصفحة (بلا تخزين مسبق).
+ * الأرقام الحقيقية الحيّة لبطاقة سلعة واحدة، تُتحقق من المصدر وتُعاد نتيجة العرض الناجحة لمدة لا تتجاوز 30 ثانية.
  * السعر/الشحن/المخزون/الإجمالي من CJ مباشرة عبر verifyCjVariantForSaudi على المتغيّر الأعلى
  * مخزوناً. للموظّفين فقط (products:view). قراءة فقط — لا طلب ولا دفع. طلبات CJ منظَّمة
  * داخلياً (طلب/ثانية) فتُعرض البطاقات تدريجياً. الإجمالي = سعر البيع + أرخص شحن = سعر الشراء الفعلي.
@@ -18,8 +18,11 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' };
 
-// Share active reads only; completed numeric results are never reused.
-const liveCache = createDisplayReadCache<Record<string,unknown>>(0);
+// Display only. Purchase verification never reads these short-lived observations.
+const liveCache = createDisplayReadCache<Record<string,unknown>>(30000,Date.now,200,value=>{
+  const age=Date.now()-Date.parse(String(value.checkedAt||''));
+  return isLiveDisplayPayload(value)&&age>=0&&age<30000;
+});
 
 export async function GET(request: Request) {
   const session = await getSession().catch(() => null);
@@ -38,13 +41,15 @@ export async function GET(request: Request) {
   if(productId!==null&&(!Number.isSafeInteger(productId)||productId<1))return NextResponse.json({error:'invalid'},{status:400,headers});
   const row=productId===null?null:await getStorefrontCjProduct(productId,false).catch(()=>null);
   if(productId!==null&&(!row||row.hidden!==0||row.cj_product_id!==pid))return NextResponse.json({status:'unavailable'},{headers});
-  const cacheKey = `${pid}|${zip}|${productId??''}`;
+  const settings=await readVerifiedCjPricing().catch(()=>null);
+  if(!settings)return NextResponse.json({status:'unavailable'},{headers});
+  const cacheKey = JSON.stringify([session.uid,pid,zip,productId,settings.usdToSarX100,settings.marginBps,row?.margin_bps,row?.other_costs_minor,row?.sale_price_override_minor]);
   const refresh=new URL(request.url).searchParams.get('refresh')==='1';
   const payload=await liveCache.read(cacheKey,async()=>{
   const respond = (value: Record<string,unknown>) => value;
 
-  // getProduct دائماً (للسعر/المتغيّرات). getInventoryByPid فقط عند تعدّد المتغيّرات (لترتيب
-  // الاختيار)؛ فالسلعة ذات متغيّر واحد توفّر هذا الطلب. ثم شحن واحد داخل verify.
+  // عند التحقق الجديد نقرأ السعر والخيارات. مخزون PID عند تعدد الخيارات يختار المتغير
+  // ثم يعاد استخدام صفوفه المطابقة فقط بدل طلب مخزون إضافي. الشحن يظل طلبًا فعليًا.
   const product = await getProduct(pid).catch(() => null);
   if (!product?.ok) return respond({ status: 'unavailable' });
 
@@ -55,10 +60,11 @@ export async function GET(request: Request) {
   if (!eligible.length) return respond({ status: 'unavailable' });
 
   // المخزون القابل للبيع لكل vid (كمية CJ إن وُجدت وإلا الكلية المُبلَّغة) — للترتيب فقط، ولا
-  // نطلبه إلا عند تعدّد المتغيّرات. التحقّق النهائي يبقى على مصدر verify الموثوق (queryByVid).
+  // نطلبه إلا عند تعدّد المتغيّرات. تمر الصفوف المطابقة عبر نفس تحقق VID والبلد والكمية داخل verify.
   const stockByVid = new Map<string, number>();
+  let pidInventory:Awaited<ReturnType<typeof getInventoryByPid>>|null=null;
   if (eligible.length > 1) {
-    const pidInventory = await getInventoryByPid(pid).catch(() => null);
+    pidInventory = await getInventoryByPid(pid).catch(() => null);
     if (pidInventory?.ok) for (const row of pidInventory.data) {
       const q = (typeof row.cjInventoryQuantity === 'number' && row.cjInventoryQuantity > 0 ? row.cjInventoryQuantity : 0) || (typeof row.storageNum === 'number' && row.storageNum > 0 ? row.storageNum : 0);
       if (row.vid && q) stockByVid.set(row.vid, (stockByVid.get(row.vid) ?? 0) + q);
@@ -69,7 +75,8 @@ export async function GET(request: Request) {
 
   const check = await verifyCjVariantForSaudi(
     pid, variant, 1,
-    { getVariants: async () => ({ ok: true, data: product.data.variants }) },
+    { getVariants: async () => ({ ok: true, data: product.data.variants }),
+      ...(pidInventory?.ok&&pidInventory.data.some(r=>r.vid===variant.vid&&r.countryCode)?{getInventoryByVid:async(vid:string)=>({ok:true as const,data:pidInventory?.ok?pidInventory.data.filter(r=>r.vid===vid):[]})}:{}) },
     settings.usdToSarX100, row?{marginBps:row.margin_bps,otherCostsMinor:row.other_costs_minor,saleOverrideMinor:row.sale_price_override_minor}:{ marginBps }, zip,
   ).catch(() => null);
 

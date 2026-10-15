@@ -8,8 +8,9 @@ vi.mock('@/lib/auth',()=>({getSession:state.session}));
 vi.mock('@/lib/access-control/guards',()=>({hasAccess:state.has,readActorAccess:state.access}));
 import {AccessBoundary, AccessPage} from '@/components/access-boundary';
 describe('registered admin navigation and presentation boundaries',()=>{
- it('offers exactly ten departments and no unregistered navigation destinations',()=>{
-  expect(ADMIN_GROUPS.map(group=>group.key)).toEqual(DEPARTMENTS.map(department=>department.id));
+ it('keeps ten authorization departments while grouping navigation by task with no unregistered destination',()=>{
+  expect(DEPARTMENTS).toHaveLength(10);
+  expect(new Set(ADMIN_GROUPS.map(group=>group.key)).size).toBe(ADMIN_GROUPS.length);
   expect(ADMIN_GROUPS.every(group=>group.items.length>0)).toBe(true);
   expect(ADMIN_NAV.every(item=>PERMISSIONS.some(permission=>permission.key===pagePermission(item.href)))).toBe(true);
  });

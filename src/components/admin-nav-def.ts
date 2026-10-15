@@ -126,9 +126,23 @@ items.push(
  { href: '/admin/ratings', label: 'تقييمات المنصة', icon: MessagesSquare, perm: null },
 );
 const colors = ['#16294A','#166534','#92700D','#0F766E','#0369A1','#4338CA','#7E22CE','#BE185D','#9A3412','#475569'];
-export const ADMIN_GROUPS: AdminNavGroup[] = DEPARTMENTS.map((department,index)=>({
+const departmentGroups: AdminNavGroup[] = DEPARTMENTS.map((department,index)=>({
  key:department.id,title:department.name,icon:department.id==='technical'?Settings:department.id==='finance'?Coins:department.id==='audit'?Shield:Store,color:colors[index],
  items:items.filter(item=>MODULES.find(module=>module.key===pagePermission(item.href)?.split(':')[0])?.departmentId===department.id),
 }));
+const taskGroups:AdminNavGroup[]=[
+ {key:'market-categories',title:'تصنيفات السوق وحقولها',icon:Megaphone,color:'#475569',items:items.filter(i=>['/admin/categories','/admin/smart-ads'].includes(i.href))},
+ {key:'market-content',title:'الإعلانات والمحتوى',icon:Megaphone,color:'#0369A1',items:items.filter(i=>['/admin/ads','/admin/classified','/admin/duplicates','/admin/promos'].includes(i.href))},
+ {key:'supplier-management',title:'الموردون وربط المتاجر',icon:Store,color:'#0F766E',items:items.filter(i=>i.href.startsWith('/admin/suppliers')&&!i.href.startsWith('/admin/suppliers/cj'))},
+ {key:'cj-catalog',title:'CJ — الكتالوج والاستيراد',icon:Store,color:'#0F766E',items:items.filter(i=>['/admin/suppliers/cj/browse','/admin/suppliers/cj/imported','/admin/suppliers/cj/showcase'].includes(i.href))},
+ {key:'cj-operations',title:'CJ — متابعة الطلبات',icon:Store,color:'#0369A1',items:['purchases','payables','preparation','tracking','history'].flatMap(path=>items.filter(i=>i.href==='/admin/suppliers/cj/'+path))},
+ {key:'cj-settings',title:'CJ — الإعدادات والاختبارات',icon:Settings,color:'#64748b',items:items.filter(i=>i.href.startsWith('/admin/suppliers/cj')&&!['browse','imported','showcase','purchases','payables','preparation','tracking','history'].some(path=>i.href==='/admin/suppliers/cj/'+path))},
+];
+const taskDestinations=new Set(taskGroups.flatMap(g=>g.items.map(i=>i.href)));
+/** Presentation groups are independent of authorization departments; grants stay unchanged. */
+export const ADMIN_GROUPS:AdminNavGroup[]=[
+ ...departmentGroups.filter(g=>g.key==='executive'),...taskGroups,
+ ...departmentGroups.filter(g=>g.key!=='executive').map(g=>({...g,title:g.key==='supply'?'السلع المعتمدة':g.title,items:g.items.filter(i=>!taskDestinations.has(i.href))})),
+].filter(g=>g.items.length);
 /** Registered navigation; legacy perm metadata never authorizes access. */
 export const ADMIN_NAV: AdminNavItem[] = ADMIN_GROUPS.flatMap(group => group.items);

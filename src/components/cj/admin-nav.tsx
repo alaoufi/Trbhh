@@ -1,7 +1,7 @@
 'use client';
 import {useAdminNavigationAccess} from '@/components/admin-navigation-access';
 import Link from 'next/link';
-import {ADMIN_NAV} from '@/components/admin-nav-def';
+import {ADMIN_NAV,ADMIN_GROUPS} from '@/components/admin-nav-def';
 
 /**
  * شريط تنقّل موحّد لصفحات إدارة CJ — يظهر أعلى كل صفحة ليسهُل الانتقال بينها.
@@ -24,9 +24,12 @@ const TABS: { key: string; href: string; label: string }[] = [
 
 export function CjAdminNav({ current }: { current: 'purchases' | 'preparation' | 'tracking' | 'history' | 'browse' | 'imported' | 'showcase' | 'orders' | 'payables' | 'agents' | 'glossary' | 'settings' }) {
   const allowed=new Set(useAdminNavigationAccess());
+  const currentHref=TABS.find(tab=>tab.key===current)?.href;
+  const group=ADMIN_GROUPS.find(g=>g.items.some(i=>i.href===currentHref));
+  const related=new Set(group?.items.map(i=>i.href));
   return (
     <nav aria-label="إدارة CJ" className="-mx-1 flex flex-wrap gap-1.5 border-b border-primary/15 pb-2">
-      {TABS.filter(tab=>allowed.has(tab.href)).map(tab => {
+      {TABS.filter(tab=>allowed.has(tab.href)&&related.has(tab.href)).map(tab => {
         const active = tab.key === current;
         return (
           <Link key={tab.key} href={tab.href} aria-current={active ? 'page' : undefined}

@@ -1,7 +1,7 @@
 import { GuideClassic, type GuideSection } from './guide-classic';
 import { GuideBook } from './guide-book';
 import { getSettingBool } from '@/lib/settings';
-import { GUIDE_BOOK_SETTING, type GuideChapter } from '@/lib/guide-book';
+import { GUIDE_BOOK_SETTING } from '@/lib/guide-book';
 export type { GuideSection } from './guide-classic';
 
 /**
@@ -15,10 +15,11 @@ export async function GuideView(props: React.ComponentProps<typeof GuideClassic>
   // لقطات الأقسام والحقول تُطعّم قسم «إدارة الأقسام والحقول» في دليل الإدارة.
   const images: Record<string, string[]> = { 'category-definitions': ['manage', 'fields', 'requirements', 'display', 'ads', 'settings'] };
   const imageTitles: Record<string, string> = { manage: 'إضافة وتعديل الأقسام', fields: 'إضافة وتعديل الحقول', requirements: 'الحقول الإجبارية والاختيارية', display: 'إظهار وإخفاء الحقول', ads: 'إعلانات الأقسام', settings: 'إعدادات الأقسام' };
-  const sections: GuideChapter[] = props.sections.map((s: GuideSection) => ({
-    id: s.id, title: s.title, goal: s.goal, steps: s.steps,
+  const sections: GuideSection[] = props.sections.map((s: GuideSection) => ({
+    ...s,
     ...(s.links ? { links: s.links } : {}),
-    ...(admin && images[s.id] ? { images: images[s.id].map((key) => ({ src: `/help/categories/${key}.webp`, alt: `لقطة تعليمية ببيانات تجريبية — ${imageTitles[key]}` })) } : {}),
+    ...(admin && images[s.id]&&!s.images?.length ? { images: images[s.id].map((key) => ({ src: `/help/categories/${key}.webp`, alt: `لقطة تعليمية ببيانات تجريبية — ${imageTitles[key]}` })) } : {}),
   }));
+  if (!(await getSettingBool(GUIDE_BOOK_SETTING, true).catch(() => true))) return <GuideClassic {...props} sections={sections}/>;
   return <GuideBook topId={props.topId} title={props.title} subtitle={props.subtitle} sections={sections}>{props.children}</GuideBook>;
 }

@@ -1,9 +1,11 @@
 import { ArrowUp, Target, ListChecks } from 'lucide-react';
 import { ScrollTop } from '@/components/scroll-top';
+import Image from 'next/image';
 
 export type GuideSection = {
   id: string; title: string; icon: React.ElementType; from: string; to: string;
   goal: string; steps: string[]; links?: { href: string; label: string }[];
+  images?:{src:string;alt:string}[];
 };
 
 /** Shared rich guide renderer: gradient header, index, and per-section goal + numbered steps. */
@@ -58,6 +60,7 @@ export function GuideClassic({
           </div>
 
           <div className="space-y-3 p-4">
+            {s.images?.map(image=><figure key={image.src} className="overflow-hidden rounded-xl border"><a href={image.src} target="_blank" rel="noreferrer"><Image src={image.src} alt={image.alt} width={1200} height={760} className="h-auto w-full"/></a><figcaption className="p-2 text-xs text-muted-foreground">{image.alt} — اضغط للتكبير.</figcaption></figure>)}
             <div className="flex items-start gap-2 rounded-xl bg-primary/5 p-3">
               <Target className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
               <div><div className="text-xs font-extrabold text-primary">الهدف</div><p className="text-sm font-bold text-foreground/90">{s.goal}</p></div>

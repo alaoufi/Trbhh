@@ -1,0 +1,12 @@
+import {expect,it,vi} from 'vitest';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {existsSync} from 'node:fs';
+const state=vi.hoisted(()=>({book:true}));
+vi.mock('@/lib/settings',()=>({getSettingBool:async()=>state.book}));
+vi.mock('@/components/scroll-top',()=>({ScrollTop:()=>null}));
+vi.mock('@/components/guide-book',()=>({GuideBook:({sections}:{sections:{images?:{src:string}[]}[]})=>createElement('div',null,sections.flatMap(s=>s.images||[]).map(i=>i.src).join(' '))}));
+import {GuideView} from '@/components/guide-view';
+const props={topId:'admin-guide-top',headerIcon:()=>null,title:'دليل الإدارة',subtitle:'تعليمات مبسطة',sections:[{id:'admin-navigation',title:'ابدأ هنا',goal:'الوصول',steps:['اختر المهمة'],icon:()=>null,from:'#000',to:'#fff',images:[{src:'/help/admin/navigation-map.png',alt:'رسم إرشادي: خريطة الإدارة'}]}]};
+it.each([true,false])('keeps instructional images available with book mode %s',async book=>{state.book=book;const html=renderToStaticMarkup(await GuideView(props));expect(html).toContain('navigation-map.png');if(!book)expect(html).toContain('رسم إرشادي: خريطة الإدارة');});
+it('ships all three referenced explanatory images',()=>{for(const name of ['navigation-map','category-selection','cj-journey'])expect(existsSync(`public/help/admin/${name}.png`)).toBe(true);});

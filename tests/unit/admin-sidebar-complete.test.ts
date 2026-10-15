@@ -3,7 +3,7 @@ import {readdirSync} from 'node:fs';
 import {join,relative} from 'node:path';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {ADMIN_NAV} from '@/components/admin-nav-def';
+import {ADMIN_NAV,ADMIN_GROUPS} from '@/components/admin-nav-def';
 import {resolveAdminPageTitle} from '@/lib/admin-page-title';
 import {canAccessPage,pagePermission} from '@/lib/access-control/catalog';
 const current=vi.hoisted(()=>({path:'/admin/suppliers/cj/orders',search:''}));
@@ -21,11 +21,18 @@ describe('complete admin sidebar matching',()=>{
   expect(routes.length).toBeGreaterThan(0);
   for(const route of routes.filter(route=>!redirects.has(route))){expect(pagePermission(route),route).toBeTruthy();expect(resolveAdminPageTitle(ADMIN_NAV,route,''),route).toBeTruthy();}
  });
- it('places the current department and CJ orders link first without duplicate links',()=>{
+ it('keeps navigation positions stable while highlighting and opening the current page',()=>{
   const html=renderToStaticMarkup(createElement(AdminSidebar,{allowedHrefs:ADMIN_NAV.map(item=>item.href),roles:[]}));
   expect(html).toContain('aria-current="page"');expect(html).toMatch(/<details[^>]*open=""/);
-  expect(html.indexOf('/admin/suppliers/cj/orders#admin-content')).toBeLessThan(html.indexOf('/admin#admin-content'));
+  expect(html.indexOf('/admin#admin-content')).toBeLessThan(html.indexOf('/admin/suppliers/cj/orders#admin-content'));
   expect(html.match(/href="\/admin\/suppliers\/cj\/orders#admin-content"/g)).toHaveLength(1);
+ });
+ it('separates category management, suppliers and the CJ lifecycle without changing permissions',()=>{
+  expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/categories'))?.key).toBe('market-categories');
+  expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers'))?.key).toBe('supplier-management');
+  expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers/cj/browse'))?.key).toBe('cj-catalog');
+  expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers/cj/payables'))?.key).toBe('cj-operations');
+  expect(pagePermission('/admin/categories')).toBe('categories:view');
  });
  it('uses exactly the same label in heading and active sidebar link for every registered destination',()=>{
   for(const entry of ADMIN_NAV){[current.path,current.search='']=entry.href.split('?');const html=renderToStaticMarkup(createElement(AdminSidebar,{allowedHrefs:ADMIN_NAV.map(item=>item.href),roles:[]}));const heading=renderToStaticMarkup(createElement(AdminPageHeading,{items:ADMIN_NAV.map(({href,label})=>({href,label}))}));const active=html.match(/<a\b[^>]*aria-current="page"[^>]*>([\s\S]*?)<\/a>/)?.[1];expect(active,entry.href).toContain(entry.label);expect(heading,entry.href).toContain(entry.label);}

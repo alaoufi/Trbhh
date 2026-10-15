@@ -1,3 +1,4 @@
+import {cjCategoryOptions} from '@/lib/cj/category-options';
 import {parseCjCatalogFilters} from '@/lib/cj/catalog-filters';
 import { AccessBoundary } from '@/components/access-boundary';
 import { CjProductImage } from '@/components/cj/product-image';
@@ -96,6 +97,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     const label = isArabicText(translatedPath) ? translatedPath! : pathParts.length > 1 && pathParts.every(isArabicText) ? pathParts.join(' › ') : isArabicText(translatedName) ? translatedName! : `تصنيف بانتظار الترجمة (${index + 1})`;
     return [c.id, label];
   }));
+  const categoryOptions=cjCategoryOptions(categories,categoryLabels);
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.min(1000,Math.max(1, Math.ceil(total / PAGE_SIZE)));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
@@ -174,7 +176,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {!listing.ok&&!catalogFilters.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
 
       {/* بحث + فلترة بأقسام البضائع — القسم يُطبَّق فوراً عند الاختيار (بلا زر عرض) */}
-      <BrowseFilter suppliers={supplierRes.ok?supplierRes.data:[]} filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: `كل الأقسام${total ? ` (${total.toLocaleString('en')})` : ''}` }, ...categories.map((c) => ({ id: c.id, label: categoryLabels.get(c.id) || c.path }))]} />
+      <BrowseFilter suppliers={supplierRes.ok?supplierRes.data:[]} filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: 'كل أقسام المصدر' }, ...categoryOptions]} />
       {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
       <p className="text-xs text-muted-foreground">الترجمة فورية عند التحميل؛ أي كلمة بقيت بلغتها اضغط عليها لجلب ترجمتها. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">

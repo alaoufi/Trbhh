@@ -16,7 +16,7 @@ export function BrowseFilter({ q, cat, categories,suppliers=[],filters={} }: { q
       <label className="text-sm" htmlFor={`${id}-q`}>بحث بالاسم
         <input id={`${id}-q`} name="q" defaultValue={q} className="ms-2 w-56 min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm" placeholder="اكتب اسم المنتج بالعربية أو الإنجليزية" />
       </label>
-      <label className="text-sm" htmlFor={`${id}-cat`}>أقسام البضائع
+      <label className="text-sm" htmlFor={`${id}-cat`}>أقسام منتجات CJ
         <select id={`${id}-cat`} name="cat" defaultValue={cat} onChange={(e) => e.currentTarget.form?.requestSubmit()} className="ms-2 w-72 min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm">
           {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>

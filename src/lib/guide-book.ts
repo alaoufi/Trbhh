@@ -9,6 +9,8 @@ export function guideHashIndex(sections:GuideChapter[],hash:string):number{
  try{const id=decodeURIComponent(hash.replace(/^#/,''));return sections.findIndex(s=>s.id===id);}catch{return -1;}
 }
 export function guideGroup(s:GuideChapter):string{
+ if(s.id==='admin-navigation')return 'ابدأ هنا';
+ if(s.id.startsWith('cj-'))return 'CJ — دليل التشغيل';
  const value=`${s.id} ${s.title}`;
  if(/categor|field|الأقسام|الحقول/.test(value))return 'الأقسام والحقول';
  if(/wallet|topup|revenue|package|subscription|المحفظة|الرصيد|اشتراك|باقات/.test(value))return 'الرصيد والباقات';

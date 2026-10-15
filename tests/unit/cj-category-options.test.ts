@@ -1,0 +1,4 @@
+import {expect,it} from 'vitest';
+import {cjCategoryOptions} from '@/lib/cj/category-options';
+it('removes duplicate ids without losing distinct branches with the same translated name',()=>{const categories=[{id:'A',name:'Shoes',path:'Men > Shoes'},{id:'A',name:'Shoes',path:'Men > Shoes'},{id:'B',name:'Shoes',path:'Women > Shoes'}];const options=cjCategoryOptions(categories,new Map([['A','أحذية'],['B','أحذية']]));expect(options).toHaveLength(2);expect(options.map(x=>x.label)).toEqual(['أحذية — Men > Shoes','أحذية — Women > Shoes']);});
+it('keeps distinct source ids selectable even when source paths also coincide',()=>{const options=cjCategoryOptions([{id:'A',name:'Shoes',path:'Shoes'},{id:'B',name:'Shoes',path:'Shoes'}],new Map([['A','أحذية'],['B','أحذية']]));expect(new Set(options.map(x=>x.label)).size).toBe(2);expect(options.map(x=>x.id)).toEqual(['A','B']);});

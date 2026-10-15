@@ -1,7 +1,10 @@
 # Optional overlay; never started by an application code-only release.
 services:
   ollama:
-    image: ollama/ollama:0.40.4
+    # Official same-version variant includes CPU and ROCm, without MLX/CUDA.
+    # No GPU device is passed through; CPU execution remains explicit below.
+    image: ollama/ollama:0.40.4-rocm@sha256:60cc4504526c70f5f693f5405c129efe7784c9b5c99b22ff41dbf7667a1a637f
+    platform: linux/amd64
     container_name: trbhh-ollama
     labels:
       trbhh.local-ai: "1"
@@ -11,6 +14,8 @@ services:
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_NO_CLOUD: "1"
+      CUDA_VISIBLE_DEVICES: "-1"
+      ROCR_VISIBLE_DEVICES: "-1"
       OLLAMA_NUM_PARALLEL: "1"
       OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_MAX_QUEUE: "2"

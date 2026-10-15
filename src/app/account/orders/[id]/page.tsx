@@ -94,7 +94,7 @@ export default async function MemberOrder({ params, searchParams }: {
         </dl>
       </li>)}</ul>
     </section>}
-    {cjNotices.length>0&&<section aria-label="تحديثات CJ" className="space-y-2"><h2 className="font-bold">تحديثات CJ</h2><ul>{cjNotices.map(notice=><li key={notice.id} className="rounded-lg border p-3 text-sm">{notice.message}</li>)}</ul></section>}
+    {cjNotices.length>0&&<section aria-label="تحديثات الطلب" className="space-y-2"><h2 className="font-bold">تحديثات الطلب</h2><ul>{cjNotices.map(notice=><li key={notice.id} className="rounded-lg border p-3 text-sm">{notice.message}</li>)}</ul></section>}
     {query.receipt==='unverified'&&order.fulfillment_status!=='completed'&&<p role="alert" className="rounded-lg bg-amber-50 p-3">تعذر تأكيد اكتمال التسليم؛ لم تُغلق العملية. يرجى مراجعة دعم تربح.</p>}
     {order.fulfillment_status==='completed'&&<p className="rounded-lg bg-green-50 p-3 text-green-900">تم تأكيد استلام الشحنة وإغلاق العملية.</p>}
     {order.fulfillment_status==='delivered'&&tracking.some(s=>s.id.startsWith('cj-'))&&<form action={confirmCjReceipt} className="space-y-2 rounded-lg border p-3">

@@ -36,7 +36,7 @@ test('refuses to benchmark over an existing active alias',async()=>{
 });
 test('the launcher pins the existing gate, keeps resource ceilings and has no cutover commands',()=>{
  const text=require('node:fs').readFileSync('scripts/release/manual-local-ai-benchmark.sh','utf8');
- assert.match(text,/candidate=16e1e6e6ef8d1e795c406aef1740b687b0ba7032/);
+ assert.match(text,/candidate=a5a3dedb66345d0b6e52bbe7355d22bb2958d553/);
  assert.match(text,/10737418240/);assert.match(text,/4000000000/);
  assert.doesNotMatch(text,/git (?:switch|checkout|reset)|compose.*\b(?:up|down)\b|docker (?:rm|stop|restart|volume|system)|systemctl/);
 });

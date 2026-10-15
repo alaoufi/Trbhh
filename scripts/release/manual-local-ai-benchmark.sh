@@ -23,7 +23,7 @@ available_kib=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
 docker_root=$(docker info --format '{{.DockerRootDir}}')
 free_kib=$(df -Pk "$docker_root" | awk 'NR==2 {print $4}')
 (( free_kib >= 16*1024*1024 )) || { echo 'Insufficient free model disk space.' >&2; exit 1; }
-candidate=16e1e6e6ef8d1e795c406aef1740b687b0ba7032
+candidate=a5a3dedb66345d0b6e52bbe7355d22bb2958d553
 git fetch --no-tags origin codex/admin-navigation-complete-20261014
 [[ $(git rev-parse FETCH_HEAD) == "$candidate" ]]
 target=$(mktemp -d /root/trbhh-release-tools/local-ai-benchmark.XXXXXX)

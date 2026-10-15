@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-candidate=16e1e6e6ef8d1e795c406aef1740b687b0ba7032
+candidate=a5a3dedb66345d0b6e52bbe7355d22bb2958d553
 baseline=35ac47b1c0b8768a65a14ca8388e2f4febc53c99
 branch=codex/admin-navigation-complete-20261014
 [[ $(id -u) == 0 ]]
@@ -132,4 +132,4 @@ echo "PUBLIC_VERSION_VERIFIED=$candidate"
 ai_timer_installed=1
 bash "$target/ai/scripts/local-ai/install-runtime.sh" --install-timer-only
 systemctl is-active --quiet trbhh-local-ai-update.timer
-echo "LOCAL_AI_ACTIVATION_SUCCESS — MODEL=qwen3:8b COMMIT=$candidate"
+echo "LOCAL_AI_ACTIVATION_SUCCESS — MODEL=qwen3.5:9b COMMIT=$candidate"

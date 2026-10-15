@@ -1,6 +1,6 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 export function verifyOfficialCjSignature(raw:Buffer,sign:string,openId:string):boolean{
- if(!openId||openId.length>200||!sign||sign.length>128)return false;
+ if(!openId||openId.length>200||!/^[A-Za-z0-9+/]{43}=$/.test(sign))return false;
  const expected=createHmac('sha256',openId).update(raw).digest('base64');
  return expected.length===sign.length&&timingSafeEqual(Buffer.from(expected),Buffer.from(sign));
 }

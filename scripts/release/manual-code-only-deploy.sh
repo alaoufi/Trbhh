@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
-candidate=682aa7c5cd19a47bc5758726e2d9abd8c1a84663
-baseline=cb558f72a930d4de12fbe33b3b8328839be1bdf8
+candidate=35ac47b1c0b8768a65a14ca8388e2f4febc53c99
+baseline=682aa7c5cd19a47bc5758726e2d9abd8c1a84663
 branch=codex/admin-navigation-complete-20261014
 [[ $(id -u) == 0 ]]
 cd /root/trbhh

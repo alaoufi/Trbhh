@@ -19,12 +19,15 @@ test('worker is pinned, isolated and serialized before provisioning or cutover',
 test('visitor deployment never loads, promotes, verifies or schedules the unrelated Qwen model',()=>{
  for(const guard of ['EXISTING_QWEN_RUNTIME_REQUIRED','{{.State.Running}}','{{.Image}}','4000000000','10737418240','QWEN=UNVERIFIED'])at(guard);
  assert.doesNotMatch(text,/run-model\.sh|update-model\.sh|install-runtime\.sh|trbhh-local-ai-update\.timer|trbhh-local-ai-update\.service/);
- assert.ok(at('exec 8>/run/lock/trbhh-local-ai-update.lock')<at('docker cp "trbhh-ollama:$model_dir/$manifest"'));
+ assert.ok(at('exec 8>/run/lock/trbhh-local-ai-update.lock')<at('https://registry.ollama.ai/v2/library/embeddinggemma/manifests/300m'));
  const snippet=[...text.matchAll(/<<'NODE'(?:[^\n]*)\n([\s\S]*?)\nNODE/g)].map(x=>x[1]).find(x=>x.includes("j.models.some(x=>x.name==='trbhh-local:active')"));assert.ok(snippet);
  const run=(models,status=200)=>spawnSync(process.execPath,['-'],{input:`globalThis.fetch=async(url,options)=>{require('node:assert/strict').equal(url,'http://ollama:11434/api/tags');require('node:assert/strict').equal(options.redirect,'error');return Response.json({models:${JSON.stringify(models)}},{status:${status}});};\n`+snippet,encoding:'utf8',timeout:3000});
  assert.equal(run([{name:'trbhh-local:active'}]).status,0);assert.equal(run([{name:'qwen3.5:9b'}]).status,2);assert.equal(run(null).status,1);assert.equal(run([],500).status,1);
 });
 test('dedicated model copy verifies ownership, immutable manifest and every blob hash',()=>{
+ at('--max-filesize 65536');at('https://registry.ollama.ai/v2/library/embeddinggemma/manifests/300m');
+ assert.doesNotMatch(text,/docker cp "trbhh-ollama:\$model_dir\/\$manifest"/);
+ at('docker cp "$target/manifest.json" "trbhh-embedding:$model_dir/$manifest"');
  assert.ok(at('com.docker.compose.project"}}\' trbhh-embedding')<at('up -d --no-deps --pull never embedding'));
  for(const limit of ['2000000000','2147483648','size<=800*1024*1024','bytes.length<=65536','layers.length<=32'])at(limit);
  assert.ok(at("assert.equal(crypto.createHash('sha256')")<at('docker cp "trbhh-ollama:$blob" -'));
@@ -37,6 +40,24 @@ test('strict dedicated preflight and nonempty index precede app build and preser
  assert.ok(at("x.event==='SEMANTIC_INDEX_COMPLETE'&&x.ready===true&&x.count>0")<at('docker build --build-arg'));
  assert.ok(at('docker build --build-arg')<at('git switch --detach "$candidate"'));
  for(const guard of ['runtimeMatches(config,before)','verify-runtime.cjs" "$target/before.json" "$target/after.json"','rollback.json','git switch --detach "$baseline"','sha256sum .env','capacity_status=UNVERIFIED'])at(guard);
+});
+
+test('real pinned registry manifest allows only its four local blobs; rewritten anchors and altered bytes fail closed',()=>{
+ const os=require('node:os'),path=require('node:path');
+ const source=[...text.matchAll(/<<'NODE'(?:[^\n]*)\n([\s\S]*?)\nNODE/g)].map(x=>x[1]).find(x=>x.includes("layers=[m.config,...m.layers]"));
+ assert.ok(source);
+ const fixture=fs.readFileSync('scripts/release/fixtures/embeddinggemma-300m.manifest.json');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'trbhh-manifest-')),input=path.join(dir,'input.json'),output=path.join(dir,'blobs.txt');
+ const run=bytes=>{fs.writeFileSync(input,bytes);return spawnSync(process.execPath,['-',input,output],{input:source,encoding:'utf8'});};
+ try{
+  const valid=run(fixture);assert.equal(valid.status,0,valid.stderr);
+  const blobs=fs.readFileSync(output,'utf8').trim().split('\n');
+  assert.equal(blobs.length,4);assert.ok(blobs.includes('0800cbac9c2064dde519420e75e512a83cb360de3ad5df176185dc69652fc515'));
+  fs.unlinkSync(output);
+  for(const invalid of [Buffer.concat([fixture,Buffer.from('\n')]),Buffer.from('{"digest":"sha256:85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1"}'),Buffer.alloc(65537)]){
+   assert.notEqual(run(invalid).status,0);assert.equal(fs.existsSync(output),false);
+  }
+ }finally{for(const file of [input,output])if(fs.existsSync(file))fs.unlinkSync(file);fs.rmdirSync(dir);}
 });
 test('postcutover validates index/model and explicitly preserves closed store; timers restore exact prior state',()=>{
  at('await c.verifyModel();const index=await c.readIndex()');

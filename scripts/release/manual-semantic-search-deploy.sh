@@ -217,10 +217,14 @@ docker compose --project-directory /root/trbhh --project-name "$project" -f /roo
 [[ $(docker inspect -f '{{.HostConfig.NanoCpus}}' trbhh-embedding) == 2000000000 ]]
 [[ $(docker inspect -f '{{.HostConfig.Memory}}' trbhh-embedding) == 2147483648 ]]
 [[ $(docker inspect -f '{{.HostConfig.MemorySwap}}' trbhh-embedding) == 2147483648 ]]
-# Copy only the verified installed manifest and its bounded SHA256 blob allowlist.
+# Use the original pinned registry document, not a runtime-rewritten local anchor.
+# This fetch is at most 64 KiB of public metadata; weights are copied locally below.
 model_dir=/root/.ollama/models
 manifest=manifests/registry.ollama.ai/library/embeddinggemma/300m
-docker cp "trbhh-ollama:$model_dir/$manifest" "$target/manifest.json"
+echo SEMANTIC_MANIFEST_VERIFY
+curl --fail --silent --show-error --max-time 30 --max-filesize 65536 \
+  --header 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+  'https://registry.ollama.ai/v2/library/embeddinggemma/manifests/300m' > "$target/manifest.json"
 node - "$target/manifest.json" "$target/blobs.txt" <<'NODE'
 const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const bytes=fs.readFileSync(process.argv[2]);assert.ok(bytes.length<=65536);
@@ -237,8 +241,10 @@ while IFS= read -r digest; do
   docker cp "trbhh-ollama:$blob" - | docker cp - "trbhh-embedding:$model_dir/blobs/"
   [[ $(docker exec trbhh-embedding sha256sum "$blob" | cut -d' ' -f1) == "$digest" ]]
 done < "$target/blobs.txt"
-docker cp "trbhh-ollama:$model_dir/$manifest" - | docker cp - "trbhh-embedding:$model_dir/manifests/registry.ollama.ai/library/embeddinggemma/"
-[[ $(docker exec trbhh-embedding sha256sum "$model_dir/$manifest" | cut -d' ' -f1) == 85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1 ]]
+docker cp "$target/manifest.json" "trbhh-embedding:$model_dir/$manifest"
+# The engine may rewrite its named manifest into a compatibility anchor.
+# The mandatory dedicated preflight verifies the original model digest via API,
+# after the registry document and every referenced blob were hash-checked above.
 embedding_ready=0
 for attempt in $(seq 1 30); do
   if docker exec trbhh-embedding ollama list >/dev/null 2>&1; then embedding_ready=1; break; fi

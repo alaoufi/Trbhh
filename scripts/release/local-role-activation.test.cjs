@@ -39,7 +39,13 @@ const answers={
  'غطاء Samsung S24':'Samsung S24 case','أبغى دريل بدون سلك 18V':'18V cordless drill','شي يرتب لي أدوات المطبخ':'Kitchen utensil storage organizer','جزمة للمشي ضد الموية مقاس 42':'Waterproof walking shoes size 42','شنطة ظهر للسفر مقاومة للماء':'Waterproof travel backpack','حامل لابتوب قابل لتعديل الارتفاع':'Adjustable height laptop stand',
  'Cotton shirt':'قميص قطني','Stainless steel bottle 750ml, not insulated':'قارورة فولاذ مقاوم للصدأ سعة 750 مل غير معزولة','USB-C cable, 2 m. Charger not included.':'كابل USB-C بطول 2 متر، الشاحن غير مشمول.','Set of 3 glass storage jars, 500 ml each. Not suitable for hot liquids.':'مجموعة من 3 برطمانات زجاجية للتخزين سعة كل منها 500 مل، غير مناسبة للسوائل الساخنة.'
 };
-const protocol={searchTask:'search',translationTask:()=> 'translation',searchFormat:{},translationFormat:{},request:(model,text,task)=>({model,text,task}),validateIntentQueries:(_text,value)=>value.queries?.length===1?value.queries:[]};
+const protocol={searchTask:'search',translationTask:()=> 'translation',searchFormat:{},translationFormat:{},request:(model,text,task)=>({model,text,task}),validateIntentQueries:(_text,value)=>value.queries?.length===1?value.queries:[],finalizeSupplierQueries:(_text,value)=>value.queries?.length===1?value.queries:[]};
+test('server gate checks the actual finalized runtime query and reports raw model output separately',async()=>{
+ const reports=[],p={...protocol,finalizeSupplierQueries:(text,value)=>text==='جزمة للمشي ضد الموية مقاس 42'?['water-resistant walking shoes size 42']:protocol.finalizeSupplierQueries(text,value)};
+ const proof=await verifyRole('search',qualityCall({'جزمة للمشي ضد الموية مقاس 42':'walking shoe'}),'qwen3.5:9b',p,Date.now,s=>reports.push(s));
+ assert.equal(proof[3].answer,'water-resistant walking shoes size 42');assert.equal(reports[3].rawAnswer,'walking shoe');
+ await assert.rejects(verifyRole('search',qualityCall(),'qwen3.5:9b',{...protocol,finalizeSupplierQueries:()=>[]}),/quality_or_latency/);
+});
 function qualityCall(overrides={}){return async(_path,body)=>({done:true,done_reason:'stop',message:{content:JSON.stringify(body.task==='search'?{queries:[overrides[body.text]??answers[body.text]]}:{translation:overrides[body.text]??answers[body.text]})}});}
 test('search and translation have independent six/four actual meaning cases',async()=>{assert.equal((await verifyRole('search',qualityCall(), 'qwen3.5:9b',protocol)).length,6);assert.equal((await verifyRole('translation',qualityCall(),'qwen3.5:9b',protocol)).length,4);});
 test('previously proven kitchen organizer category remains valid without a redundant utensil word',async()=>{assert.equal((await verifyRole('search',qualityCall({'شي يرتب لي أدوات المطبخ':'kitchen organizer'}),'qwen3.5:9b',protocol)).length,6);await assert.rejects(verifyRole('search',qualityCall({'شي يرتب لي أدوات المطبخ':'kitchen chair'}),'qwen3.5:9b',protocol),/quality_or_latency/);});

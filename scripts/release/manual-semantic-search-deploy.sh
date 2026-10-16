@@ -274,11 +274,17 @@ NODE
   printf '\nreturn module.exports;})();\n'
   cat "$target/ai/build-product-index.cjs"
 } | docker exec -i "$container" timeout --signal=TERM --kill-after=10s 29m node - --initial | tee "$target/index.log"
-node - "$target/index.log" <<'NODE'
+node - "$target/index.log" <<'NODE' | tee "$target/index-status.log"
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const rows=fs.readFileSync(process.argv[2],'utf8').split('\n').filter(s=>s.startsWith('{')).map(s=>JSON.parse(s));
-assert.ok(rows.some(x=>x.event==='SEMANTIC_INDEX_COMPLETE'&&x.ready===true&&x.count>0));
+const index=rows.find(x=>x.event==='SEMANTIC_INDEX_COMPLETE');
+assert.ok(index&&Number.isInteger(index.count)&&index.count>=0&&index.count<=10000&&index.ready===(index.count>0));
+assert.equal(index.model,'embeddinggemma:300m');assert.equal(index.digest,'85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1');
+assert.ok(Number.isFinite(Date.parse(index.builtAt)));
+console.log('INDEX_STATE='+(index.count===0?'EMPTY':'POPULATED'));
 NODE
+index_state=$(sed -n 's/^INDEX_STATE=//p' "$target/index-status.log")
+[[ $index_state == EMPTY || $index_state == POPULATED ]]
 
 echo "BUILDING=$candidate — code only; no new database or media backup."
 if ! git archive --format=tar "$candidate" | docker build --build-arg "TRBHH_RELEASE_COMMIT=$candidate" --tag "trbhh-code:$candidate" - > "$target/build.log" 2>&1; then
@@ -320,21 +326,28 @@ echo "PUBLIC_VERSION_VERIFIED=$candidate"
 {
   core_stream
   cat <<'NODE'
-(async()=>{const c=globalThis.__trbhhSemanticCore;await c.verifyModel();const index=await c.readIndex();if(!index.docs.length)throw Error('empty_index');console.log('SEMANTIC_INDEX_POSTCUTOVER_READY');})().catch(()=>process.exitCode=1);
+(async()=>{const c=globalThis.__trbhhSemanticCore;await c.verifyModel();const index=await c.readIndex();console.log('SEMANTIC_INDEX_POSTCUTOVER_VALID COUNT='+index.docs.length);})().catch(()=>process.exitCode=1);
 NODE
 } | docker exec -i "$running" timeout 15 node -
 # Closed store is a valid preserved setting. Never enable it for this check.
-docker exec -i "$running" timeout 20 node - <<'NODE' | tee "$target/shop-status.log"
+docker exec -i "$running" timeout 20 node - "$index_state" <<'NODE' | tee "$target/shop-status.log"
 (async()=>{
  const r=await fetch('http://127.0.0.1:3000/shop?q='+encodeURIComponent('أدوات مطبخ'),{redirect:'error',signal:AbortSignal.timeout(15000)});
  if(!r.ok)throw Error('shop_http');const html=await r.text();
- if(html.includes('data-search-scope="trbhh-products"')){if(!html.includes('data-search-mode="semantic"'))throw Error('shop_semantic_unavailable');console.log('HTTP_STATUS=SEMANTIC');return;}
+ if(html.includes('data-search-scope="trbhh-products"')){
+  if(process.argv[2]==='EMPTY'){
+   if(!html.includes('data-search-mode="literal"'))throw Error('empty_index_mode');
+   console.log('HTTP_STATUS=EMPTY_INDEX');return;
+  }
+  if(!html.includes('data-search-mode="semantic"'))throw Error('shop_semantic_unavailable');
+  console.log('HTTP_STATUS=SEMANTIC');return;
+ }
  const {PrismaClient}=require('@prisma/client'),db=new PrismaClient();
  try{const rows=await db.site_settings.findMany({where:{k:'commerce_enabled'},select:{v:true}});if((rows[0]?.v??'0')==='1')throw Error('store_closed_unconfirmed');console.log('HTTP_STATUS=STORE_CLOSED');}finally{await db.$disconnect();}
 })().catch(()=>process.exitCode=1);
 NODE
 http_status=$(sed -n 's/^HTTP_STATUS=//p' "$target/shop-status.log")
-[[ $http_status == SEMANTIC || $http_status == STORE_CLOSED ]]
+[[ $http_status == SEMANTIC || $http_status == STORE_CLOSED || $http_status == EMPTY_INDEX ]]
 # Measure only the running candidate. Literal fallback lowers capacity; it is not app failure.
 capacity_status=UNVERIFIED
 if [[ $http_status == SEMANTIC ]]; then
@@ -355,6 +368,8 @@ console.log('CAPACITY_DISTINCT_MEASURED — REQUESTS='+report.distinctRequests+'
 NODE
     then capacity_status=MEASURED; else echo 'CAPACITY_UNVERIFIED — missing or invalid completion report'; fi
   else echo 'CAPACITY_UNVERIFIED — bounded probe stopped; inspect capacity-http.log'; fi
+elif [[ $http_status == EMPTY_INDEX ]]; then
+  echo 'CAPACITY_UNVERIFIED — EMPTY_INDEX; HTTP capacity cannot be verified without eligible products'
 else
   echo 'CAPACITY_UNVERIFIED — STORE_CLOSED; HTTP load skipped without changing settings'
 fi
@@ -364,4 +379,4 @@ snapshot_timers
 search_timer_installed=1
 bash "$target/ai/scripts/local-ai/install-search-refresh.sh" "$target/ai"
 systemctl is-active --quiet trbhh-semantic-index-refresh.timer
-echo "SEMANTIC_SEARCH_CODE_ONLY_VERIFIED — COMMIT=$candidate INDEX_READY=1 HTTP_STATUS=$http_status CAPACITY=$capacity_status QWEN=UNVERIFIED"
+echo "SEMANTIC_SEARCH_CODE_ONLY_VERIFIED — COMMIT=$candidate INDEX_VALID=1 INDEX_STATE=$index_state HTTP_STATUS=$http_status CAPACITY=$capacity_status AUTO_INDEX=15MIN QWEN=UNVERIFIED"

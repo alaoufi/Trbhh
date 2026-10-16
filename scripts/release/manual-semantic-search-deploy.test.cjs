@@ -4,6 +4,27 @@ const fs=require('node:fs');
 const {spawnSync}=require('node:child_process');
 const text=fs.readFileSync('scripts/release/manual-semantic-search-deploy.sh','utf8');
 const at=fragment=>{const offset=text.indexOf(fragment);assert.ok(offset>=0,'missing guard: '+fragment);return offset;};
+
+test('pinned automatic refresh discovers eligible products after an empty index and removes newly ineligible products',async()=>{
+ const candidate=text.match(/candidate=([a-f0-9]{40})/)[1];
+ const load=(file,globals={})=>{
+  const result=spawnSync('git',['show',candidate+':'+file],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);
+  const unit={exports:{},id:'unit'};new Function('module','require','globalThis',result.stdout)(unit,require,globals);return unit.exports;
+ };
+ const core=load('scripts/local-ai/semantic-core.cjs'),select=load('scripts/local-ai/public-product-select.cjs');
+ const {buildIndex}=load('scripts/local-ai/build-product-index.cjs',{__trbhhSemanticCore:core,__trbhhPublicProductSelect:select});
+ assert.match(select,/cp.approved=1 AND cp.visible=1 AND cp.enabled=1/);assert.match(select,/cp.stock_available>cp.stock_reserved/);
+ let eligible=[],calls=0;
+ const query=async(sql,after)=>{assert.equal(sql,select+' AND cp.id>? ORDER BY cp.id LIMIT ?');return after==='0'?eligible:[];};
+ const embed=async texts=>{calls++;return texts.map(()=>Array(768).fill(.1));};
+ const empty=await buildIndex({query,embed});assert.equal(empty.docs.length,0);assert.equal(calls,0);
+ eligible=[{id:1n,title:'Approved available product'}];
+ const populated=await buildIndex({query,embed,prior:core.validateIndex(empty)});assert.equal(populated.docs.length,1);assert.equal(calls,1);
+ const reused=await buildIndex({query,embed,prior:core.validateIndex(populated)});assert.equal(calls,1);assert.deepEqual(reused.docs,populated.docs);
+ eligible=[];const withdrawn=await buildIndex({query,embed,prior:core.validateIndex(populated)});assert.equal(withdrawn.docs.length,0);
+ const timer=spawnSync('git',['show',candidate+':scripts/local-ai/install-search-refresh.sh'],{encoding:'utf8'});assert.equal(timer.status,0);
+ assert.match(timer.stdout,/OnUnitInactiveSec=15min/);assert.match(timer.stdout,/node - --refresh/);assert.match(timer.stdout,/trbhh-semantic-index.lock/);
+});
 test('worker is pinned, isolated and serialized before provisioning or cutover',()=>{
  assert.match(text,/candidate=(?:CANDIDATE_PENDING|[a-f0-9]{40})\n/);
  assert.match(text,/baseline=35ac47b1c0b8768a65a14ca8388e2f4febc53c99/);
@@ -34,10 +55,12 @@ test('dedicated model copy verifies ownership, immutable manifest and every blob
  at('docker exec trbhh-ollama sha256sum "$blob"');at('docker exec trbhh-embedding sha256sum "$blob"');
  assert.doesNotMatch(text,/ollama\s+(?:pull|rm|cp)|docker\s+(?:volume\s+rm|system\s+prune)|(?:DELETE|UPDATE|INSERT)\s+(?:FROM|INTO|site_settings)/i);
 });
-test('strict dedicated preflight and nonempty index precede app build and preserve runtime rollback',()=>{
+test('strict dedicated preflight and validated empty or populated index precede app build and preserve runtime rollback',()=>{
  assert.ok(at('__trbhhEmbeddingProbe="dedicated"')<at('result.correct===40'));
  assert.ok(at('result.correct===40')<at('node - --initial'));
- assert.ok(at("x.event==='SEMANTIC_INDEX_COMPLETE'&&x.ready===true&&x.count>0")<at('docker build --build-arg'));
+ assert.ok(at("index.ready===(index.count>0)")<at('docker build --build-arg'));
+ at("index.count===0?'EMPTY':'POPULATED'");
+ assert.doesNotMatch(text,/throw Error\('empty_index'\)/);
  assert.ok(at('docker build --build-arg')<at('git switch --detach "$candidate"'));
  for(const guard of ['runtimeMatches(config,before)','verify-runtime.cjs" "$target/before.json" "$target/after.json"','rollback.json','git switch --detach "$baseline"','sha256sum .env','capacity_status=UNVERIFIED'])at(guard);
 });
@@ -62,8 +85,34 @@ test('real pinned registry manifest allows only its four local blobs; rewritten 
 test('postcutover validates index/model and explicitly preserves closed store; timers restore exact prior state',()=>{
  at('await c.verifyModel();const index=await c.readIndex()');
  at('data-search-mode="semantic"');at('HTTP_STATUS=STORE_CLOSED');at("db.site_settings.findMany({where:{k:'commerce_enabled'}");
+ at('HTTP_STATUS=EMPTY_INDEX');at('INDEX_STATE=$index_state');at('EMPTY_INDEX; HTTP capacity cannot be verified without eligible products');
  for(const guard of ['timer_snapshot_ready == 1 && $timers_touched == 1','restore_timers','install-search-refresh.sh" "$target/ai"'])at(guard);
  assert.doesNotMatch(text,/site_settings\.(?:update|upsert|create)|\$executeRaw/);
+});
+
+test('index completion accepts a genuine zero count and rejects inconsistent or missing readiness',()=>{
+ const os=require('node:os'),path=require('node:path');
+ const snippet=[...text.matchAll(/<<'NODE'(?:[^\n]*)\n([\s\S]*?)\nNODE/g)].map(x=>x[1]).find(x=>x.includes("index.ready===(index.count>0)"));assert.ok(snippet);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'trbhh-empty-index-')),file=path.join(dir,'index.log');
+ const value={event:'SEMANTIC_INDEX_COMPLETE',model:'embeddinggemma:300m',digest:'85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1',count:0,ready:false,builtAt:new Date().toISOString()};
+ const run=entry=>{fs.writeFileSync(file,JSON.stringify(entry)+'\n');return spawnSync(process.execPath,['-',file],{input:snippet,encoding:'utf8'});};
+ try{
+  assert.match(run(value).stdout,/INDEX_STATE=EMPTY/);assert.equal(run(value).status,0);
+  const populated=run({...value,count:1,ready:true});assert.equal(populated.status,0);assert.match(populated.stdout,/INDEX_STATE=POPULATED/);
+  for(const invalid of [{...value,ready:true},{...value,count:-1},{...value,count:10001},{...value,digest:'changed'},{...value,event:'SEMANTIC_INDEX_FAILED'}])assert.notEqual(run(invalid).status,0);
+ }finally{fs.unlinkSync(file);fs.rmdirSync(dir);}
+});
+
+test('live HTTP check distinguishes a valid empty catalog from failed populated semantic search',()=>{
+ const snippet=[...text.matchAll(/<<'NODE'(?:[^\n]*)\n([\s\S]*?)\nNODE/g)].map(x=>x[1]).find(x=>x.includes("HTTP_STATUS=EMPTY_INDEX"));assert.ok(snippet);
+ const run=(state,mode)=>{
+  const html='<main data-search-scope="trbhh-products" data-search-mode="'+mode+'"></main>';
+  const prelude='globalThis.fetch=async(url,options)=>{require("node:assert/strict").equal(options.redirect,"error");return new Response('+JSON.stringify(html)+');};\n';
+  return spawnSync(process.execPath,['-',state],{input:prelude+snippet,encoding:'utf8',timeout:3000});
+ };
+ const empty=run('EMPTY','literal');assert.equal(empty.status,0,empty.stderr);assert.match(empty.stdout,/HTTP_STATUS=EMPTY_INDEX/);
+ const populated=run('POPULATED','semantic');assert.equal(populated.status,0,populated.stderr);assert.match(populated.stdout,/HTTP_STATUS=SEMANTIC/);
+ assert.notEqual(run('POPULATED','literal').status,0);assert.notEqual(run('EMPTY','semantic').status,0);
 });
 test('rollback health requires the old image and exact baseline response within bounded checks',()=>{
  for(const guard of ['rollback_deadline=$((SECONDS+120))','SECONDS+18 <= rollback_deadline','timeout 5s docker compose ps -q app','timeout 5s docker inspect','== "$old_image"','timeout 6s docker exec "$restored"','j.commit===process.argv[1]','"$baseline"; then','rollback_healthy=1; break'])at(guard);

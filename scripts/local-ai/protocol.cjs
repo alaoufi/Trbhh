@@ -4,7 +4,7 @@ const searchFormat={type:'object',properties:{queries:{type:'array',items:{type:
 const publicSearchTask=searchTask.replace('one English catalog noun phrase','one Arabic catalog noun phrase');
 const publicSearchFormat={type:'object',properties:{queries:{type:'array',items:{type:'string',minLength:1,maxLength:100},minItems:1,maxItems:1}},required:['queries'],additionalProperties:false};
 const translationFormat={type:'object',properties:{translation:{type:'string'}},required:['translation'],additionalProperties:false};
-function translationTask(target){return `Translate the entire product text naturally into ${target==='ar'?'Arabic':'English'}. Preserve facts, brand/model verbatim, units, quantities and negations; add no features.`;}
+function translationTask(target){return `Translate text naturally to ${target==='ar'?'Arabic':'English'}. Keep facts, brands/models verbatim, units, quantities and negations. Add nothing. Proofread spelling and grammar silently before returning.`;}
 function request(model,input,task,format){return {
  model,stream:false,think:false,keep_alive:'24h',format,
  messages:[

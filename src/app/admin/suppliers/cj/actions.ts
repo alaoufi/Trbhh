@@ -773,6 +773,7 @@ export async function saveCjTranslationSettings(form: FormData) {
   const { setSetting } = await import('@/lib/settings');
   const enabled=String(form.get('localAiEnabled')||'0');
   await setSetting('local_ai_enabled',enabled==='1'?'1':'0');
+  if(form.has('backgroundTranslationEnabled'))await setSetting('local_ai_background_translation_enabled',form.get('backgroundTranslationEnabled')==='1'?'1':'0');
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), 'transcfg=1'));
 }

@@ -1,12 +1,32 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 const settings=vi.hoisted(()=>({enabled:'1'}));
 vi.mock('@/lib/settings',()=>({getSetting:async()=>settings.enabled}));
-import {clearLocalInferenceCache,localGenerate,localSearchQueries,localPublicSearchQueries,localTranslation,localServiceUrl} from '@/lib/ai/local';
+import {clearLocalInferenceCache,localGenerate,localSearchQueries,localPublicSearchQueries,localTranslation,localServiceUrl,localSearchActive} from '@/lib/ai/local';
 const fetcher=vi.fn();
 beforeEach(()=>{settings.enabled='1';clearLocalInferenceCache();fetcher.mockReset();vi.stubGlobal('fetch',fetcher);});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs();});
 const answer=(value:unknown)=>new Response(JSON.stringify({done:true,message:{content:JSON.stringify(value)}}));
 describe('local intelligence boundary',()=>{
+ it('gives simultaneous search priority over a background reservation before fetch starts',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['kitchen organizer']}));
+  const jobs=await Promise.all([localTranslation('pending background','ar',45000,{priority:'background'}),localSearchQueries('منظم المطبخ')]);
+  expect(jobs).toEqual([null,['kitchen organizer']]);expect(fetcher).toHaveBeenCalledOnce();
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).model).toBe('trbhh-local:search');
+ });
+ it('activates supplier search independently from the translation model',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['kitchen organizer']}));
+  await localSearchQueries('منظم المطبخ');
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).model).toBe('trbhh-local:search');
+ });
+ it('search cancels background work and takes priority without parallel model requests',async()=>{
+  fetcher.mockImplementationOnce((_url,init)=>new Promise((_resolve,reject)=>init.signal.addEventListener('abort',()=>reject(Error('cancelled')))));
+  const background=localTranslation('background','ar',45000,{priority:'background'});
+  await vi.waitFor(()=>expect(fetcher).toHaveBeenCalledOnce());
+  fetcher.mockImplementationOnce(async()=>{expect(localSearchActive()).toBe(true);return answer({queries:['kitchen organizer']});});
+  const search=localSearchQueries('منظم المطبخ');
+  expect(await background).toBeNull();expect(await search).toEqual(['kitchen organizer']);expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(localSearchActive()).toBe(false);
+ });
  it('shares one intelligent answer across forty simultaneous visitors',async()=>{
   let release!:(response:Response)=>void;fetcher.mockImplementation(()=>new Promise<Response>(resolve=>{release=resolve;}));
   const jobs=Array.from({length:40},()=>localSearchQueries('شي يرتب لي أدوات المطبخ'));
@@ -28,7 +48,7 @@ describe('local intelligence boundary',()=>{
   fetcher.mockResolvedValue(answer({translation:'قميص قطني'}));
   expect(await localTranslation('Cotton shirt','ar')).toBe('قميص قطني');
   const [url,init]=fetcher.mock.calls[0];expect(url).toBe('http://ollama:11434/api/chat');expect(init.redirect).toBe('error');
-  expect(JSON.parse(init.body)).toMatchObject({model:'trbhh-local:active',stream:false,think:false});
+  expect(JSON.parse(init.body)).toMatchObject({model:'trbhh-local:translation',stream:false,think:false});
   const body=JSON.parse(init.body);expect(body.messages.map((m:{role:string})=>m.role)).toEqual(['system','user']);
   expect(body.messages[0].content).toContain('untrusted');expect(body.messages[1].content).toContain('Cotton shirt');
  });

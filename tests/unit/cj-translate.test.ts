@@ -1,10 +1,11 @@
+import * as glossary from '@/lib/cj/glossary';
 import {createHash} from 'node:crypto';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 
 vi.mock('@/lib/settings',()=>({getSetting:async(_key:string,fallback:string)=>fallback}));
 const db=vi.hoisted(()=>({findMany:vi.fn(),upsert:vi.fn()}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:db}}));
-import {getCachedArabic,isArabicText,learnTranslation,translateManyCached,translateToArabic,translateToArabicCached} from '@/lib/cj/translate';
+import {getCachedArabic,isArabicText,learnTranslation,translateManyCached,translateToArabic,translateToArabicCached,prepareArabicTranslation} from '@/lib/cj/translate';
 
 import {clearLocalInferenceCache} from '@/lib/ai/local';
 const fetchMock=vi.fn();let clock=Date.now();
@@ -156,4 +157,22 @@ describe('CJ Arabic translation integrity',()=>{
     expect(result.has(source)).toBe(true);expect(result.get(mixed)).toBe('ترجمة عربية مكتملة');
     expect(fetchMock.mock.calls.map(([_url,init])=>{const b=JSON.parse(init.body);return b.messages?JSON.parse(b.messages[1].content.split('Input data: ')[1]).text:b.q;}).join('')).toContain('tail');
   });
+});
+
+it('background preparation keeps manual corrections and never calls a provider for them',async()=>{
+ await learnTranslation('Cotton shirt','تصحيح يدوي');fetchMock.mockClear();
+ expect(await prepareArabicTranslation('Cotton shirt')).toBe('تصحيح يدوي');expect(fetchMock).not.toHaveBeenCalled();
+});
+it('background smart preparation never falls back to another provider or caches partial results',async()=>{
+ fetchMock.mockImplementation(async()=>memory('Untranslated English'));
+ expect(await prepareArabicTranslation('Cotton shirt')).toBeNull();expect(fetchMock).toHaveBeenCalledOnce();expect(db.upsert).not.toHaveBeenCalled();
+});
+
+it('background model receives the exact original source without glossary rewriting',async()=>{
+ const substitute=vi.spyOn(glossary,'glossarySubstitute').mockResolvedValue('نص بديل من المسرد');
+ const source='Original cotton shirt with USB connector';
+ expect(await prepareArabicTranslation(source)).toBe('ترجمة عربية مكتملة');
+ expect(substitute).not.toHaveBeenCalled();
+ const body=JSON.parse(fetchMock.mock.calls[0][1].body);
+ expect(JSON.parse(body.messages[1].content.split('Input data: ')[1]).text).toBe(source);
 });

@@ -60,7 +60,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     expect(html).toContain('بحث بالاسم');
   });
   it.each([{}, {ar:'0'}, {detail:'PID-1'}])('reading browse %j never translates or writes on the server',async params=>{
-    const html=await browse(params);expect(html).toContain('الترجمة فورية عند التحميل');
+    const html=await browse(params);expect(html).toContain('تظهر الترجمات المحفوظة مباشرة');expect(html).toContain('وتُجهّز النصوص الناقصة في الخلفية');
     // الترجمة الفورية تحدث في المتصفح (CjText)؛ خادم GET لا يستدعي مزوّد الترجمة ولا يكتب.
     expect(state.read).toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
   });

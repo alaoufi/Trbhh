@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { constantSecret } from '@/lib/suppliers/crypto';
-import { warmCjTranslations } from '@/lib/cj/translate-warm';
+import { runArabicTranslationWorker } from '@/lib/cj/translation-queue';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/**
- * تهيئة الترجمات المجدولة (كرون أسبوعي داخلي) — تترجم شجرة التصنيفات وحقول السلع
- * المستوردة الناقصة وتخزّنها على الخادم، فيصبح التصفّح سريعاً وآمناً. مصادقة Bearer
- * بنفس سر التسوية الداخلي. قراءة فقط، لا شراء ولا تعديل بيانات المصدر.
- * جدولة مقترحة (على الخادم): أسبوعياً، مثال crontab:
- *   0 3 * * 1  curl -sS -X POST -H "Authorization: Bearer $SUPPLIER_RECONCILE_SECRET" https://trbhh.sa/api/internal/cj/translate
- */
+/** Authenticated bounded text-cache worker; never reads or writes product metadata. */
 export async function POST(request: Request) {
   const secret = process.env.SUPPLIER_RECONCILE_SECRET || '';
   const headers = { 'Cache-Control': 'no-store' };
@@ -22,8 +16,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers });
   }
   try {
-    return NextResponse.json({ ok: true, warmed: await warmCjTranslations() }, { headers });
+    return NextResponse.json({ ok: true, worker: await runArabicTranslationWorker() }, { headers });
   } catch {
-    return NextResponse.json({ error: 'warm_unavailable' }, { status: 503, headers });
+    return NextResponse.json({ error: 'worker_unavailable' }, { status: 503, headers });
   }
 }

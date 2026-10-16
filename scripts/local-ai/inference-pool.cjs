@@ -1,5 +1,6 @@
 /* One model execution per process; identical requests share work, never queue distinct misses. */
-function createInferencePool(){
+function createInferencePool(options={}){
+ const maxWaitMs=Number.isFinite(options.maxWaitMs)?Math.min(45000,Math.max(15000,options.maxWaitMs)):15000;
  const cache=new Map();let bytes=0,active=null,epoch=0;
  const counts={executions:0,coalesced:0,cacheHits:0,busy:0,waitersRejected:0};
  function clear(){cache.clear();bytes=0;epoch++;}
@@ -28,7 +29,7 @@ function createInferencePool(){
    }).catch(()=>null).finally(()=>{if(active===current)active=null;});
   }
   job.waiters++;let timer;
-  try{return await Promise.race([job.promise,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),Math.min(15000,budgetMs));})]);}
+  try{return await Promise.race([job.promise,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),Math.min(maxWaitMs,budgetMs));})]);}
   finally{clearTimeout(timer);job.waiters--;}
  }
  return {run,clear,stats:()=>({...counts,active:active?1:0,waiters:active?.waiters||0,entries:cache.size,bytes})};

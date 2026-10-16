@@ -1,6 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 
-const state=vi.hoisted(()=>({keys:new Set<string>(),list:vi.fn(),detail:vi.fn(),translate:vi.fn(),write:vi.fn(),audit:vi.fn(),refresh:vi.fn()}));
+const state=vi.hoisted(()=>({keys:new Set<string>(),list:vi.fn(),detail:vi.fn(),translate:vi.fn(),write:vi.fn(),audit:vi.fn(),refresh:vi.fn(),setting:vi.fn()}));
+vi.mock('@/lib/settings',()=>({getSetting:vi.fn(),setSetting:state.setting}));
 vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw Error('redirect:'+url);}}));
 vi.mock('next/cache',()=>({revalidatePath:state.refresh}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:async(module:string,action:string)=>{if(!state.keys.has(`${module}:${action}`))throw Error('access_denied');return {uid:9};},hasAccess:vi.fn()}));
@@ -19,7 +20,7 @@ vi.mock('@/lib/cj/translate-warm',()=>({warmCjTranslations:state.write,refreshCj
 vi.mock('@/lib/cj/storefront',()=>({cjStorefrontPublic:vi.fn(),setCjStorefrontPublic:state.write}));
 vi.mock('@/lib/cj/access',()=>({cjProductCapabilities:vi.fn()}));
 vi.mock('@/lib/cj/agents',()=>({getAgent:vi.fn(),defaultAgentWeeklyQuota:vi.fn(),upsertAgent:state.write,setDefaultAgentWeeklyQuota:state.write,setAgentActive:state.write,assignProductAgent:state.write,unassignProductAgent:state.write}));
-import {translateCjBrowsePage} from '@/app/admin/suppliers/cj/actions';
+import {translateCjBrowsePage,saveCjTranslationSettings} from '@/app/admin/suppliers/cj/actions';
 
 const product=(index:number)=>({pid:`PID-${index}`,productName:`Source product ${index}`,categoryName:`Source category ${index}`});
 function form(values:Record<string,string|undefined>={}){const out=new FormData();for(const [key,value] of Object.entries({page:'2',q:'private-query',cat:'CAT_2',back:'/admin/suppliers/cj/browse?page=2',...values}))if(value!==undefined)out.set(key,value);return out;}
@@ -31,6 +32,18 @@ beforeEach(()=>{
 });
 
 describe('explicit CJ browse translation action',()=>{
+  it('requires settings access before changing background flags',async()=>{
+    await expect(saveCjTranslationSettings(form({localAiEnabled:'1',backgroundTranslationEnabled:'1'}))).rejects.toThrow('access_denied');
+    expect(state.setting).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
+  });
+  it('changes only explicitly supplied intelligence settings without touching products',async()=>{
+    state.keys=new Set(['integrations:view','integrations:manage_settings']);
+    await expect(saveCjTranslationSettings(form({localAiEnabled:'1',backgroundTranslationEnabled:'1'}))).rejects.toThrow('transcfg=1');
+    expect(state.setting.mock.calls).toEqual([['local_ai_enabled','1'],['local_ai_background_translation_enabled','1']]);expect(state.write).not.toHaveBeenCalled();
+    state.setting.mockClear();
+    await expect(saveCjTranslationSettings(form({localAiEnabled:'1'}))).rejects.toThrow('transcfg=1');
+    expect(state.setting.mock.calls).toEqual([['local_ai_enabled','1']]);
+  });
   it.each([[],['products:view'],['products:edit'],['integrations:view','integrations:manage_settings']].map(keys=>({keys})))('rejects insufficient grants $keys before supplier or translation calls',async({keys})=>{
     state.keys=new Set(keys);await expect(translateCjBrowsePage(form())).rejects.toThrow('access_denied');
     expect(state.list).not.toHaveBeenCalled();expect(state.detail).not.toHaveBeenCalled();expect(state.translate).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();expect(state.audit).not.toHaveBeenCalled();

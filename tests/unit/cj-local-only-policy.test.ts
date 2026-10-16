@@ -6,8 +6,10 @@ afterEach(()=>vi.unstubAllGlobals());
 it('never uses a saved external translator or cloud fallbacks during local outage',async()=>{
  const fetcher=vi.fn(async()=>new Response('offline',{status:503}));vi.stubGlobal('fetch',fetcher);
  expect(await translateToArabic('Cotton shirt')).toBeNull();
+ const beforeDisplay=fetcher.mock.calls.length;
  expect(await translateToArabicForDisplay('Cotton shirt')).toBeNull();
+ expect(fetcher).toHaveBeenCalledTimes(beforeDisplay);
  expect(await translateArabicToEnglish('قميص قطني')).toBeNull();
- expect(fetcher).toHaveBeenCalledTimes(3);
+ expect(fetcher).toHaveBeenCalledTimes(2);
  expect(fetcher.mock.calls.every(call=>String((call as unknown[])[0]).startsWith('http://ollama:11434/'))).toBe(true);
 });

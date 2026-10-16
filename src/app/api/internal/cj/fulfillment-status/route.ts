@@ -5,6 +5,7 @@ import {reconcileCjFulfillment} from '@/lib/cj/fulfillment/status';
 import {reconcileCjSettlementForFulfillment} from '@/lib/cj/settlements';
 import {reconcileCjFulfillmentPayment} from '@/lib/cj/fulfillment';
 import {getCjOrderDetailBatch} from '@/lib/cj/client';
+import {deliverSupplierNotices} from '@/lib/suppliers/tracking';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=120;
@@ -33,4 +34,10 @@ export async function POST(request:Request){
   // Keep the installed host runner's checked=0/1 contract; expose order count separately.
   return NextResponse.json({checked:1,ordersChecked:checked},{headers});
  }catch{return fail('cj_status_unavailable',503);}
+ finally{
+  // The standalone CJ timer also drains the existing atomic in-app outbox.
+  // Delivery is local, remains available with purchasing disabled, and retries
+  // on later ticks if its transaction fails; it never authorizes supplier writes.
+  try{await deliverSupplierNotices(prisma,20);}catch{/* Durable pending rows remain for retry. */}
+ }
 }

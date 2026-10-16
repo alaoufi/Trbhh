@@ -58,6 +58,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
 
   const [catsRes,supplierRes]=await Promise.all([getCategories(),getCjCatalogSuppliers()]);
   const localAiEnabled=await getSetting('local_ai_enabled','1');
+  const backgroundTranslationEnabled=await getSetting('local_ai_background_translation_enabled','0');
   const categories = catsRes.ok ? catsRes.data : [];
   // CJ indexes product names in its source language, while admins commonly
   // search using the saved Arabic display title. Translate only the query;
@@ -187,12 +188,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {/* بحث + فلترة بأقسام البضائع — القسم يُطبَّق فوراً عند الاختيار (بلا زر عرض) */}
       <BrowseFilter suppliers={supplierRes.ok?supplierRes.data:[]} filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: 'كل أقسام المصدر' }, ...categoryOptions]} />
       {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
-      <p className="text-xs text-muted-foreground">الترجمة فورية عند التحميل؛ أي كلمة بقيت بلغتها اضغط عليها لجلب ترجمتها. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
+      <p className="text-xs text-muted-foreground">تظهر الترجمات المحفوظة مباشرة، وتُجهّز النصوص الناقصة في الخلفية عند تفعيلها. أعد تحميل الصفحة لاحقًا لعرض المكتمل. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">إعدادات الذكاء والترجمة المحلية</summary>
         <form action={saveCjTranslationSettings} className="mt-3 space-y-3">
           <input type="hidden" name="back" value="/admin/suppliers/cj/browse" />
           <p className="text-sm">فهم معنى البحث وصياغة عبارة تصف السلعة وترجمة النصوص داخل خادم تربح. لا تُستخدم خدمات ذكاء أو ترجمة خارجية. النموذج النشط يُحدّث بعد اجتياز فحصه، وتبقى التصحيحات اليدوية محفوظة.</p>
           <label className="block">محرك الذكاء المحلي <select name="localAiEnabled" defaultValue={localAiEnabled} className="rounded-lg border p-2"><option value="1">مفعّل عند جاهزية الخدمة المحلية</option><option value="0">معطّل — استخدام المسرد والمترجم المحلي فقط</option></select></label>
+          <label className="block">تجهيز الترجمة في الخلفية <select name="backgroundTranslationEnabled" defaultValue={backgroundTranslationEnabled} className="rounded-lg border p-2"><option value="0">متوقف</option><option value="1">مفعّل عند جاهزية النموذج والجدولة المحلية</option></select></label>
           <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ</SubmitButton>
         </form>
       </details></AccessBoundary>

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSetting } from '@/lib/settings';
 import { glossaryExact, glossarySubstitute } from './glossary';
 
-import {localTranslation,localServiceUrl} from '@/lib/ai/local';
+import {localTranslation,localServiceUrl,localSearchActive} from '@/lib/ai/local';
 
 /** Local-only translation. Existing manual corrections and caches retain precedence. */
 export const DEFAULT_LIBRETRANSLATE_URL='http://libretranslate:5000';
@@ -103,9 +103,9 @@ async function viaLibreTranslate(text: string, deadline: number): Promise<string
 }
 
 /** Local model returns structured translation; no external provider fallback. */
-async function viaLocal(text:string,deadline:number):Promise<string|null> {
+async function viaLocal(text:string,deadline:number, background=false):Promise<string|null> {
  const remaining=deadline-Date.now();if(remaining<=0)return null;
- const translated=await localTranslation(text,'ar',Math.min(TIMEOUT_MS,remaining));
+ const translated=await localTranslation(text,'ar',Math.min(background?45_000:TIMEOUT_MS,remaining),background?{priority:'background'}:undefined);
  return translated&&validOutput(translated)?translated:null;
 }
 
@@ -148,20 +148,21 @@ export async function translateArabicToEnglish(text: string | null | undefined):
 }
 
 /** Full-source translation is all-or-nothing; a failed chunk cannot become a cached description. */
-async function translateRaw(text: string): Promise<string | null> {
-  const deadline = Date.now() + TRANSLATION_BUDGET_MS;
+async function translateRaw(text: string, budgetMs = TRANSLATION_BUDGET_MS, background = false): Promise<string | null> {
+  const deadline = Date.now() + budgetMs;
   // يطبّق المسرد (استبدال المصطلحات المعروفة بالعربية) قبل الترجمة الآلية؛ إن أصبح
   // النص كله عربياً بفضل المسرد فلا حاجة لنداء المترجم.
-  const prepared = await glossarySubstitute(text);
+  const prepared = background ? text : await glossarySubstitute(text);
   if (isArabicText(prepared)) return prepared;
   const chunks = sourceChunks(prepared);
   if (!chunks?.length) return null;
   const translated: string[] = [];
   for (const chunk of chunks) {
+    if (background && localSearchActive()) return null;
     if (Date.now() >= deadline) return null;
     await throttle();
     if (Date.now() >= deadline) return null;
-    const result = (await viaLocal(chunk, deadline)) ?? (await viaLibreTranslate(chunk, deadline));
+    const result = (await viaLocal(chunk, deadline, background)) ?? (background ? null : await viaLibreTranslate(chunk, deadline));
     if (!result || Date.now() >= deadline) return null;
     translated.push(result);
   }
@@ -276,52 +277,35 @@ export async function translateManyCached(texts: (string | null | undefined)[], 
  */
 const displayKeyOf = (src: string) => createHash('sha1').update('en:ar:disp-v1:' + src).digest('hex');
 
-async function translateEnToArLoose(src:string):Promise<string|null> {
- const deadline=Date.now()+TIMEOUT_MS+6000;
- const generated=await localTranslation(src,'ar',TIMEOUT_MS);
- if(generated&&meaningfulArabic(generated))return generated;
- return viaLibreTranslate(src,deadline);
+/** Background preparation writes only the automatic translation cache. */
+export async function prepareArabicTranslation(src: string, budgetMs = 50_000): Promise<string | null> {
+  if (!src || Buffer.byteLength(src, 'utf8') > MAX_SOURCE_BYTES) return null;
+  const hit = (await getCachedArabic([src])).get(src);
+  if (hit) return hit;
+  const translated = await translateRaw(src, Math.min(50_000, Math.max(0, budgetMs)), true);
+  return translated ? saveAutomaticTranslation(src, translated) : null;
 }
 
-/** ترجمة نص للعرض (متساهلة) مع تخزين. تُفضّل المخزَّن الصارم (ترجمة يدوية سليمة) ثم العرض. */
+/** Display reads saved translations and queues missing text without inference. */
 export async function translateToArabicForDisplay(text: string | null | undefined): Promise<string | null> {
   const src = (text ?? '').trim();
   if (!src) return null;
   if (isArabicText(src)) return src;
-  const strict = (await getCachedArabic([src])).get(src);
-  if (strict) return strict;
-  try { const row = await prisma.cj_translations.findUnique({ where: { source_key: displayKeyOf(src) }, select: { target_ar: true } }); if (row && meaningfulArabic(row.target_ar)) return row.target_ar; } catch { /* المخزن غير جاهز */ }
-  const loose = await translateEnToArLoose(src).catch(() => null);
-  if (!loose) return null;
-  try { await prisma.cj_translations.upsert({ where: { source_key: displayKeyOf(src) }, create: { source_key: displayKeyOf(src), target_ar: loose }, update: { target_ar: loose } }); } catch { /* تجاهل */ }
-  return loose;
+  return (await translateManyForDisplay([src], 1)).get(src) ?? null;
 }
 
-/** نسخة دفعة للعرض: تقرأ المخزَّن (الصارم + العرض) دفعةً، ثم تترجم المفقود متساهلاً. */
 export async function translateManyForDisplay(texts: (string | null | undefined)[], max = 40): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  const clean = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !isArabicText(t)))];
-  if (!clean.length) return map;
-  const strict = await getCachedArabic(clean);
-  for (const [k, v] of strict) map.set(k, v);
-  const needDisplay = clean.filter((s) => !map.has(s));
-  if (needDisplay.length) {
+  const clean = [...new Set(texts.slice(0, 100).map(t => (t ?? '').trim()).filter(t => t && Buffer.byteLength(t, 'utf8') <= MAX_SOURCE_BYTES && !isArabicText(t)))];
+  const map = await getCachedArabic(clean);
+  const missing = clean.filter(s => !map.has(s));
+  if (missing.length) {
     try {
-      const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: needDisplay.map(displayKeyOf) } }, select: { source_key: true, target_ar: true } });
-      const byKey = new Map(rows.map((r) => [r.source_key, r.target_ar]));
-      for (const s of needDisplay) { const v = byKey.get(displayKeyOf(s)); if (v && meaningfulArabic(v)) map.set(s, v); }
-    } catch { /* المخزن غير جاهز */ }
-  }
-  const missing = clean.filter((s) => !map.has(s)).slice(0, Math.max(0, Math.floor(max)));
-  const CONCURRENCY = 1;
-  for (let i = 0; i < missing.length; i += CONCURRENCY) {
-    const batch = missing.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(batch.map(async (s) => [s, await translateEnToArLoose(s).catch(() => null)] as const));
-    let wins = 0;
-    for (const [s, v] of results) {
-      if (v) { wins++; map.set(s, v); prisma.cj_translations.upsert({ where: { source_key: displayKeyOf(s) }, create: { source_key: displayKeyOf(s), target_ar: v }, update: { target_ar: v } }).catch(() => {}); }
-    }
-    if (wins === 0) break; // قاطع دائرة
+      const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: missing.map(displayKeyOf) } }, select: { source_key: true, target_ar: true } });
+      const saved = new Map(rows.map(row => [row.source_key, row.target_ar]));
+      for (const text of missing) { const value = saved.get(displayKeyOf(text)); if (value && validOutput(value)) map.set(text, value); }
+    } catch { /* Cache unavailable: retain original source. */ }
+    const { enqueueArabicTranslations } = await import('./translation-queue');
+    await enqueueArabicTranslations(missing.filter(s => !map.has(s)).slice(0, Number.isFinite(max) ? Math.max(0, Math.min(100, Math.floor(max))) : 0));
   }
   return map;
 }

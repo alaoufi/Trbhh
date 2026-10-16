@@ -1,6 +1,17 @@
 import {createRequire} from 'node:module';
 import {expect,it,vi} from 'vitest';
 const {createInferencePool}=createRequire(import.meta.url)('../../scripts/local-ai/inference-pool.cjs');
+it('extends only explicitly configured background waits while keeping the default ceiling',async()=>{
+ vi.useFakeTimers();
+ try{
+  const normal=createInferencePool(),background=createInferencePool({maxWaitMs:45000});let release!:(value:unknown)=>void;
+  const first=normal.run('normal',()=>new Promise(()=>{}),45000);
+  const second=background.run('background',()=>new Promise(resolve=>{release=resolve;}),45000);
+  let completed=false;void second.then(()=>{completed=true;});
+  await vi.advanceTimersByTimeAsync(15001);expect(await first).toBeNull();expect(completed).toBe(false);
+  release({translation:'نص'});expect(await second).toEqual({translation:'نص'});
+ }finally{vi.useRealTimers();}
+});
 it('serves forty identical simultaneous searches with one model execution',async()=>{
  const pool=createInferencePool();let release!:(value:unknown)=>void;
  const work=vi.fn(()=>new Promise(resolve=>{release=resolve;}));

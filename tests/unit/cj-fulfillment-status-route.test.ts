@@ -1,5 +1,6 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const mock=vi.hoisted(()=>({query:vi.fn(),update:vi.fn(),reconcile:vi.fn(),payment:vi.fn(),sync:vi.fn(),batch:vi.fn()}));
+const mock=vi.hoisted(()=>({query:vi.fn(),update:vi.fn(),reconcile:vi.fn(),payment:vi.fn(),sync:vi.fn(),batch:vi.fn(),notices:vi.fn()}));
+vi.mock('@/lib/suppliers/tracking',()=>({deliverSupplierNotices:mock.notices}));
 vi.mock('@/lib/cj/settlements',()=>({reconcileCjSettlementForFulfillment:mock.sync}));
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:mock.query,$executeRaw:mock.update}}));
 vi.mock('@/lib/cj/fulfillment/status',()=>({reconcileCjFulfillment:mock.reconcile}));
@@ -10,6 +11,10 @@ const secret='fixture-cj-status-secret-at-least-32';
 const req=(authorization=`Bearer ${secret}`)=>new Request('https://trbhh.sa/api/internal/cj/fulfillment-status',{method:'POST',headers:{authorization}});
 beforeEach(()=>{vi.resetAllMocks();vi.stubEnv('SUPPLIER_RECONCILE_SECRET',secret);vi.stubEnv('CJ_ALLOW_LIVE_ORDERS','false');mock.query.mockResolvedValue([{id:8n,cj_order_id:'CJ8',supplier_reference:'REF8'}]);mock.batch.mockResolvedValue({ok:true,data:[{orderId:'CJ8',orderNum:'REF8',paymentDate:'2026-10-15 10:00:00'}]});mock.update.mockResolvedValue(1);});
 describe('CJ periodic authenticated batch reconciliation',()=>{
+ it('flushes existing durable inbox notices after reconciliation with purchasing disabled',async()=>{await POST(req());expect(mock.notices).toHaveBeenCalledOnce();expect(mock.notices.mock.calls[0][1]).toBe(20);expect(mock.notices.mock.invocationCallOrder[0]).toBeGreaterThan(mock.sync.mock.invocationCallOrder[0]);});
+ it('flushes pending notices even when no CJ order needs polling or the provider is unavailable',async()=>{mock.query.mockResolvedValueOnce([]);expect((await POST(req())).status).toBe(200);expect(mock.notices).toHaveBeenCalledTimes(1);mock.batch.mockResolvedValue({ok:false});expect((await POST(req())).status).toBe(503);expect(mock.notices).toHaveBeenCalledTimes(2);});
+ it('does not touch inbox delivery for unauthorized callers',async()=>{await POST(req('Bearer wrong'));expect(mock.notices).not.toHaveBeenCalled();});
+ it('retains reconciliation response if inbox delivery needs a later retry',async()=>{mock.notices.mockRejectedValue(Error('private-db-details'));const response=await POST(req());expect(response.status).toBe(200);expect(await response.json()).toEqual({checked:1,ordersChecked:1});});
  it('refreshes payments, shipments and accounting while new purchases are disabled',async()=>{const r=await POST(req());expect(r.status).toBe(200);expect(await r.json()).toEqual({checked:1,ordersChecked:1});expect(mock.batch).toHaveBeenCalledExactlyOnceWith(['CJ8']);expect(mock.payment).toHaveBeenCalledWith('8',expect.objectContaining({orderId:'CJ8'}));expect(mock.sync).toHaveBeenCalledWith('8');expect(mock.sync.mock.invocationCallOrder[0]).toBeGreaterThan(mock.payment.mock.invocationCallOrder[0]);});
  it('rejects invalid bearer before DB or API reads',async()=>{expect((await POST(req('Bearer wrong'))).status).toBe(401);expect(mock.query).not.toHaveBeenCalled();});
  it('never accepts missing or wrong-reference batch members as verified',async()=>{mock.batch.mockResolvedValue({ok:true,data:[{orderId:'CJ8',orderNum:'WRONG'}]});expect((await POST(req())).status).toBe(503);expect(mock.payment).not.toHaveBeenCalled();expect(mock.sync).not.toHaveBeenCalled();});

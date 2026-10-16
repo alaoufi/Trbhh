@@ -2,6 +2,17 @@ import {describe,it,expect,vi} from 'vitest';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {deliverSupplierNotices} from '@/lib/suppliers/tracking';
 describe('shipping legacy inbox bridge',()=>{
+ it('delivers a CJ notice once across repeated timer ticks using its durable pending state',async()=>{
+  let pending=true,inboxCopies=0;
+  const tx={
+   $queryRaw:async(s:TemplateStringsArray)=>s.join('?').includes('site_settings')?[]:pending?[{id:4n,order_id:2n,member_id:3n}]:[],
+   $executeRaw:async(s:TemplateStringsArray)=>{const sql=s.join('?');if(sql.includes('INSERT INTO notfications'))inboxCopies++;if(sql.includes("status='sent'"))pending=false;return 1;},
+  };
+  const db={$transaction:async(fn:(t:unknown)=>unknown)=>fn(tx)} as unknown as CommerceDb;
+  expect(await deliverSupplierNotices(db,20)).toBe(1);
+  expect(await deliverSupplierNotices(db,20)).toBe(0);
+  expect(inboxCopies).toBe(1);
+ });
  it.each([0,21,-1,1.5])('rejects unbounded/invalid limit %s',async limit=>{
   const db={$transaction:vi.fn()} as unknown as CommerceDb;await expect(deliverSupplierNotices(db,limit)).rejects.toThrow();expect(db.$transaction).not.toHaveBeenCalled();
  });

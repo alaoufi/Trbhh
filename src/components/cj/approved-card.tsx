@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ShareButtons } from '@/components/share-buttons';
+import { primaryOrigin } from '@/lib/public-origin';
 import type { ApprovedPreview } from '@/lib/cj/approved-catalog';
 import { cjPriceLabel } from '@/lib/cj/presentation';
 import { PriceText } from '@/components/price-text';
@@ -14,5 +16,5 @@ export function CjApprovedCard({ product }: { product: ApprovedPreview }) {
       {!product.cjSourceId&&<p className="mt-auto"><PriceText>{cjPriceLabel(product.priceMinor)}</PriceText></p>}
       <span className="text-xs text-slate-500">معاينة التفاصيل</span>
     </div>
-  </Link>{product.cjPid&&product.cjSourceId&&<div className="p-3"><CjLiveNumbers pid={product.cjPid} productId={Number(product.cjSourceId)}/></div>}</div>;
+  </Link>{product.cjPid&&product.cjSourceId&&<div className="p-3"><CjLiveNumbers pid={product.cjPid} productId={Number(product.cjSourceId)}/></div>}<div className="border-t p-2"><ShareButtons compact url={`${primaryOrigin}${product.href}`} title={product.title}/></div></div>;
 }

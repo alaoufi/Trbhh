@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ShareButtons } from '@/components/share-buttons';
+import { primaryOrigin } from '@/lib/public-origin';
 import { BadgeCheck, ChevronDown } from 'lucide-react';
 import type { CjProductRow } from '@/lib/cj/mapping';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
@@ -41,6 +43,7 @@ export function CjProductCard({ product }: { product: CjProductRow }) {
     </details>}
     <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2.5 py-1.5 text-[10px] text-slate-500 sm:px-3">
       <span className="inline-flex min-w-0 items-center gap-1"><BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />تربح</span>
+      <ShareButtons compact url={`${primaryOrigin}/cj/${product.id}`} title={product.name_ar || product.name} />
     </div>
   </div>;
 }

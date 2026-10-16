@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ShareButtons } from '@/components/share-buttons';
+import { primaryOrigin } from '@/lib/public-origin';
 import { notFound } from 'next/navigation';
 import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck, ChevronDown } from 'lucide-react';
 import { getSession } from '@/lib/auth';
@@ -90,6 +92,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-2.5">
         {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl"><CjText original={p.name} ar={title}/></h1>
+        <ShareButtons compact url={`${primaryOrigin}/cj/${id}`} title={title}/>
         {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) — يُخفى إن لم تُسعّر السلعة بعد. */}
 
         {/* عدد عمليات الشراء الحقيقية — يظهر فقط من أول عملية فعلية (بلا تزييف). */}

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ShareButtons } from '@/components/share-buttons';
+import { primaryOrigin } from '@/lib/public-origin';
 import { notFound,redirect } from 'next/navigation';
 import { getApprovedPreview } from '@/lib/cj/approved-catalog';
 import { cjStorefrontView } from '@/lib/cj/storefront';
@@ -23,6 +25,7 @@ export default async function ApprovedPreviewPage({ params }: { params: Promise<
       <section className="min-w-0 space-y-4" aria-label="معلومات السلعة المعتمدة">
         <p className="text-xs font-semibold text-slate-500">سلعة معتمدة للبيع باسم تربح</p>
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{product.title}</h1>
+        <ShareButtons compact url={`${primaryOrigin}${product.href}`} title={product.title}/>
         <p><PriceText size="detail">{cjPriceLabel(product.priceMinor)}</PriceText></p>
         <p className="text-sm leading-7 text-slate-600">السعر من الكتالوج المعتمد. تكلفة الشحن والضريبة وشروط الطلب النهائية لا تُحسَب في هذه المعاينة.</p>
         <p className="text-sm text-slate-600">{product.stock > 0 ? 'توجد كمية مسجلة في الكتالوج؛ لا يتم حجزها في المعاينة.' : 'لا توجد كمية متاحة مسجلة حاليًا.'}</p>

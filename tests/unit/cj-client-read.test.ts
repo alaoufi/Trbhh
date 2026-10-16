@@ -215,6 +215,7 @@ describe('CJ authentication and verified connection', () => {
 });
 
 describe('CJ inventory identity', () => {
+  it('preserves the product declared option schema for every variant',async()=>{mock.fetch.mockResolvedValueOnce(success({pid:'p',productNameEn:'Shoes',productKeyEn:'Color-Size',variants:[{vid:'v1',variantSku:'S1',variantKey:'Purple-US 12.5'}]}));const {getProduct}=await import('@/lib/cj/client');expect(await finish(getProduct('p'))).toMatchObject({ok:true,data:{optionSchema:['Color','Size'],variants:[{vid:'v1',optionSchema:['Color','Size'],variantKey:'Purple-US 12.5'}]}});});
   it('keeps structured option attributes and skips empty display aliases',async()=>{mock.fetch.mockResolvedValueOnce(success([{vid:'v1',variantSku:'S1',variantNameEn:'',variantName:'Purple 36',variantKey:'',variantKeyEn:'Purple-36',options:[{name:'Color',value:'Purple'},{name:'Size',value:'36'}]}]));const {getVariants}=await import('@/lib/cj/client');expect(await finish(getVariants('p'))).toMatchObject({ok:true,data:[{vid:'v1',variantName:'Purple 36',variantKey:'Purple-36',attributes:{options:[{name:'Color',value:'Purple'},{name:'Size',value:'36'}]}}]});});
   it('reads current tracking API and selects only the requested identity', async () => {
     mock.fetch.mockResolvedValueOnce(success([{trackingNumber:'OTHER',trackingStatus:'Delivered'}, {trackingNumber:'T1',logisticName:'CJPacket',trackingStatus:'In transit',lastMileCarrier:'Local carrier',lastTrackNumber:'LAST1'}]));

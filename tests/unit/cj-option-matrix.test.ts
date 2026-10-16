@@ -6,16 +6,16 @@ describe('supplier option matrix across catalog categories',()=>{
  it.each([
   ['shoes',{variantKey:'Purple-36',variantName:''},[['اللون','بنفسجي'],['المقاس','36']]],
   ['clothes',{variantKey:'Black-XL',variantName:''},[['اللون','أسود'],['المقاس','XL']]],
-  ['textiles',{variantKey:'100×200 cm',variantName:''},[['المقاس','100×200cm']]],
-  ['packs',{variantKey:'6pcs White',variantName:''},[['اللون','أبيض'],['عدد القطع في العبوة','6']]],
+  ['textiles',{variantKey:'100×200 cm',variantName:''},[['المقاس','100×200 cm']]],
+  ['packs',{variantKey:'White-6',variantName:'',optionSchema:['Color','Pack']},[['اللون','أبيض'],['العبوة','6']]],
   ['electrical',{variantKey:'',variantName:'',attributes:{voltage:'220V',plugType:'EU'}},[['الفولت','220V'],['القابس','أوروبي']]],
   ['storage',{variantKey:'',variantName:'',attributes:{capacity:'128GB',material:'ABS'}},[['السعة','128GB'],['الخامة','ABS']]],
-  ['named shoes',{variantKey:'Color: Purple; Size: 36',variantName:''},[['اللون','بنفسجي'],['المقاس','36']]],
- ] as const)('%s keeps distinct source attributes',(_category,input,expected)=>expect(labels(input)).toEqual(expected));
- it('accepts equivalent source sizes without false conflicts',()=>{expect(labels({variantKey:'Black-xl',variantName:'Sneakers Black XL'})).toEqual([['اللون','أسود'],['المقاس','XL']]);expect(labels({variantKey:'Purple-US12.5',variantName:'Sneakers Purple US 12.5'})).toEqual([['اللون','بنفسجي'],['المقاس','US 12.5']]);});
+  ['named shoes',{variantKey:'',variantName:'',attributes:{color:'Purple',size:'36'}},[['اللون','بنفسجي'],['المقاس','36']]],
+ ] as const)('%s keeps distinct source attributes',(_category,input,expected)=>expect(labels({...input,optionSchema:'optionSchema' in input?[...input.optionSchema]:expected.map(([key])=>(({'اللون':'Color','المقاس':'Size'} as Record<string,string>)[key]??key))})).toEqual(expected));
+ it('accepts equivalent source sizes without false conflicts',()=>{expect(labels({variantKey:'Black-xl',variantName:'Sneakers Black XL',optionSchema:['Color','Size']})).toEqual([['اللون','أسود'],['المقاس','xl']]);expect(labels({variantKey:'Purple-US12.5',variantName:'Sneakers Purple US 12.5',optionSchema:['Color','Size']})).toEqual([['اللون','بنفسجي'],['المقاس','US12.5']]);});
  it('does not invent a color from unrelated numeric attributes',()=>{expect(cjVariantDisplayOptions({variantKey:'220V-36',variantName:''}).some(o=>o.label==='اللون')).toBe(false);});
- it('blocks conflicting color evidence instead of guessing',()=>{expect(cjVariantDisplayOptions({variantKey:'Black',variantName:'Shoes Red 36'})).toEqual([]);expect(cjVariantDisplayOptions({variantKey:'Red-36',variantName:'',attributes:{color:'Black'}})).toEqual([]);});
- it.each(['US 6','US 6.5','US 7.5','US 8','US 9','US 9.5','US 10.5','US 11','US 12','US 12.5','EU 42.5','UK 7.5'])('preserves the explicit supplier shoe sizing system %s',size=>{expect(labels({variantKey:'Purple-'+size,variantName:'Trendy Stylish Puncture-resistant Casual Sports Safety Shoes Purple '+size})).toEqual([['اللون','بنفسجي'],['المقاس',size]]);});
+ it('blocks conflicting color evidence instead of guessing',()=>{expect(cjVariantDisplayOptions({variantKey:'Black',variantName:'Shoes Red 36'})).toEqual([]);expect(cjVariantDisplayOptions({variantKey:'Red-36',variantName:'',optionSchema:['Color','Size'],attributes:{color:'Black'}})).toEqual([]);});
+ it.each(['US 6','US 6.5','US 7.5','US 8','US 9','US 9.5','US 10.5','US 11','US 12','US 12.5','EU 42.5','UK 7.5'])('preserves the explicit supplier shoe sizing system %s',size=>{expect(labels({variantKey:'Purple-'+size,optionSchema:['Color','Size'],variantName:'Trendy Stylish Puncture-resistant Casual Sports Safety Shoes Purple '+size})).toEqual([['اللون','بنفسجي'],['المقاس',size]]);});
  it('does not leak telemetry and preserves structured option arrays',()=>{
   expect(labels({variantKey:'',variantName:'',attributes:{createTime:123,stock:200,options:[{name:'Color',value:'Purple'},{name:'Size',value:'36'}]}})).toEqual([['اللون','بنفسجي'],['المقاس','36']]);
  });

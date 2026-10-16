@@ -5,7 +5,7 @@ vi.mock('@/components/cj/cart-controls',()=>({useTrialCart:()=>({items:[],ready:
 vi.mock('@/components/cj/cj-text',()=>({CjText:()=>null}));
 import {CjPurchasePanel} from '@/components/cj/purchase-panel';
 const base={productId:281,productPid:'pid',productName:'حذاء',accountId:1,isStaff:true};
-const variant=(vid:string,key:string)=>({vid,variantSku:'SKU'+vid,variantName:key,variantKey:key,variantSellPrice:1,variantWeight:470,variantImage:null});
+const variant=(vid:string,key:string)=>({vid,variantSku:'SKU'+vid,variantName:key,variantKey:key,optionSchema:['Color','Size'],variantSellPrice:1,variantWeight:470,variantImage:null});
 describe('readable purchase attributes before any cart insertion',()=>{
  it('renders separate color and size fields and starts disabled',()=>{
   const html=renderToStaticMarkup(createElement(CjPurchasePanel,{...base,variants:[variant('v1','Purple-36'),variant('v2','Purple-37')]}));

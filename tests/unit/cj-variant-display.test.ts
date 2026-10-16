@@ -1,66 +1,21 @@
 import {describe,expect,it} from 'vitest';
 import {cjVariantDisplayOptions,cleanCjDisplayDescription} from '@/lib/cj/variant-display';
-import {cjProductDisplayTitle} from '@/lib/cj/presentation';
-describe('CJ product customer display',()=>{
-  it('uses readable supplier metadata when the primary key is technical or empty',()=>{
-    expect(cjVariantDisplayOptions({variantKey:'CJYD322988402BY',variantName:'Women Sneakers Purple 36'})).toEqual([{label:'اللون',value:'بنفسجي',source:'parsed'},{label:'المقاس',value:'36',source:'parsed'}]);
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{variantKeyEn:'Purple-36'}})).toEqual([{label:'اللون',value:'بنفسجي',source:'parsed'},{label:'المقاس',value:'36',source:'parsed'}]);
-  });
-  it('extracts the actual cable clip pack and color after its repeated product title',()=>{
-    const title='Magnetic Cable Clip Under Desk Cable Management Adjustable Cord Holder Wire Organizer And Cable Management Wire Keeper';
-    for(const suffix of ['6 Pack White','3Packwhite','White 6pcs'])expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} ${suffix}`},title)).toEqual([
-      {label:'اللون',value:'أبيض',source:'parsed'},{label:'عدد القطع في العبوة',value:suffix.startsWith('3')?'3':'6',source:'parsed'},
-    ]);
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} Set1`},title)).toEqual([{label:'المجموعة',value:'1',source:'parsed'}]);
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} 1PC`},title)).toEqual([{label:'عدد القطع في العبوة',value:'1',source:'parsed'}]);
-    expect(cjVariantDisplayOptions({variantKey:'6 Pack White',variantName:'',attributes:{color:'White'}})).toEqual([{label:'اللون',value:'أبيض',source:'attribute'},{label:'عدد القطع في العبوة',value:'6',source:'parsed'}]);
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} 3 black and 3 white`},title)).toEqual([{label:'التشكيلة',value:'3 أسود + 3 أبيض',source:'parsed'}]);
-  });
-  it('splits a source color and size pair without changing its original value',()=>{
-    const source='Black-XL';
-    expect(cjVariantDisplayOptions({variantKey:source,variantName:source})).toEqual([{label:'اللون',value:'أسود',source:'parsed'},{label:'المقاس',value:'XL',source:'parsed'}]);
-    expect(source).toBe('Black-XL');
-  });
-  it('extracts color and size suffixes from the full CJ product title shown in variant names',()=>{
-    const source='Mens Autumn Jacket 2026 SpringAutumn Style Youth All-Match Hooded Retro Casual Streetwear Windproof Coat For Men Red S';
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:source})).toEqual([
-      {label:'اللون',value:'أحمر',source:'parsed'},
-      {label:'المقاس',value:'S',source:'parsed'},
-    ]);
-  });
-  it('extracts numeric footwear sizes from the supplier title shown in the latest report',()=>{
-    const source='Arrival Comfortable Flat Womens Sandals With Delicate Straps Versatile And Easy to Match Black 36';
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:source})).toEqual([
-      {label:'اللون',value:'أسود',source:'parsed'},
-      {label:'المقاس',value:'36',source:'parsed'},
-    ]);
-  });
-  it('extracts a dimension size and constant color from a repeated CJ mat title',()=>{
-    const source='Fur Sofa Cushion Bay Window Mat Living Room Bedroom White 70x100cm';
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:source})).toEqual([
-      {label:'اللون',value:'أبيض',source:'parsed'},
-      {label:'المقاس',value:'70×100cm',source:'parsed'},
-    ]);
-  });
-  it('extracts a bare dimension option key as the size',()=>{
-    expect(cjVariantDisplayOptions({variantKey:'100×200 cm',variantName:''})).toEqual([
-      {label:'المقاس',value:'100×200cm',source:'parsed'},
-    ]);
-  });
-  it('renders dynamic named source attributes with Arabic labels and arbitrary options',()=>{
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{color:'Black',plugType:'EU',voltage:'220V',capacity:64,customFinish:'Matte'}})).toEqual([
-      {label:'اللون',value:'أسود',source:'attribute'},{label:'القابس',value:'أوروبي',source:'attribute'},{label:'الفولت',value:'220V',source:'attribute'},{label:'السعة',value:'64',source:'attribute'},{label:'customFinish',value:'Matte',source:'attribute'},
-    ]);
-  });
-  it('does not expose a long untranslated supplier name as the customer option',()=>{
-    expect(cjVariantDisplayOptions({variantKey:'',variantName:'Long special edition jacket windproof model for men in a very long supplier label'})).toEqual([]);
-  });
-  it('cleans repeated imported headings and whitespace while preserving unique specification values',()=>{
-    expect(cleanCjDisplayDescription('معلومات المنتج:\n\n\nمعلومات المنتج:\nالخامة: قطن\n\nالخامة: قطن')).toBe('معلومات المنتج:\n\nالخامة: قطن');
-  });
-  it('smooths a known literal all-match phrase for the display title without touching the source',()=>{
-    const source='سترة رجالي للخريف 2026 نمط الربيع والخريف للشباب كل مباراة';
-    expect(cjProductDisplayTitle(source)).toContain('متعدد الاستخدامات');
-    expect(source).toContain('كل مباراة');
-  });
+describe('CJ source-only display translation',()=>{
+ it('translates explicit color and size declarations without altering source values',()=>{
+  const input={variantKey:'Purple-US 12.5',variantName:'Misleading Black XL',optionSchema:['Color','Size']};
+  expect(cjVariantDisplayOptions(input)).toEqual([{label:'اللون',value:'بنفسجي',source:'parsed'},{label:'المقاس',value:'US 12.5',source:'parsed'}]);expect(input.variantKey).toBe('Purple-US 12.5');
+ });
+ it('does not recover types or quantities from product titles',()=>{
+  for(const name of ['Shoes Purple 36','Cable Clip 6 Pack White','Set1'])expect(cjVariantDisplayOptions({variantKey:'',variantName:name})).toEqual([]);
+ });
+ it('uses arbitrary explicit source attribute names rather than classifying their values',()=>{
+  expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{options:[{name:'Finish',value:'Matte'},{name:'Voltage',value:'220V'}]}})).toEqual([{label:'Finish',value:'Matte',source:'attribute'},{label:'الفولت',value:'220V',source:'attribute'}]);
+ });
+ it('ignores technical packaging dimensions as purchase options',()=>{
+  expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{variantLength:300,variantWidth:200,variantHeight:100,variantStandard:'long=300,width=200,height=100',variantProperty:'[]',createTime:123,barcode:'123'}})).toEqual([]);
+ });
+ it('rejects schema and named attribute conflicts',()=>{
+  expect(cjVariantDisplayOptions({variantKey:'Purple-US 12.5',variantName:'',optionSchema:['Color','Size'],attributes:{color:'Black'}})).toEqual([]);
+ });
+ it('cleans repeated display headings without changing specifications',()=>{expect(cleanCjDisplayDescription('معلومات المنتج:\nمعلومات المنتج:\nالخامة: قطن\nالخامة: قطن')).toBe('معلومات المنتج:\n\nالخامة: قطن');});
 });

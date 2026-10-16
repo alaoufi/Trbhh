@@ -17,6 +17,7 @@ export type CjVariant = {
   variantSku: string;
   variantName: string | null;
   variantKey?: string | null;
+  optionSchema?: string[];
   variantSellPrice: number | null;
   variantImage: string | null;
   variantWeight: number | null;
@@ -26,6 +27,7 @@ export type CjVariant = {
 
 export type CjProductDetail = CjProductSummary & {
   description: string | null;
+  optionSchema?: string[];
   variants: CjVariant[];
 };
 

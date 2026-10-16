@@ -77,7 +77,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
   // (لون/مقاس) داخل لوحة الشراء ويُحفظ مع الطلب؛ لا قائمة عرض منفصلة غير قابلة للاختيار.
-  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })),0,p.name);
+  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes, optionSchema:v.optionSchema })),40,p.name);
   const variantRows = displayVariants.map(v => ({ key: v.vid, sku:v.sku,label: translatedVariants[v.vid]?.label || '—', weight: v.weight })).slice(0, 60);
   const panelLabels = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.label]));
   const panelOptions = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.options]));
@@ -106,7 +106,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {view.isStaff && session && (displayVariants.length > 0
           ? <>
               {verifiedVariants.length === 0 && <p role="status" className="text-xs font-bold text-red-600">تجربة إدارية — يُتحقَّق من التوفّر حيّاً عند الاختيار (لا تظهر للعميل).</p>}
-              <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} labels={panelLabels} optionsByVid={panelOptions} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
+              <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} labels={panelLabels} optionsByVid={panelOptions} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes,optionSchema:variant.optionSchema}))} />
             </>
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات متاحة لهذه السلعة حالياً.</p>)}
         {variantRows.length > 1 && <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm">

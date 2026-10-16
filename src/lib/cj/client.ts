@@ -1,4 +1,5 @@
 import 'server-only';
+import {readCjOptionSchema} from './variant-schema';
 import {preserveCjVariantAttributes} from './variant-attributes';
 import {createHash} from 'node:crypto';
 import {parseCjCatalogFilters,type CatalogFilterValues} from './catalog-filters';
@@ -233,9 +234,10 @@ export async function getProduct(pid: string): Promise<CjResult<CjProductDetail>
   if (!r.ok) return r;
   const d = r.data || {};
   const rawVariants = Array.isArray(d.variants) ? d.variants : Array.isArray(d.stanProducts) ? d.stanProducts : [];
-  const variants = (rawVariants as Record<string, unknown>[]).map(mapVariant);
+  const optionSchema=readCjOptionSchema(d.productKeyEn);
+  const variants = (rawVariants as Record<string, unknown>[]).map(v=>({...mapVariant(v),optionSchema}));
   const summary = mapSummary(d);
-  return { ok: true, data: { ...summary, description: str(d.description) || str(d.descriptionEn) || str(d.productDescription), variants } };
+  return { ok: true, data: { ...summary, description: str(d.description) || str(d.descriptionEn) || str(d.productDescription), optionSchema, variants } };
 }
 
 export async function getVariants(pid: string): Promise<CjResult<CjVariant[]>> {

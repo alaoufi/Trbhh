@@ -56,7 +56,7 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   const detailVariants = d.variants ?? [];
   const variantsRes = await (deps.getVariants ?? cjGetVariants)(clean).catch(() => null);
   const queryVariants = variantsRes?.ok ? variantsRes.data : [];
-  const fullVariants = queryVariants.length >= detailVariants.length ? queryVariants : detailVariants;
+  const fullVariants = (queryVariants.length >= detailVariants.length ? queryVariants : detailVariants).map(v=>({...v,optionSchema:d.optionSchema??v.optionSchema}));
   const detailsJson = JSON.stringify(buildCjDetails(fullVariants));
   // Verify stock by the product's full variant inventory and request a Saudi
   // freight estimate. If either read fails or gives no available route, keep

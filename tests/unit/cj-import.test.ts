@@ -25,6 +25,7 @@ function harness(over: Partial<CjImportDeps> = {}) {
 }
 
 describe('CJ selective import → staging with cost×FX + shipping + margin', () => {
+  it('stores API declared dimensions with dedicated query variants for future imports',async()=>{const v={vid:'v1',variantSku:'S1',variantName:'Ignored',variantKey:'Purple-US 12.5',variantSellPrice:10,variantImage:null,variantWeight:470};const {deps,upserts}=harness({getProduct:async pid=>({ok:true,data:{...detail(pid),optionSchema:['Color','Size'],variants:[v]}}),getVariants:async()=>({ok:true,data:[v]})});await importCjProductByPid('p',deps);expect(JSON.parse(upserts[0].detailsJson!).variants[0]).toMatchObject({vid:'v1',optionKey:'Purple-US 12.5',optionSchema:['Color','Size'],priceUsd:10});});
   it('imports one product by PID and computes the sale price', async () => {
     const { deps, upserts } = harness();
     const r = await importCjProductByPid('2609231107131613900', deps);

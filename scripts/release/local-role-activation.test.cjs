@@ -42,8 +42,10 @@ const answers={
 const protocol={searchTask:'search',translationTask:()=> 'translation',searchFormat:{},translationFormat:{},request:(model,text,task)=>({model,text,task}),validateIntentQueries:(_text,value)=>value.queries?.length===1?value.queries:[],finalizeSupplierQueries:(_text,value)=>value.queries?.length===1?value.queries:[]};
 test('server gate checks the actual finalized runtime query and reports raw model output separately',async()=>{
  const reports=[],p={...protocol,finalizeSupplierQueries:(text,value)=>text==='جزمة للمشي ضد الموية مقاس 42'?['water-resistant walking shoes size 42']:protocol.finalizeSupplierQueries(text,value)};
- const proof=await verifyRole('search',qualityCall({'جزمة للمشي ضد الموية مقاس 42':'walking shoe'}),'qwen3.5:9b',p,Date.now,s=>reports.push(s));
+ const call=async(path,body)=>body.text==='جزمة للمشي ضد الموية مقاس 42'?{done:true,message:{content:JSON.stringify({queries:['walking shoe','waterproof walking shoe']})}}:qualityCall()(path,body);
+ const proof=await verifyRole('search',call,'qwen3.5:9b',p,Date.now,s=>reports.push(s));
  assert.equal(proof[3].answer,'water-resistant walking shoes size 42');assert.equal(reports[3].rawAnswer,'walking shoe');
+ assert.deepEqual(reports[3].rawQueries,['walking shoe','waterproof walking shoe']);assert.equal(reports[3].rawQueryCount,2);
  await assert.rejects(verifyRole('search',qualityCall(),'qwen3.5:9b',{...protocol,finalizeSupplierQueries:()=>[]}),/quality_or_latency/);
 });
 function qualityCall(overrides={}){return async(_path,body)=>({done:true,done_reason:'stop',message:{content:JSON.stringify(body.task==='search'?{queries:[overrides[body.text]??answers[body.text]]}:{translation:overrides[body.text]??answers[body.text]})}});}

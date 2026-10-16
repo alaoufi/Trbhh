@@ -26,7 +26,26 @@ if [[ ${1:-} != --run ]]; then
   watcher=$!
   tail --pid="$watcher" -n 8 -f "$target/result.log"
   wait "$watcher"
-  ! systemctl is-failed --quiet "$unit.service"
+  if [[ $(systemctl show -p Result --value "$unit.service") != success || $(systemctl show -p ExecMainStatus --value "$unit.service") != 0 ]]; then
+    echo 'LOCAL_ROLE_FAILED — activation was not verified.' >&2
+    exit 1
+  fi
+  if ! node - "$target/result.log" "$role" "$candidate" "$mode" <<'VERIFY'
+const fs=require('node:fs');
+try{
+ const [file,role,release,mode]=process.argv.slice(2);
+ if(fs.statSync(file).size>1048576)throw Error();
+ const text=fs.readFileSync(file,'utf8'),rows=text.split(/\r?\n/).filter(line=>line.startsWith('{')).map(line=>JSON.parse(line));
+ const status=mode==='--activate'?'LOCAL_ROLE_READY':'LOCAL_ROLE_CANDIDATE_PASSED';
+ const results=rows.filter(row=>typeof row.status==='string'),last=results.at(-1);
+ if(results.some(row=>row.status==='LOCAL_ROLE_NOT_ACTIVATED')||last?.status!==status||last.role!==role||last.release!==release||!text.includes('LOCAL_ROLE_RUNTIME_UNCHANGED'))throw Error();
+ if(!Array.isArray(last.proof)||last.proof.length!==(role==='search'?6:4)||last.proof.some(row=>row.passed!==true||!Number.isFinite(row.elapsedMs)||row.elapsedMs<0||row.elapsedMs>(role==='search'?11500:45000)))throw Error();
+ console.log(`LOCAL_ROLE_RESULT_VERIFIED role=${role} release=${release}`);
+}catch{console.error('LOCAL_ROLE_RESULT_REJECTED — do not enable the worker.');process.exitCode=1;}
+VERIFY
+  then
+    exit 1
+  fi
   exit 0
 fi
 target=${2:?}

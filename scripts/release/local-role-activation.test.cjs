@@ -1,5 +1,25 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{spawnSync}=require('node:child_process');
 const {activateRole,verifyRole,roleNames,assertResources,installedCandidate,assertLocalAiEnabled}=require('./local-role-activation.cjs');
+const os=require('node:os'),path=require('node:path');
+test('manual runner propagates failed units and rejected quality even inside a caller conditional',()=>{
+ const shell=fs.readFileSync('scripts/release/manual-local-role.sh','utf8');
+ const tail=shell.slice(shell.indexOf('  wait "$watcher"'),shell.indexOf('\nfi\n'));
+ const target=fs.mkdtempSync(path.join(os.tmpdir(),'role-result-'));
+ const release='a'.repeat(40),ready={status:'LOCAL_ROLE_READY',role:'search',release,digest:'b'.repeat(64),proof:Array.from({length:6},()=>({passed:true,elapsedMs:10}))};
+ const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'bash';
+ try{for(const [result,status,log,pass]of [
+  ['exit-code','1',JSON.stringify(ready)+'\nLOCAL_ROLE_RUNTIME_UNCHANGED',false],
+  ['success','0','{"status":"LOCAL_ROLE_NOT_ACTIVATED","reason":"quality_or_latency_rejected"}\n',false],
+  ['success','0',JSON.stringify(ready),false],
+  ['success','0',JSON.stringify({...ready,role:'translation'})+'\nLOCAL_ROLE_RUNTIME_UNCHANGED',false],
+  ['success','0',JSON.stringify(ready)+'\nLOCAL_ROLE_RUNTIME_UNCHANGED',true]
+ ]){
+  fs.writeFileSync(path.join(target,'result.log'),log);
+  const code='set -e\nwait(){ return 0; }\nsystemctl(){ case "$*" in *ExecMainStatus*) printf "%s" "$TEST_STATUS";; *Result*) printf "%s" "$TEST_RESULT";; *) return 0;; esac; }\nrunner(){\n'+tail+'\n}\nif runner; then exit 0; else exit 17; fi';
+  const r=spawnSync(bash,['-c',code],{encoding:'utf8',env:{...process.env,target:target.replace(/\\/g,'/'),candidate:release,role:'search',mode:'--activate',unit:'test',watcher:'1',TEST_RESULT:result,TEST_STATUS:status}});
+  assert.equal(r.status===0,pass,JSON.stringify({result,status,log,stdout:r.stdout,stderr:r.stderr}));
+ }}finally{fs.rmSync(target,{recursive:true,force:true});}
+});
 test('installed source validation rejects missing, malformed and oversized weights before preload in both modes',()=>{const valid={name:'qwen3.5:9b',digest:'a'.repeat(64),size:7e9};assert.equal(installedCandidate({models:[valid]}),valid);for(const models of [[],[{...valid,name:'other'}],[{...valid,digest:'bad'}],[{...valid,size:0}],[{...valid,size:8*1024**3+1}]])assert.throws(()=>installedCandidate({models}),/installed_model/);const code=fs.readFileSync('scripts/release/local-role-activation.cjs','utf8');assert.ok(code.indexOf("installedCandidate(await call('tags'))")<code.indexOf("const preload=protocol.request"));});
 test('global disabled setting is preserved without writes and missing setting retains default enabled',async()=>{for(const v of ['0','false',''])await assert.rejects(assertLocalAiEnabled({$queryRawUnsafe:async()=>[{v}]}),/disabled_setting_preserved/);await assertLocalAiEnabled({$queryRawUnsafe:async()=>[]});await assertLocalAiEnabled({$queryRawUnsafe:async()=>[{v:'1'}]});});
 function fixture(){const state={'qwen3.5:9b':'a'.repeat(64),'trbhh-local:search':'b'.repeat(64),'trbhh-local:translation':'c'.repeat(64)},calls=[];return {state,calls,call:async(path,body)=>{calls.push({path,body});if(path==='tags')return {models:Object.entries(state).map(([name,digest])=>({name,digest,size:7e9}))};if(path==='copy'){state[body.destination]=state[body.source];return;}if(path==='delete'){delete state[body.model];return;}throw Error('unexpected');}};}

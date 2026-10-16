@@ -5,11 +5,26 @@ function cosine(a,b){
  let dot=0,aa=0,bb=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]**2;bb+=b[i]**2;}
  return aa&&bb?dot/Math.sqrt(aa*bb):0;
 }
+// Explicit product properties are hard filters; similarity cannot override a contradiction.
+// Missing or conflicting evidence stays unknown, never silently promoted to a promise.
+const PROPERTY_RULES={
+ wireless:{yes:/\b(?:wireless|cordless)\b|(?:^|\s)و?(?:لا\s*سلكي(?:ه)?|بدون\s+(?:اي\s+)?(?:سلك|اسلاك)|بلا\s+سلك)(?=\s|$)/u,no:/\b(?:(?:not\s+|non[- ]?)(?:wireless|cordless)|wired|corded|with\s+(?:a\s+)?(?:wire|cable))\b|(?:^|\s)و?(?:(?:غير|مو|ليس(?:ت)?)\s+لا\s*سلكي(?:ه)?|(?:مع|ب)\s*سلك|سلكي(?:ه)?)(?=\s|$)/u},
+ insulated:{yes:/\binsulated\b|(?:^|\s)معزول(?:ه)?(?=\s|$)/u,no:/\b(?:not\s+|non[- ]?)insulated\b|(?:غير|مو|ليس)\s+معزول(?:ه)?|(?:بدون|بلا)\s+عزل/u},
+ waterproof:{yes:/\bwater[- ]?(?:proof|resistant)\b|مقاوم(?:ه)?\s+(?:لل)?م(?:اء|ياه)|ضد\s+الم(?:اء|ويه)/u,no:/\b(?:not\s+|non[- ]?)water[- ]?(?:proof|resistant)\b|(?:غير|مو|ليس)\s+(?:مقاوم(?:ه)?\s+(?:لل)?م(?:اء|ياه)|ضد\s+الم(?:اء|ويه))/u},
+};
+function properties(raw){
+ const text=raw.normalize('NFKC').toLowerCase().replace(/[\u064b-\u065f\u0670]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه');
+ const out={};for(const [name,rule] of Object.entries(PROPERTY_RULES)){
+  const negative=rule.no.test(text),positive=rule.yes.test(text.replace(new RegExp(rule.no.source,'gu'),' '));
+  if(positive!==negative)out[name]=positive;
+ }return out;
+}
 function rank(query,vector,docs){
  const normalized=text=>text.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/(\d)\s+(V|W|ml|GB|mm)\b/gi,'$1$2').toLowerCase();
  const source=normalized(query),required=source.match(/[a-z]*\d+[a-z\d.-]*|\d+(?:\.\d+)?/g)||[];
  if(/\p{Script=Arabic}/u.test(source))required.push(...source.match(/\b[a-z][a-z0-9-]*\b/g)||[]);
- return docs.filter(doc=>{const tokens=normalized(doc.text).split(/[^a-z0-9.-]+/);return required.every(value=>tokens.includes(value));})
+ const constraints=properties(query);
+ return docs.filter(doc=>{const tokens=normalized(doc.text).split(/[^a-z0-9.-]+/),known=properties(doc.text);return required.every(value=>tokens.includes(value))&&Object.entries(constraints).every(([name,value])=>known[name]===value);})
   .map(doc=>({id:doc.id,score:cosine(vector,doc.vector)})).sort((a,b)=>b.score-a.score);
 }
 function createBatcher(embed){
@@ -30,7 +45,7 @@ function createBatcher(embed){
   const promise=new Promise((resolve,reject)=>queue.push({text,resolve,reject}));pending.set(text,promise);kick();return promise;
  };
 }
-// Fixed synthetic products and unseen Arabic queries, never customer or supplier account data.
+// Fixed synthetic regression examples, never customer or supplier account data.
 const FIXTURES=[
  ['case','Samsung Galaxy S24 phone protective case',['أبغى كفر Samsung S24','غطاء يحمي جوالي Samsung S24']],
  ['drill','18V cordless drill',['أبغى دريل بدون سلك 18V','مثقاب شحن لاسلكي 18V']],

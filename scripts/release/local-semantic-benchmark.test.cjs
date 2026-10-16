@@ -21,6 +21,23 @@ test('ranking preserves model and quantity constraints without translating them'
  assert.equal(rank('أبغى غطاء Samsung S24',[1,0],docs)[0].id,'right');
  assert.equal(cosine([1,0],[1,0]),1);assert.throws(()=>cosine([1],[1,0]),/vector_dimension/);
 });
+test('explicit wireless constraints defeat a higher semantic score for a wired product',()=>{
+ const docs=[{id:'cable',text:'18V wired drill with cable',vector:[1,0]},{id:'battery',text:'18V cordless drill',vector:[.8,.2]}];
+ for(const query of ['أبغى دريل بدون سلك 18V','مثقاب لاسلكي 18V','cordless drill 18V'])assert.equal(rank(query,[1,0],docs)[0]?.id,'battery');
+ assert.equal(rank('دريل بسلك 18V',[.8,.2],docs)[0]?.id,'cable');
+});
+test('constraints apply to other products and do not invent a missing attribute',()=>{
+ const docs=[{id:'wired',text:'Wired headphones',vector:[1,0]},{id:'wireless',text:'Wireless headphones',vector:[.8,.2]},{id:'unknown',text:'Headphones',vector:[1,0]}];
+ assert.deepEqual(rank('سماعة بدون سلك',[1,0],docs).map(item=>item.id),['wireless']);
+ assert.deepEqual(rank('أبي أسمع بدون ضجة وبدون سلك',[1,0],docs).map(item=>item.id),['wireless']);
+ assert.deepEqual(rank('سماعات لاسلكية',[1,0],docs).map(item=>item.id),['wireless']);
+ assert.deepEqual(rank('سماعة غير لاسلكية',[1,0],docs).map(item=>item.id),['wired']);
+ assert.deepEqual(rank('سماعة بدون سلك',[1,0],[docs[2]]),[]);
+});
+test('negated insulation and water protection remain independent of vector similarity',()=>{
+ assert.deepEqual(rank('قارورة 750ml بدون عزل',[1,0],[{id:'insulated',text:'Insulated water bottle 750ml',vector:[1,0]},{id:'plain',text:'Water bottle 750ml not insulated',vector:[.8,.2]}]).map(item=>item.id),['plain']);
+ assert.deepEqual(rank('حذاء مشي ضد الموية 42',[1,0],[{id:'ordinary',text:'Non waterproof walking shoes size 42',vector:[1,0]},{id:'waterproof',text:'Waterproof walking shoes size 42',vector:[.8,.2]}]).map(item=>item.id),['waterproof']);
+});
 test('the full streamed probe never activates a model and rejects poor retrieval despite fast vectors',()=>{
  const fs=require('node:fs'),cp=require('node:child_process'),script=fs.readFileSync('scripts/release/local-semantic-benchmark.cjs','utf8');
  const prelude=`

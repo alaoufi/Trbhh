@@ -9,7 +9,7 @@ import {refreshSettlement,saveSettlementWait,authorizeWalletSettlement,prepareUn
 import {settlementPaymentUrl} from './policy';
 
 export const dynamic = 'force-dynamic';
-export const metadata = {title:'مستحقات CJ',robots:{index:false,follow:false}};
+export const metadata = {title:'سداد مستحقات CJ',robots:{index:false,follow:false}};
 const errors:Record<string,string> = {selection:'حدد من طلب واحد إلى 20 طلبًا صالحًا دون تكرار.',confirmation:'راجع المستحقات وأكد التحديد أولاً.',changed:'تغيّرت حالة طلب أو سبق ضمه إلى دفعة. حدّث القائمة وراجعها.',wait:'مدة الانتظار يجب أن تكون بين ساعة و168 ساعة.',refresh:'تعذر تحديث المطابقة. لا تعد الدفع قبل التأكد من حالة كل طلب.'};
 errors.wallet_confirmation='السداد من المحفظة يحتاج تأكيدًا صريحًا بالمبلغ المعروض.';
 errors.wallet_changed='رفض تفويض الخصم: تغيّرت حالة طلب أو مبلغ أو انتهى رابط الدفع. حدّث حالة الطلبات قبل إعادة المحاولة.';
@@ -25,7 +25,7 @@ export default async function CjPayablesPage({searchParams}:{searchParams:Promis
   const [rows,hours,batch,batches] = await Promise.all([listCjPayables(),getCjSettlementWaitHours(),batchId?getCjSettlementBatch(batchId):null,listCjSettlementBatches()]);
   return <div className="space-y-4">
     <CjAdminNav current="payables"/>
-    <h1 className="text-xl font-extrabold text-primary">مستحقات CJ</h1>
+    <h1 className="text-xl font-extrabold text-primary">سداد مستحقات CJ</h1>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3">هذه طلبات تحصّل مبلغها في تربح وثبت إيصالها، ولم يثبت سدادها للمورد. اختر الطلبات ثم «دفع جميع الطلبات» لتجهيز روابط السداد دون خصم. البطاقة تُدفع على CJ؛ المحفظة تحتاج تفويضًا ماليًا صريحًا.</p>
     {typeof sp.error==='string'&&errors[sp.error]&&<p role="alert" className="rounded border border-red-200 bg-red-50 p-3">{errors[sp.error]}</p>}
     {sp.saved==='1'&&<p className="text-emerald-700">تم حفظ مهلة الانتظار.</p>}

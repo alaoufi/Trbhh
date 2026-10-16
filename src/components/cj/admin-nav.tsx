@@ -12,7 +12,7 @@ const TABS: { key: string; href: string; label: string }[] = [
   { key: 'imported', href: '/admin/suppliers/cj/imported', label: 'البضائع المستوردة' },
   { key: 'showcase', href: '/admin/suppliers/cj/showcase', label: 'السلع المعروضة' },
   {key:'purchases',href:'/admin/suppliers/cj/purchases',label:'شراء العميل والإرسال إلى CJ'},
-  { key: 'payables', href: '/admin/suppliers/cj/payables', label: 'مستحقات CJ' },
+  { key: 'payables', href: '/admin/suppliers/cj/payables', label: 'سداد مستحقات CJ' },
   {key:'preparation',href:'/admin/suppliers/cj/preparation',label:'تأكيد سداد CJ والتجهيز'},
   {key:'tracking',href:'/admin/suppliers/cj/tracking',label:'شحن CJ والتتبع والاستلام'},
   {key:'history',href:'/admin/suppliers/cj/history',label:'سجل CJ المغلق والحسابات'},

@@ -109,7 +109,7 @@ items.push(
  {href:'/admin/suppliers/cj/preparation',label:'تأكيد سداد CJ والتجهيز',icon:Store,perm:'commerce'},
  {href:'/admin/suppliers/cj/tracking',label:'شحن CJ والتتبع والاستلام',icon:Store,perm:'commerce'},
  {href:'/admin/suppliers/cj/history',label:'سجل CJ المغلق والحسابات',icon:Store,perm:'commerce'},
- {href:'/admin/suppliers/cj/payables',label:'مستحقات CJ',icon:Coins,perm:'commerce'},
+ {href:'/admin/suppliers/cj/payables',label:'سداد مستحقات CJ',icon:Coins,perm:'commerce'},
  {href:'/admin/suppliers/cj/agents',label:'وكلاء CJ',icon:Users,perm:'commerce'},
  {href:'/admin/suppliers/cj/glossary',label:'مُسرد ترجمة CJ',icon:BookOpen,perm:'commerce'},
  {href:'/admin/suppliers/cj',label:'إعدادات CJ والاختبار',icon:Settings,perm:'commerce'},
@@ -133,9 +133,9 @@ const departmentGroups: AdminNavGroup[] = DEPARTMENTS.map((department,index)=>({
 const taskGroups:AdminNavGroup[]=[
  {key:'market-categories',title:'تصنيفات السوق وحقولها',icon:Megaphone,color:'#475569',items:items.filter(i=>['/admin/categories','/admin/smart-ads'].includes(i.href))},
  {key:'market-content',title:'الإعلانات والمحتوى',icon:Megaphone,color:'#0369A1',items:items.filter(i=>['/admin/ads','/admin/classified','/admin/duplicates','/admin/promos'].includes(i.href))},
- {key:'supplier-management',title:'الموردون وربط المتاجر',icon:Store,color:'#0F766E',items:items.filter(i=>i.href.startsWith('/admin/suppliers')&&!i.href.startsWith('/admin/suppliers/cj'))},
+ {key:'supplier-management',title:'الموردون وربط المتاجر',icon:Store,color:'#0F766E',items:items.filter(i=>i.href==='/admin/suppliers/cj/payables'||i.href.startsWith('/admin/suppliers')&&!i.href.startsWith('/admin/suppliers/cj'))},
  {key:'cj-catalog',title:'CJ — الكتالوج والاستيراد',icon:Store,color:'#0F766E',items:items.filter(i=>['/admin/suppliers/cj/browse','/admin/suppliers/cj/imported','/admin/suppliers/cj/showcase'].includes(i.href))},
- {key:'cj-operations',title:'CJ — متابعة الطلبات',icon:Store,color:'#0369A1',items:['purchases','payables','preparation','tracking','history'].flatMap(path=>items.filter(i=>i.href==='/admin/suppliers/cj/'+path))},
+ {key:'cj-operations',title:'CJ — متابعة الطلبات',icon:Store,color:'#0369A1',items:['purchases','preparation','tracking','history'].flatMap(path=>items.filter(i=>i.href==='/admin/suppliers/cj/'+path))},
  {key:'cj-settings',title:'CJ — الإعدادات والاختبارات',icon:Settings,color:'#64748b',items:items.filter(i=>i.href.startsWith('/admin/suppliers/cj')&&!['browse','imported','showcase','purchases','payables','preparation','tracking','history'].some(path=>i.href==='/admin/suppliers/cj/'+path))},
 ];
 const taskDestinations=new Set(taskGroups.flatMap(g=>g.items.map(i=>i.href)));

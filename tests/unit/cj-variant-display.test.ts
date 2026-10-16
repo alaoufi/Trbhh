@@ -2,6 +2,16 @@ import {describe,expect,it} from 'vitest';
 import {cjVariantDisplayOptions,cleanCjDisplayDescription} from '@/lib/cj/variant-display';
 import {cjProductDisplayTitle} from '@/lib/cj/presentation';
 describe('CJ product customer display',()=>{
+  it('extracts the actual cable clip pack and color after its repeated product title',()=>{
+    const title='Magnetic Cable Clip Under Desk Cable Management Adjustable Cord Holder Wire Organizer And Cable Management Wire Keeper';
+    for(const suffix of ['6 Pack White','3Packwhite','White 6pcs'])expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} ${suffix}`},title)).toEqual([
+      {label:'اللون',value:'أبيض',source:'parsed'},{label:'عدد القطع في العبوة',value:suffix.startsWith('3')?'3':'6',source:'parsed'},
+    ]);
+    expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} Set1`},title)).toEqual([{label:'المجموعة',value:'1',source:'parsed'}]);
+    expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} 1PC`},title)).toEqual([{label:'عدد القطع في العبوة',value:'1',source:'parsed'}]);
+    expect(cjVariantDisplayOptions({variantKey:'6 Pack White',variantName:'',attributes:{color:'White'}})).toEqual([{label:'اللون',value:'أبيض',source:'attribute'},{label:'عدد القطع في العبوة',value:'6',source:'parsed'}]);
+    expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} 3 black and 3 white`},title)).toEqual([{label:'التشكيلة',value:'3 أسود + 3 أبيض',source:'parsed'}]);
+  });
   it('splits a source color and size pair without changing its original value',()=>{
     const source='Black-XL';
     expect(cjVariantDisplayOptions({variantKey:source,variantName:source})).toEqual([{label:'اللون',value:'أسود',source:'parsed'},{label:'المقاس',value:'XL',source:'parsed'}]);

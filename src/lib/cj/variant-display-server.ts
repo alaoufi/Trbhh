@@ -14,8 +14,8 @@ export type TranslatedVariant = { vid: string; label: string; options: DisplayOp
 
 export async function translateVariantOptions<
   T extends Pick<CjVariant, 'vid' | 'variantKey' | 'variantName' | 'attributes'>,
->(variants: T[], max = 150): Promise<Record<string, TranslatedVariant>> {
-  const raw = variants.map((v) => ({ vid: v.vid, options: cjVariantDisplayOptions(v) }));
+>(variants: T[], max = 150, productName=''): Promise<Record<string, TranslatedVariant>> {
+  const raw = variants.map((v) => ({ vid: v.vid, options: cjVariantDisplayOptions(v,productName) }));
   const texts = new Set<string>();
   for (const r of raw) for (const o of r.options) { texts.add(o.label); texts.add(o.value); }
   const ar = await translateManyForDisplay([...texts], max).catch(() => new Map<string, string>());

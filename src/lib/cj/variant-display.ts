@@ -11,7 +11,7 @@ function safeText(value:unknown):string|null{if(typeof value!=='string'&&typeof 
 function translateKnownValue(value:string):string{return VALUES.get(value.trim().toLowerCase())??value;}
 
 /** Uses only values actually present in CJ attributes/variant key; raw source is not mutated. */
-export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'variantName'|'attributes'>):DisplayOption[]{
+export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'variantName'|'attributes'>,productName=''):DisplayOption[]{
   const options:DisplayOption[]=[];
   const attrs=variant.attributes??{};
   for(const [key,value] of Object.entries(attrs)){
@@ -23,9 +23,25 @@ export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'var
       ||/^variant(?:id|sku|name|image|price|weight|key|unit|length|width|height|standard|sellprice|sugsellprice|volume)/i.test(key))continue;
     options.push({label:labelFor(key),value:translateKnownValue(clean),source:'attribute'});
   }
-  if(options.length)return options;
-  const source=(variant.variantKey||variant.variantName||'').trim();
+  if(options.length){
+    const parsed=cjVariantDisplayOptions({...variant,attributes:{}},productName);
+    return [...options,...parsed.filter(o=>o.label!=='الخيار'&&!options.some(existing=>existing.label===o.label))];
+  }
+  let source=(variant.variantKey||variant.variantName||'').trim();
+  if(productName&&source.toLowerCase().startsWith(productName.trim().toLowerCase()+' '))source=source.slice(productName.trim().length).trim();
   if(!source)return [];
+  // Pack count is a purchase attribute, never a clothing size. Match the entire
+  // source option so unrelated numbers in the product title cannot become counts.
+  const mixed=/^(\d+)\s+(black|white)\s+and\s+(\d+)\s+(black|white)$/i.exec(source);
+  if(mixed)return [{label:'التشكيلة',value:`${mixed[1]} ${translateKnownValue(mixed[2])} + ${mixed[3]} ${translateKnownValue(mixed[4])}`,source:'parsed'}];
+  const group=/^set\s*(\d+)$/i.exec(source);
+  if(group)return [{label:'المجموعة',value:group[1],source:'parsed'}];
+  const pack=/^(?:(black|white|red|blue|green|pink|grey|gray)\s*)?(\d+)\s*(?:packs?|pcs?|pieces?)(?:\s*(black|white|red|blue|green|pink|grey|gray))?$/i.exec(source);
+  if(pack){
+    if(pack[1]&&pack[3]&&pack[1].toLowerCase()!==pack[3].toLowerCase())return [{label:'الخيار',value:source,source:'parsed'}];
+    const color=pack[1]||pack[3];
+    return [...(color?[{label:'اللون',value:translateKnownValue(color),source:'parsed' as const}]:[]),{label:'عدد القطع في العبوة',value:pack[2],source:'parsed'}];
+  }
   const labeled=source.split(/\s*[,;|]\s*/).flatMap(part=>{
     const match=part.match(/^([^:=]+)\s*[:=]\s*(.+)$/);return match?[{label:labelFor(match[1]),value:translateKnownValue(match[2].trim()),source:'parsed' as const}]:[];
   });

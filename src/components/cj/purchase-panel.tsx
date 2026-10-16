@@ -4,6 +4,7 @@ import {useEffect,useId,useMemo,useState} from 'react';
 import Link from 'next/link';
 import {formatSar} from '@/lib/commerce/money';
 import {cjVariantDisplayOptions,type DisplayOption} from '@/lib/cj/variant-display';
+import {buildCjVariantSelector,resolveCjVariantSelection} from '@/lib/cj/variant-selector';
 import {addTrialCartItem,type TrialCartSnapshot} from '@/lib/cj/trial-cart';
 import {CartLink,useTrialCart} from './cart-controls';
 import type {CjVariant} from '@/lib/cj/types';
@@ -17,7 +18,7 @@ const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
 export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
-  const [variantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
+  const [manualVariantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
   const [checkedSelection,setCheckedSelection]=useState<VerifiedSelection|null>(null);
   // التسميات مُترجمة مسبقاً من الخادم (الإجراء الموحّد). عند غياب خيار واضح (رقم مجرّد) نُلحق
   // رمز السلعة SKU ليتمكّن المستخدم من التمييز بدل «الخيار N» غير المفيد.
@@ -26,28 +27,14 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     if(base&&!/^الخيار \d+$/.test(base))return base;
     return `الخيار ${index+1}${variant.variantSku?` · ${variant.variantSku}`:''}`;
   };
-  const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
-  const options=useMemo(()=>selected?(optionsByVid?.[selected.vid]??cjVariantDisplayOptions(selected)):[],[selected,optionsByVid]);
   // نموذج اختيار بالسمات (لون/مقاس) عندما تحمل كل المتغيّرات نفس مجموعة الخيارات الواضحة؛
   // فيختار المستخدم كل سمة على حدة وتُحلّ إلى متغيّر. وإلا نعود للقائمة المنسدلة الكاملة.
-  const selector=useMemo(()=>{
-    const per=variants.map(v=>({vid:v.vid,opts:(optionsByVid?.[v.vid]??cjVariantDisplayOptions(v))}));
-    if(per.length<2||per.some(p=>!p.opts.length))return null;
-    const groupLabels=per[0].opts.map(o=>o.label);
-    if(!groupLabels.length||groupLabels.length>3||groupLabels.includes('الخيار'))return null;
-    const consistent=per.every(p=>p.opts.length===groupLabels.length&&groupLabels.every(l=>p.opts.some(o=>o.label===l)));
-    if(!consistent)return null;
-    const groups=groupLabels.map(label=>({label,values:[...new Set(per.flatMap(p=>p.opts.filter(o=>o.label===label).map(o=>o.value)))]}));
-    const combo=new Map<string,string>();
-    for(const p of per)combo.set(groupLabels.map(l=>p.opts.find(o=>o.label===l)?.value??'').join('\u0000'),p.vid);
-    return {groups,groupLabels,combo};
-  },[variants,optionsByVid]);
+  const selector=useMemo(()=>buildCjVariantSelector(variants.map(v=>({vid:v.vid,opts:optionsByVid?.[v.vid]??cjVariantDisplayOptions(v)}))),[variants,optionsByVid]);
   const [chosen,setChosen]=useState<Record<string,string>>({});
+  const variantId=selector?resolveCjVariantSelection(selector,chosen):manualVariantId;
+  const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
+  const options=useMemo(()=>selected?(optionsByVid?.[selected.vid]??cjVariantDisplayOptions(selected)):[],[selected,optionsByVid]);
   const comboComplete=!!selector&&selector.groupLabels.every(l=>chosen[l]);
-  useEffect(()=>{
-    if(!selector)return;
-    setVariantId(comboComplete?(selector.combo.get(selector.groupLabels.map(l=>chosen[l]).join('\u0000'))??''):'');
-  },[chosen,selector,comboComplete]);
   const alreadyInCart=items.find(item=>item.id===productId&&item.variantId===variantId)?.qty??0;
   const verificationQuantity=qty+alreadyInCart;
   useEffect(()=>{
@@ -78,16 +65,17 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5">
     <h2 className="text-[15px] font-extrabold text-primary">اختر المنتج</h2>
+    {selected&&<p className="break-all rounded-lg bg-slate-50 p-2 text-xs">رمز الخيار المختار (SKU): <b dir="ltr">{selected.variantSku}</b></p>}
     {selector
       ? <div className="space-y-2.5">{selector.groups.map(group=><div key={group.label}>
-          <p className="mb-1 text-[13px] font-bold leading-tight text-slate-700" dir="auto"><CjText original={group.label} passive/></p>
-          <div className="flex flex-wrap gap-1.5">{group.values.map(val=><button key={val} type="button" onClick={()=>setChosen(c=>({...c,[group.label]:val}))} aria-pressed={chosen[group.label]===val} dir="auto" title={val} className={`min-h-9 max-w-[16rem] rounded-lg border px-3 py-1 text-[13px] font-semibold leading-tight transition ${chosen[group.label]===val?'border-primary bg-primary text-white shadow-sm':'border-slate-300 bg-white text-slate-700 hover:border-primary/50'}`}><CjText original={val} passive/></button>)}</div>
+          <label htmlFor={`${id}-${group.label}`} className="mb-1 block text-[13px] font-bold text-slate-700">{group.label}</label>
+          <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>({...c,[group.label]:e.target.value}))} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{group.values.map(val=><option key={val} value={val}>{val}</option>)}</select>
         </div>)}
         {comboComplete&&!selected&&<p role="status" className="text-sm font-bold text-amber-800">هذا التركيب غير متوفّر — اختر تركيباً آخر.</p>}
       </div>
       : <label htmlFor={`${id}-variant`} className="block text-sm font-bold">الخيار المتاح
           <select id={`${id}-variant`} value={variantId} onChange={event=>setVariantId(event.target.value)} className="mt-2 block min-h-12 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3" required>
-            <option value="">اختر الخيار</option>{variants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)}</option>)}
+            <option value="">اختر الخيار</option>{variants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)} · SKU: {variant.variantSku}</option>)}
           </select>
         </label>}
     {selected&&<div className="grid grid-cols-2 gap-1.5 text-[13px]">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500" dir="auto">{option.label}</span><b className="break-words leading-tight" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500">الوزن</span><b className="leading-tight">{selected.variantWeight} غ</b></div>}</div>}

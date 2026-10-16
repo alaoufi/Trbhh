@@ -76,8 +76,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // الإجراء الموحّد: ترجمة خيارات كل متغيّر على الخادم مرّة، وتُستخدم في جدول الخيارات
   // ولوحة الشراء (الاختيار بالسمات) معاً — فلا يبقى خيار غير مترجم في أي مكان. الاختيار الفعلي
   // (لون/مقاس) داخل لوحة الشراء ويُحفظ مع الطلب؛ لا قائمة عرض منفصلة غير قابلة للاختيار.
-  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })),0);
-  const variantRows = displayVariants.map(v => ({ key: v.vid, label: translatedVariants[v.vid]?.label || '—', weight: v.weight })).slice(0, 60);
+  const translatedVariants = await translateVariantOptions(displayVariants.map(v => ({ vid: v.vid, variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })),0,p.name);
+  const variantRows = displayVariants.map(v => ({ key: v.vid, sku:v.sku,label: translatedVariants[v.vid]?.label || '—', weight: v.weight })).slice(0, 60);
   const panelLabels = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.label]));
   const panelOptions = Object.fromEntries(Object.entries(translatedVariants).map(([vid, t]) => [vid, t.options]));
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
@@ -92,6 +92,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-2.5">
         {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl"><CjText original={p.name} ar={title}/></h1>
+        <p className="break-all text-xs text-slate-600">رقم المنتج في تربح: {id} · رقم المورد: <b dir="ltr">{p.cj_product_id}</b> · رمز المنتج: <b dir="ltr">{p.cj_sku}</b></p>
         <ShareButtons compact url={`${primaryOrigin}/cj/${id}`} title={title}/>
         {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) — يُخفى إن لم تُسعّر السلعة بعد. */}
 
@@ -110,7 +111,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {variantRows.length > 1 && <details className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           <summary className="cursor-pointer font-bold text-slate-700">تفاصيل الخيارات ({variantRows.length})</summary>
           <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[280px] text-right text-xs"><thead className="bg-slate-50"><tr>{['الخيار', 'الوزن'].map(h => <th key={h} className="p-2 font-bold text-slate-600">{h}</th>)}</tr></thead><tbody>
-            {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}</td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
+            {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}<span className="block text-slate-500" dir="ltr">SKU: {r.sku}</span></td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
         {/* الشحن إلى السعودية — قسم قابل للطيّ بسهم للأسفل؛ يتمدّد بالنقر ويجلب الأرقام الحيّة عندها. */}

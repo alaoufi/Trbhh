@@ -61,3 +61,36 @@ globalThis.fetch=async(url,options)=>{
  const failure=cp.spawnSync(process.execPath,['-'],{input:failedCleanup+script,encoding:'utf8',timeout:5000});
  assert.equal(failure.status,0);assert.match(failure.stderr,/SEMANTIC_CLEANUP_UNCONFIRMED/);
 });
+
+test('dedicated streamed preflight uses shared runtime code and two threads on embedding service only',()=>{
+ const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
+ const script=fs.readFileSync(path.join(__dirname,'local-semantic-benchmark.cjs'),'utf8');
+ const shared=fs.readFileSync(path.resolve(__dirname,'../../../../scripts/local-ai/semantic-core.cjs'),'utf8');
+ const digest='85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1';
+ const wrapper=`globalThis.__trbhhSemanticCore=(()=>{const module={exports:{}};\n${shared}\nreturn module.exports;})();\n`;
+ function execute(kind){
+  const prelude=`const assert=require('node:assert/strict'),Module=require('node:module'),original=Module._load;
+  Module._load=function(name,...args){if(name==='node:fs')return {readFileSync:()=> 'MemAvailable: 23068672 kB'};if(name==='node:os')return {loadavg:()=>[1,1,1]};return original.call(this,name,...args);};
+  globalThis.__trbhhEmbeddingProbe='dedicated';
+  ${kind==='missing_core'?'':wrapper}
+  let ranked=0,embedCalls=0;
+  if(globalThis.__trbhhSemanticCore){const real=globalThis.__trbhhSemanticCore.rank;globalThis.__trbhhSemanticCore.rank=(...args)=>{ranked++;return real(...args);};}
+  globalThis.fetch=async(url,options)=>{
+   assert.equal(options.redirect,'error');if(url==='http://127.0.0.1:3000/api/version')return Response.json({commit:'a'.repeat(40)});
+   assert.ok(String(url).startsWith('http://embedding:11434/api/'));const endpoint=String(url).split('/').at(-1);
+   assert.ok(['tags','ps','embed'].includes(endpoint),'dedicated preflight must never pull or mutate models');
+   if(endpoint==='tags')return Response.json({models:${kind==='missing_model'?'[]':`[{name:'embeddinggemma:300m',size:622000000,digest:'${kind==='wrong_digest'?'wrong':digest}'}]`}});
+   if(endpoint==='ps')return Response.json({models:[]});
+   const body=JSON.parse(options.body);assert.equal(body.model,'embeddinggemma:300m');
+   if(!body.input.length)return Response.json({embeddings:[]});
+   embedCalls++;assert.equal(body.options.num_thread,2);assert.ok(body.input.length<=8);
+   return Response.json({embeddings:body.input.map(()=>Array(768).fill(.1))});
+  };
+  process.on('exit',()=>{${kind==='valid'?'assert.equal(ranked,40);assert.equal(embedCalls,8);':'assert.equal(embedCalls,0);'}});\n`;
+  return cp.spawnSync(process.execPath,['-'],{input:prelude+script,encoding:'utf8',timeout:5000});
+ }
+ const valid=execute('valid');assert.equal(valid.status,0,valid.stderr);assert.match(valid.stdout,/SEMANTIC_PROBE_COMPLETE/);assert.doesNotMatch(valid.stdout,/SEMANTIC_DOWNLOAD/);
+ for(const kind of ['missing_core','wrong_digest','missing_model']){
+  const failure=execute(kind);assert.equal(failure.status,1,kind+': '+failure.stderr);assert.match(failure.stderr,/SEMANTIC_PROBE_STOPPED/);assert.doesNotMatch(failure.stdout,/SEMANTIC_PROBE_COMPLETE/);
+ }
+});

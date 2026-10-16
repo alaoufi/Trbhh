@@ -1,5 +1,8 @@
 /* Experimental retrieval probe, not an application release or a translation replacement. */
 const MODEL='embeddinggemma:300m';
+// Only the manual deployment preflight selects the isolated, resource-limited service.
+const DEDICATED=globalThis.__trbhhEmbeddingProbe==='dedicated';
+const BASE=DEDICATED?'http://embedding:11434':'http://ollama:11434';
 function cosine(a,b){
  if(a.length!==b.length)throw Error('vector_dimension');
  let dot=0,aa=0,bb=0;for(let i=0;i<a.length;i++){dot+=a[i]*b[i];aa+=a[i]**2;bb+=b[i]**2;}
@@ -87,30 +90,34 @@ async function main(){
  }
  async function api(path,body,ms=30000){
   if(!['tags','ps','pull','embed'].includes(path)||body?.model&&body.model!==MODEL)throw Error('semantic_mutation_blocked');
-  controller.signal.throwIfAborted();const response=await fetch('http://ollama:11434/api/'+path,{method:body?'POST':'GET',redirect:'error',signal:signal(ms),headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  controller.signal.throwIfAborted();const response=await fetch(BASE+'/api/'+path,{method:body?'POST':'GET',redirect:'error',signal:signal(ms),headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
   const value=await json(response);if(!response.ok)throw Error('semantic_'+path+'_'+response.status+': '+String(value.error||'').slice(0,180));return value;
  }
- const options={num_thread:4,num_ctx:2048,num_batch:128};
+ const options={num_thread:DEDICATED?2:4,num_ctx:2048,num_batch:128};
+ const core=globalThis.__trbhhSemanticCore||{createBatcher,rank};
  try{
+  if(DEDICATED&&(!globalThis.__trbhhSemanticCore||core.MODEL!==MODEL||core.DIGEST!=='85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1'))throw Error('dedicated_core_required');
   const release=await guard(),tags=await api('tags'),loaded=await api('ps');
   if(tags.models?.some(item=>item.name==='trbhh-local:active')||loaded.models?.some(item=>item.name!==MODEL))throw Error('active_model_requires_isolated_probe');
   log({event:'SEMANTIC_PROBE_BEGIN',runningCommit:release,model:MODEL,scope:'synthetic retrieval quality + staged microbatch; not application capacity',applicationUnchanged:true});
   monitor=setInterval(()=>{if(checking)return;checking=true;guard().catch(error=>controller.abort(error)).finally(()=>{checking=false;});},2000);
   if(!tags.models?.some(item=>item.name===MODEL)){
+   if(DEDICATED)throw Error('dedicated_model_missing');
    console.log('SEMANTIC_DOWNLOAD — approximately 622 MB once; application unchanged.');
    const progress=setInterval(()=>console.log('SEMANTIC_DOWNLOAD_WAIT — health guard active.'),30000);
    try{if((await api('pull',{model:MODEL,stream:false},480000)).status!=='success')throw Error('semantic_pull_incomplete');}finally{clearInterval(progress);}
   }
   const entry=(await api('tags')).models?.find(item=>item.name===MODEL);digest=entry?.digest;
   if(!digest||!entry.size||entry.size>800*1024**2)throw Error('semantic_model_size_or_digest');
+  if(DEDICATED&&digest!==core.DIGEST)throw Error('dedicated_model_digest');
   used=true;
   const embed=async texts=>(await api('embed',{model:MODEL,input:texts,truncate:false,keep_alive:'10m',options},60000)).embeddings;
-  const batch=createBatcher(embed),docs=FIXTURES.map(([id,text])=>({id,text}));
+  const batch=core.createBatcher(embed),docs=FIXTURES.map(([id,text])=>({id,text}));
   docs.push({id:'phone',text:'Samsung Galaxy S24 smartphone'},{id:'wired',text:'18V wired electric drill with cable'},{id:'utensils',text:'Kitchen cooking spoon utensils set'},{id:'ordinary',text:'Non waterproof walking shoes size 42'});
   const vectors=await Promise.all(docs.map(doc=>batch('title: '+doc.text+' | text: '+doc.text)));docs.forEach((doc,i)=>{doc.vector=vectors[i];});
   const trials=FIXTURES.flatMap(([expected,,queries])=>queries.map(query=>({expected,query})));
   await guard();const begin=Date.now(),results=await Promise.all(trials.map(async item=>{
-   const start=Date.now(),vector=await batch('task: search result | query: '+item.query),first=rank(item.query,vector,docs)[0];
+   const start=Date.now(),vector=await batch('task: search result | query: '+item.query),first=core.rank(item.query,vector,docs)[0];
    return {query:item.query,expected:item.expected,actual:first?.id,score:Math.round((first?.score||0)*1000)/1000,ms:Date.now()-start,passed:first?.id===item.expected};
   }));
   results.forEach(result=>log({event:'SEMANTIC_RESULT',...result}));
@@ -120,9 +127,9 @@ async function main(){
  }finally{
   clearTimeout(timer);clearInterval(monitor);controller.abort();
   if(used)try{
-   const response=await fetch('http://ollama:11434/api/embed',{method:'POST',redirect:'error',signal:AbortSignal.timeout(3000),headers:{'Content-Type':'application/json'},body:JSON.stringify({model:MODEL,input:[],keep_alive:0})});
+   const response=await fetch(BASE+'/api/embed',{method:'POST',redirect:'error',signal:AbortSignal.timeout(3000),headers:{'Content-Type':'application/json'},body:JSON.stringify({model:MODEL,input:[],keep_alive:0})});
    if(!response.ok)throw Error('unload_failed');await response.body?.cancel();
-   const inventory=await fetch('http://ollama:11434/api/ps',{redirect:'error',signal:AbortSignal.timeout(3000)});
+   const inventory=await fetch(BASE+'/api/ps',{redirect:'error',signal:AbortSignal.timeout(3000)});
    if(!inventory.ok)throw Error('unload_unverified');const loaded=await json(inventory,65536);
    if(!Array.isArray(loaded.models)||loaded.models.some(item=>item.name===MODEL||item.model===MODEL))throw Error('candidate_still_loaded');
   }catch{console.error('SEMANTIC_CLEANUP_UNCONFIRMED');}

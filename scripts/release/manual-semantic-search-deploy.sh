@@ -76,19 +76,17 @@ search_timer_installed=0
 timer_snapshot_ready=0
 timers_touched=0
 timer_paths=(
- /etc/systemd/system/trbhh-local-ai-update.service
- /etc/systemd/system/trbhh-local-ai-update.timer
  /etc/systemd/system/trbhh-semantic-index-refresh.service
  /etc/systemd/system/trbhh-semantic-index-refresh.timer
  /usr/local/libexec/trbhh-semantic-index-refresh
 )
-timer_units=(trbhh-local-ai-update.service trbhh-local-ai-update.timer trbhh-semantic-index-refresh.service trbhh-semantic-index-refresh.timer)
+timer_units=(trbhh-semantic-index-refresh.service trbhh-semantic-index-refresh.timer)
 declare -a timer_present timer_enabled timer_active
 snapshot_timers(){
   local i path unit state
   [[ ! -L /etc/systemd/system && ! -L /usr/local/libexec ]]
   # Existing oneshots must not be overwritten, even when waiting on one of our locks.
-  for unit in trbhh-local-ai-update.service trbhh-semantic-index-refresh.service; do
+  for unit in trbhh-semantic-index-refresh.service; do
     state=$(systemctl show -p ActiveState --value "$unit" 2>/dev/null || true)
     [[ $state != active && $state != activating && $state != deactivating && $state != reloading ]]
   done
@@ -111,10 +109,10 @@ snapshot_timers(){
   timer_snapshot_ready=1
   timers_touched=1
   # Stop timer triggers before replacing units; preserve their original active states above.
-  for unit in trbhh-local-ai-update.timer trbhh-semantic-index-refresh.timer; do
+  for unit in trbhh-semantic-index-refresh.timer; do
     if [[ $(systemctl show -p LoadState --value "$unit" 2>/dev/null || true) != not-found ]]; then systemctl stop "$unit"; fi
   done
-  for unit in trbhh-local-ai-update.service trbhh-semantic-index-refresh.service; do
+  for unit in trbhh-semantic-index-refresh.service; do
     state=$(systemctl show -p ActiveState --value "$unit" 2>/dev/null || true)
     [[ $state != active && $state != activating && $state != deactivating && $state != reloading ]]
   done
@@ -196,17 +194,10 @@ timeout 10s docker exec -i "$container" timeout 8 node - <<'NODE' || alias_statu
  process.exitCode=j.models.some(x=>x.name==='trbhh-local:active')?0:2;
 })().catch(()=>process.exitCode=1);
 NODE
-if [[ $alias_status == 0 ]]; then
-  bash "$target/ai/scripts/local-ai/run-model.sh" --verify
-elif [[ $alias_status == 2 ]]; then
-  # The existing updater owns its lock and quality gate; only an absent alias permits promotion.
-  bash "$target/ai/scripts/local-ai/update-model.sh"
-  bash "$target/ai/scripts/local-ai/run-model.sh" --verify
-else
-  echo QWEN_ALIAS_INVENTORY_UNAVAILABLE >&2
-  exit 1
-fi
-# Hold the update lock afterwards for the rest of the deployment.
+# Inventory is diagnostic only. Visitor embeddings do not depend on Qwen inference.
+# An installed alias is not evidence of quality or readiness; do not promote it here.
+echo "QWEN=UNVERIFIED — alias inventory exit=$alias_status; supplier search and translation are outside this activation"
+# Serialize the read-only model copy against any independently scheduled updater.
 exec 8>/run/lock/trbhh-local-ai-update.lock
 flock -n 8
 exec 7>/run/lock/trbhh-semantic-index.lock
@@ -319,7 +310,6 @@ curl --fail --silent --show-error --max-time 30 "https://trbhh.sa/api/version?re
 node -e 'if(JSON.parse(require("fs").readFileSync(process.argv[1])).commit!==process.argv[2])process.exit(1)' "$target/version.json" "$candidate"
 [[ $(sha256sum .env | cut -d' ' -f1) == "$env_hash" ]]
 echo "APPLICATION_RUNTIME_VERIFIED — COMMIT=$candidate"
-bash "$target/ai/scripts/local-ai/run-model.sh" --verify
 echo "PUBLIC_VERSION_VERIFIED=$candidate"
 {
   core_stream
@@ -368,7 +358,4 @@ snapshot_timers
 search_timer_installed=1
 bash "$target/ai/scripts/local-ai/install-search-refresh.sh" "$target/ai"
 systemctl is-active --quiet trbhh-semantic-index-refresh.timer
-ai_timer_installed=1
-bash "$target/ai/scripts/local-ai/install-runtime.sh" --install-timer-only
-systemctl is-active --quiet trbhh-local-ai-update.timer
-echo "SEMANTIC_SEARCH_CODE_ONLY_VERIFIED — COMMIT=$candidate INDEX_READY=1 HTTP_STATUS=$http_status CAPACITY=$capacity_status"
+echo "SEMANTIC_SEARCH_CODE_ONLY_VERIFIED — COMMIT=$candidate INDEX_READY=1 HTTP_STATUS=$http_status CAPACITY=$capacity_status QWEN=UNVERIFIED"

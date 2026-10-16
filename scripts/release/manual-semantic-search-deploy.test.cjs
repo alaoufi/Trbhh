@@ -16,11 +16,10 @@ test('worker is pinned, isolated and serialized before provisioning or cutover',
  assert.match(text,/git diff --quiet "\$baseline" "\$candidate" -- Dockerfile docker-compose.yml/);
 });
 
-test('preserves the installed Qwen runtime and promotes only when active alias is absent',()=>{
- for(const guard of ['EXISTING_QWEN_RUNTIME_REQUIRED','{{.State.Running}}','{{.Image}}','4000000000','10737418240','alias_status == 0','alias_status == 2','QWEN_ALIAS_INVENTORY_UNAVAILABLE'])at(guard);
- assert.ok(at('alias_status == 0')<at('run-model.sh" --verify'));
- assert.ok(at('alias_status == 2')<at('update-model.sh"'));
- assert.ok(at('update-model.sh"')<at('exec 8>/run/lock/trbhh-local-ai-update.lock'));
+test('visitor deployment never loads, promotes, verifies or schedules the unrelated Qwen model',()=>{
+ for(const guard of ['EXISTING_QWEN_RUNTIME_REQUIRED','{{.State.Running}}','{{.Image}}','4000000000','10737418240','QWEN=UNVERIFIED'])at(guard);
+ assert.doesNotMatch(text,/run-model\.sh|update-model\.sh|install-runtime\.sh|trbhh-local-ai-update\.timer|trbhh-local-ai-update\.service/);
+ assert.ok(at('exec 8>/run/lock/trbhh-local-ai-update.lock')<at('docker cp "trbhh-ollama:$model_dir/$manifest"'));
  const snippet=[...text.matchAll(/<<'NODE'(?:[^\n]*)\n([\s\S]*?)\nNODE/g)].map(x=>x[1]).find(x=>x.includes("j.models.some(x=>x.name==='trbhh-local:active')"));assert.ok(snippet);
  const run=(models,status=200)=>spawnSync(process.execPath,['-'],{input:`globalThis.fetch=async(url,options)=>{require('node:assert/strict').equal(url,'http://ollama:11434/api/tags');require('node:assert/strict').equal(options.redirect,'error');return Response.json({models:${JSON.stringify(models)}},{status:${status}});};\n`+snippet,encoding:'utf8',timeout:3000});
  assert.equal(run([{name:'trbhh-local:active'}]).status,0);assert.equal(run([{name:'qwen3.5:9b'}]).status,2);assert.equal(run(null).status,1);assert.equal(run([],500).status,1);
@@ -42,7 +41,7 @@ test('strict dedicated preflight and nonempty index precede app build and preser
 test('postcutover validates index/model and explicitly preserves closed store; timers restore exact prior state',()=>{
  at('await c.verifyModel();const index=await c.readIndex()');
  at('data-search-mode="semantic"');at('HTTP_STATUS=STORE_CLOSED');at("db.site_settings.findMany({where:{k:'commerce_enabled'}");
- for(const guard of ['timer_snapshot_ready == 1 && $timers_touched == 1','restore_timers','install-search-refresh.sh" "$target/ai"','--install-timer-only'])at(guard);
+ for(const guard of ['timer_snapshot_ready == 1 && $timers_touched == 1','restore_timers','install-search-refresh.sh" "$target/ai"'])at(guard);
  assert.doesNotMatch(text,/site_settings\.(?:update|upsert|create)|\$executeRaw/);
 });
 test('rollback health requires the old image and exact baseline response within bounded checks',()=>{
@@ -51,7 +50,7 @@ test('rollback health requires the old image and exact baseline response within 
  assert.equal((text.match(/echo ROLLBACK_HEALTHY=true/g)||[]).length,1);
 });
 test('timer snapshots cover only fixed units and runner and precede partial installer mutations',()=>{
- const allowed=['/etc/systemd/system/trbhh-local-ai-update.service','/etc/systemd/system/trbhh-local-ai-update.timer','/etc/systemd/system/trbhh-semantic-index-refresh.service','/etc/systemd/system/trbhh-semantic-index-refresh.timer','/usr/local/libexec/trbhh-semantic-index-refresh'];
+ const allowed=['/etc/systemd/system/trbhh-semantic-index-refresh.service','/etc/systemd/system/trbhh-semantic-index-refresh.timer','/usr/local/libexec/trbhh-semantic-index-refresh'];
  const paths=text.match(/timer_paths=\(([\s\S]*?)\n\)/)[1].trim().split(/\s+/);assert.deepEqual(paths,allowed);
  for(const guard of ['[[ ! -L /etc/systemd/system && ! -L /usr/local/libexec ]]','[[ ! -L $path ]]','cp -p -- "$path" "$target/timer-before/$i"','state != activating','timer_enabled[$i]=$(systemctl is-enabled','timer_active[$i]=1','timer_snapshot_ready=1','timers_touched=1'])at(guard);
  assert.ok(at('\nsnapshot_timers\n')<at('\nsearch_timer_installed=1\n'));

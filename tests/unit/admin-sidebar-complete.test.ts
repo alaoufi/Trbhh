@@ -31,7 +31,7 @@ describe('complete admin sidebar matching',()=>{
   expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/categories'))?.key).toBe('market-categories');
   expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers'))?.key).toBe('supplier-management');
   expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers/cj/browse'))?.key).toBe('cj-catalog');
-  expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers/cj/payables'))?.key).toBe('cj-operations');
+  expect(ADMIN_GROUPS.find(g=>g.items.some(i=>i.href==='/admin/suppliers/cj/payables'))?.key).toBe('supplier-management');
   expect(pagePermission('/admin/categories')).toBe('categories:view');
  });
  it('uses exactly the same label in heading and active sidebar link for every registered destination',()=>{

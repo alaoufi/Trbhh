@@ -30,10 +30,16 @@ async function verifyRole(role,call,model,protocol,clock=Date.now,report=()=>{})
  roleNames(role);const search=role==='search',cases=search?searchCases:translationCases,proof=[];
  for(const [input,check]of cases){const started=clock(),r=await call('chat',protocol.request(model,input,search?protocol.searchTask:protocol.translationTask('ar'),search?protocol.searchFormat:protocol.translationFormat)),elapsedMs=clock()-started;let v;try{v=JSON.parse(r.message?.content||'{}');}catch{throw Error('quality_or_latency_rejected');}const answer=search?v.queries?.[0]:v.translation;
  const passed=r.done===true&&r.done_reason!=='length'&&typeof answer==='string'&&check(answer)&&elapsedMs>=0&&elapsedMs<=(search?11500:45000)&&(!search||protocol.validateIntentQueries(input,v).length===1);
- report({role,model,input,answer,elapsedMs,passed});if(!passed)throw Error('quality_or_latency_rejected');proof.push({input,answer,elapsedMs,passed});
+ report({role,model,input,answer,elapsedMs,passed,promptTokens:r.prompt_eval_count??null,promptMs:Math.round((r.prompt_eval_duration||0)/1e6),generationMs:Math.round((r.eval_duration||0)/1e6),loadMs:Math.round((r.load_duration||0)/1e6)});if(!passed)throw Error('quality_or_latency_rejected');proof.push({input,answer,elapsedMs,passed});
  }return proof;
 }
 async function readJson(response){if(!response.ok||!response.body)throw Error('local_http_'+response.status);const reader=response.body.getReader(),decoder=new TextDecoder();let bytes=0,text='';try{for(;;){const r=await reader.read();if(r.done)break;bytes+=r.value.length;if(bytes>65536)throw Error('response_limit');text+=decoder.decode(r.value,{stream:true});}return JSON.parse(text+decoder.decode());}finally{await reader.cancel().catch(()=>{});}}
+async function warmSearch(call,model,protocol,clock=Date.now,report=()=>{}){
+ const body=protocol.request(model,searchCases[0][0],protocol.searchTask,protocol.searchFormat);
+ body.options={...body.options,num_predict:1};const started=clock();
+ await call('chat',body,{warmup:true});
+ report({event:'LOCAL_SEARCH_WARMUP',model,elapsedMs:clock()-started,qualitySample:false});
+}
 async function main(){
  const [role,release,mode]=process.argv.slice(2),{active,rollback}=roleNames(role);
  if(!/^[a-f0-9]{40}$/.test(release||'')||!['--probe-only','--activate'].includes(mode))throw Error('explicit_candidate_and_mode_required');
@@ -41,14 +47,14 @@ async function main(){
  if(process.env.LOCAL_AI_URL&&process.env.LOCAL_AI_URL!=='http://ollama:11434')throw Error('unexpected_local_endpoint');
  const fs=require('node:fs'),os=require('node:os'),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),560000),memory=()=>Number(fs.readFileSync('/sys/fs/cgroup/memory.current','utf8')),baseline=memory();let monitor,checking=false;
  async function guard(){controller.signal.throwIfAborted();assertResources(Number(fs.readFileSync('/proc/meminfo','utf8').match(/^MemAvailable:\s+(\d+)/m)?.[1]||0)*1024,os.loadavg()[0],memory()-baseline);const v=await readJson(await fetch('http://127.0.0.1:3000/api/version',{redirect:'error',signal:AbortSignal.timeout(2000)}));if(v.commit!==release)throw Error('running_release_changed');}
- async function call(path,body){
+ async function call(path,body,options={}){
   if(!['tags','chat','copy','delete'].includes(path))throw Error('operation_blocked');
   if(path==='chat'&&![SOURCE,active].includes(body?.model))throw Error('model_blocked');
   if(path==='copy'&&!((body?.source===active&&body.destination===rollback)||(body?.source===SOURCE&&body.destination===active)||(body?.source===rollback&&body.destination===active)))throw Error('copy_blocked');
   if(path==='delete'&&body?.model!==active)throw Error('delete_blocked');
   if(mode==='--probe-only'&&['copy','delete'].includes(path))throw Error('probe_mutation_blocked');
   if(path==='chat')await guard();const preload=path==='chat'&&body.messages?.length===0;
-  const timeout=path==='chat'?(preload?90000:role==='translation'?45000:12000):10000;
+  const timeout=path==='chat'?(preload||options.warmup?90000:role==='translation'?45000:12000):10000;
   // Alias rollback remains possible after the inference/resource controller aborts.
   const signal=path==='chat'?AbortSignal.any([controller.signal,AbortSignal.timeout(timeout)]):AbortSignal.timeout(timeout);
   const response=await fetch('http://ollama:11434/api/'+path,{method:path==='delete'?'DELETE':body?'POST':'GET',redirect:'error',signal,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
@@ -58,10 +64,13 @@ async function main(){
  try{await guard();await assertLocalAiEnabled(db);installedCandidate(await call('tags'));monitor=setInterval(()=>{if(checking)return;checking=true;guard().catch(()=>controller.abort()).finally(()=>{checking=false;});},2000);
   // Existing installed weights only; preload avoids charging load time to an individual meaning case.
   const preload=protocol.request(SOURCE,'',protocol.searchTask,protocol.searchFormat);preload.messages=[];await call('chat',preload);
-  const verify=model=>verifyRole(role,call,model,protocol,Date.now,sample=>console.log(JSON.stringify({event:'LOCAL_ROLE_QUALITY',...sample})));
+  const verify=async model=>{
+   if(role==='search')await warmSearch(call,model,protocol,Date.now,sample=>console.log(JSON.stringify(sample)));
+   return verifyRole(role,call,model,protocol,Date.now,sample=>console.log(JSON.stringify({event:'LOCAL_ROLE_QUALITY',...sample})));
+  };
   const result=mode==='--probe-only'?{role,changed:false,activated:false,proof:await verify(SOURCE)}:await activateRole(role,call,verify,guard);
   if(mode==='--probe-only')await guard();console.log(JSON.stringify({status:mode==='--probe-only'?'LOCAL_ROLE_CANDIDATE_PASSED':'LOCAL_ROLE_READY',...result,release,localOnly:true,downloads:0,databaseWrites:0,storeChanged:false}));
  }finally{clearTimeout(timer);clearInterval(monitor);controller.abort();await db.$disconnect();}
 }
-module.exports={activateRole,verifyRole,roleNames,assertResources,installedCandidate,assertLocalAiEnabled};
+module.exports={activateRole,verifyRole,roleNames,assertResources,installedCandidate,assertLocalAiEnabled,warmSearch};
 if(module.id==='[stdin]')main().catch(error=>{console.log(JSON.stringify({status:'LOCAL_ROLE_NOT_ACTIVATED',reason:String(error.message).slice(0,150)}));process.exitCode=1;});

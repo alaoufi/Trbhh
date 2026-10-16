@@ -1,5 +1,13 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{spawnSync}=require('node:child_process');
-const {activateRole,verifyRole,roleNames,assertResources,installedCandidate,assertLocalAiEnabled}=require('./local-role-activation.cjs');
+const {activateRole,verifyRole,roleNames,assertResources,installedCandidate,assertLocalAiEnabled,warmSearch}=require('./local-role-activation.cjs');
+test('search warmup is one bounded token, reported separately and never counts as a quality answer',async()=>{
+ const calls=[],reports=[],protocol={searchTask:'compact',searchFormat:{type:'object'},request:(model,input,task,format)=>({model,messages:[{role:'user',content:input}],format,options:{num_predict:64,num_thread:4,num_ctx:2048},task})};
+ let time=0;
+ await warmSearch(async(...args)=>{calls.push(args);time=42000;return {done:true,done_reason:'length'};},'qwen3.5:9b',protocol,()=>time,row=>reports.push(row));
+ assert.equal(calls.length,1);assert.equal(calls[0][0],'chat');assert.equal(calls[0][1].options.num_predict,1);assert.equal(calls[0][1].options.num_thread,4);assert.deepEqual(calls[0][2],{warmup:true});
+ assert.deepEqual(reports,[{event:'LOCAL_SEARCH_WARMUP',model:'qwen3.5:9b',elapsedMs:42000,qualitySample:false}]);
+ await assert.rejects(warmSearch(async()=>{throw Error('timeout');},'qwen3.5:9b',protocol),/timeout/);
+});
 const os=require('node:os'),path=require('node:path');
 test('manual runner propagates failed units and rejected quality even inside a caller conditional',()=>{
  const shell=fs.readFileSync('scripts/release/manual-local-role.sh','utf8');

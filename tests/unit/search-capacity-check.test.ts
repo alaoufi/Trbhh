@@ -3,7 +3,28 @@ import {expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-const {summary,burst,readSmall,assertResources,releaseExploratory,assessPublicIntent}=createRequire(import.meta.url)('../../scripts/local-ai/capacity-check.cjs');
+const {summary,burst,readSmall,assertResources,releaseExploratory,assessPublicIntent,assessPublicHttp,assessHttpStage,DISTINCT_QUERIES}=createRequire(import.meta.url)('../../scripts/local-ai/capacity-check.cjs');
+it('can probe real shop HTTP alone without loading staged models or calling any other route',()=>{
+ const script=readFileSync(new URL('../../scripts/local-ai/capacity-check.cjs',import.meta.url),'utf8');
+ const prelude=`const assert=require('node:assert/strict'),Module=require('node:module'),original=Module._load;
+ Module._load=function(name,...args){if(name==='node:fs')return {readFileSync:p=>p==='/proc/meminfo'?'MemAvailable: 23068672 kB':String(1024**3)};if(name==='node:os')return {loadavg:()=>[1,1,1]};return original.call(this,name,...args);};
+ let shopCalls=0;const shopQueries=[];let active=0,maxActive=0;globalThis.fetch=async(url,options)=>{assert.equal(options.method,undefined);assert.equal(options.redirect,'error');if(url==='http://127.0.0.1:3000/api/version')return Response.json({commit:'a'.repeat(40)});assert.match(String(url),/^http:\\/\\/127\\.0\\.0\\.1:3000\\/shop\\?q=/);shopCalls++;shopQueries.push(new URL(url).searchParams.get('q'));active++;maxActive=Math.max(maxActive,active);await Promise.resolve();active--;return new Response('<html><p data-search-scope="trbhh-products" data-search-mode="semantic"></p></html>');};
+ process.on('exit',()=>{assert.equal(shopCalls,120);assert.equal(new Set(shopQueries.slice(80)).size,40);assert.equal(maxActive,40);assert.ok(shopQueries.slice(80).every(q=>!/[0-9]/.test(q)));});\n`;
+ const result=spawnSync(process.execPath,['-','b'.repeat(40),'--http-only'],{input:prelude+script,encoding:'utf8',timeout:9000});
+ expect(result.status,result.stderr).toBe(0);
+ const lines=result.stdout.split('\n').filter(line=>line.startsWith('{')).map(line=>JSON.parse(line));
+ expect(lines.find(line=>line.event==='CAPACITY_HTTP_COMPLETE')).toMatchObject({publicHttpObservedConcurrency:40,publicHttpIntelligentConcurrency:40,publicHttpSemanticConcurrency:40,modelInferenceTested:false,deployed:false,distinctRequests:40,distinctSemantic:40,distinctErrors:0,distinctCacheState:'unverified',distinctQuality:'unverified',distinctPassed:true});
+ expect(lines.filter(line=>line.event==='PUBLIC_HTTP_STAGE').map(line=>line.semantic)).toEqual([1,5,10,20,40]);
+ expect(lines.find(line=>line.event==='PUBLIC_HTTP_DISTINCT')).toMatchObject({requests:40,semantic:40,errors:0,distinctCacheState:'unverified',passed:true});
+ expect(result.stdout).not.toContain('MODEL_PRELOAD');expect(result.stdout).not.toContain('STAGED_MODEL_POOL');
+},12000);
+it('recognizes public semantic results without conflating legacy intent and literal modes',()=>{
+ for(const mode of ['semantic','intent','literal','idle'])expect(assessPublicHttp(`<html><p data-search-scope="trbhh-products" data-search-mode="${mode}"></p></html>`,true)).toMatchObject({ok:true,mode});
+ expect(assessPublicHttp('<html data-search-mode="semantic"></html>',true)).toMatchObject({ok:false,searchUnavailable:true});
+ expect(assessPublicHttp('<html data-search-scope="trbhh-products" data-search-mode="semantic"></html>',false)).toMatchObject({ok:false});
+ const result=summary([{ms:1,ok:true,mode:'semantic'},{ms:2,ok:true,mode:'intent'},{ms:3,ok:true,mode:'literal'},{ms:4,ok:false,mode:'semantic'}],10);
+ expect(result).toMatchObject({intelligent:2,semantic:1,intent:1,literal:1,errors:1});
+});
 it('preserves rejected raw answers so validation failures are distinguishable from bad meaning',()=>{
  const protocol=createRequire(import.meta.url)('../../scripts/local-ai/protocol.cjs');
  const result=assessPublicIntent(protocol,'أبغى كفر Samsung S24',{done:true,message:{content:JSON.stringify({queries:['غطاء SamsungS24']})}},()=>true);
@@ -71,3 +92,25 @@ globalThis.fetch=async(url,options)=>{
  const quality=spawnSync(process.execPath,['-','b'.repeat(40),'--quality-only'],{input:qualityPrelude+script,encoding:'utf8',timeout:5000});
  expect(quality.status,quality.stderr).toBe(0);expect(quality.stdout).not.toContain('PUBLIC_HTTP_STAGE');expect(quality.stdout).not.toContain('STAGED_MODEL_POOL');expect(quality.stdout).toContain('PUBLIC_QUALITY_COMPLETE');expect(quality.stdout).toContain('rawAnswer');
 },15000);
+
+it('applies semantic 4s, legacy intent 10s and literal 2.5s stage limits without crediting failed stages',()=>{
+ const semantic={requests:40,success:40,errors:0,intelligent:40,semantic:40,p95Ms:4000};
+ expect(assessHttpStage(semantic)).toEqual({passed:true,latencyBudgetMs:4000});
+ expect(assessHttpStage({...semantic,p95Ms:4001}).passed).toBe(false);
+ expect(assessHttpStage({...semantic,semantic:0,p95Ms:10000})).toEqual({passed:true,latencyBudgetMs:10000});
+ expect(assessHttpStage({...semantic,intelligent:39,p95Ms:2501}).passed).toBe(false);
+ expect(assessHttpStage({...semantic,errors:1,success:39}).passed).toBe(false);
+ expect(DISTINCT_QUERIES).toHaveLength(40);expect(new Set(DISTINCT_QUERIES).size).toBe(40);
+});
+it('does not escalate to distinct requests after a warmed semantic stage exceeds 4s',()=>{
+ const script=readFileSync(new URL('../../scripts/local-ai/capacity-check.cjs',import.meta.url),'utf8');
+ const prelude=`const assert=require('node:assert/strict'),Module=require('node:module'),original=Module._load;
+ Module._load=function(name,...args){if(name==='node:fs')return {readFileSync:p=>p==='/proc/meminfo'?'MemAvailable: 23068672 kB':String(1024**3)};if(name==='node:os')return {loadavg:()=>[1,1,1]};return original.call(this,name,...args);};
+ let now=1000,shopCalls=0;Date.now=()=>now;
+ globalThis.fetch=async(url,options)=>{assert.equal(options.method,undefined);if(url==='http://127.0.0.1:3000/api/version')return Response.json({commit:'a'.repeat(40)});assert.ok(String(url).startsWith('http://127.0.0.1:3000/shop?q='));shopCalls++;now+=4001;return new Response('<html><p data-search-scope="trbhh-products" data-search-mode="semantic"></p></html>');};
+ process.on('exit',()=>assert.equal(shopCalls,5));\n`;
+ const result=spawnSync(process.execPath,['-','b'.repeat(40),'--http-only'],{input:prelude+script,encoding:'utf8',timeout:5000});
+ expect(result.status,result.stderr).toBe(0);expect(result.stdout).not.toContain('PUBLIC_HTTP_DISTINCT');
+ const report=result.stdout.split('\n').filter(line=>line.startsWith('{')).map(line=>JSON.parse(line)).find(line=>line.event==='CAPACITY_HTTP_COMPLETE');
+ expect(report).toMatchObject({publicHttpObservedConcurrency:0,publicHttpSemanticConcurrency:0,distinctRequests:0,distinctPassed:false,distinctCacheState:'unverified'});
+});

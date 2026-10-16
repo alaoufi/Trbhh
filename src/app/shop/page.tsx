@@ -4,11 +4,11 @@ import { hasAction } from '@/lib/roles';
 import { PLACEHOLDER } from '@/lib/media';
 import { primaryImages } from '@/lib/account';
 import { getCommerceConfig } from '@/lib/commerce/settings';
-import { readPublicCommerceProducts, searchPublicCommerceProducts } from '@/lib/commerce/public-product';
-import { localPublicSearchQueries } from '@/lib/ai/local';
+import { readPublicCommerceProducts, searchTrbhhProducts } from '@/lib/commerce/public-product';
 import Link from 'next/link';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
+import { HOME_SECTION_CAP } from '@/lib/commerce/home-layout';
 import { CommerceHome, type CommerceHomeSection, type CommerceBanner, type CommerceCategory } from '@/components/commerce/commerce-home';
 import { firstImageUrl, type CommerceCardItem } from '@/components/commerce/catalog';
 import type { HeroSlide } from '@/components/commerce/commerce-hero';
@@ -84,12 +84,14 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
   }
   await assertCommerceSchemaReady(prisma);
   const q=typeof sp.q==='string'?sp.q.trim().slice(0,200):'';
-  const qVariants=q?await localPublicSearchQueries(q):[];
+  const searchResult = q ? await searchTrbhhProducts(q) : null;
   const [candidateIds, gateway] = await Promise.all([
     q?Promise.resolve([]):prisma.$queryRaw<{id:bigint}[]>`SELECT cp.id FROM commerce_products cp WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' ORDER BY cp.id DESC LIMIT 100`,
     getCommerceGateway(),
   ]);
-  const products=(q?await searchPublicCommerceProducts(q,qVariants):[...(await readPublicCommerceProducts(candidateIds.map(row=>row.id))).values()]).sort((a,b)=>Number(b.featured)-Number(a.featured)||Number(b.id)-Number(a.id));
+  const products = searchResult
+    ? searchResult.products.slice(0, HOME_SECTION_CAP)
+    : [...(await readPublicCommerceProducts(candidateIds.map(row=>row.id))).values()].sort((a,b)=>Number(b.featured)-Number(a.featured)||Number(b.id)-Number(a.id));
   const canCheckout = config.purchasingEnabled && config.enabled && config.paymentsEnabled && gateway?.ready && config.shippingFeeMinor !== null && !!config.text.shippingTerms;
 
   const shortInfo = (d: string): string | null => {
@@ -121,7 +123,7 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
 
   const featured = sourceCards.filter((c) => c.featured);
   const rest = sourceCards.filter((c) => !c.featured);
-  const heroCards = featured.length ? featured : sourceCards;
+  const heroCards = q ? [] : featured.length ? featured : sourceCards;
 
   const hero: HeroSlide[] = heroCards.slice(0, 5).map((c) => ({
     id: c.id, title: c.title, subtitle: c.info ?? undefined, image: c.image, href: c.href, cta: usingDemoAds ? 'عرض الإعلان' : config.text.buy,
@@ -138,7 +140,9 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
     { id: 'featured', title: 'متجر تربح — عروض مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'orange', subtitle: 'شراء مباشر' },
     { id: 'all', title: 'متجر تربح — كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
   ];
-  const sections = usingDemoAds ? [demoSection] : realSections.filter((s) => s.items.length > 0);
+  const sections: CommerceHomeSection[] = q
+    ? [{ id: 'results', title: config.text.title, kind: 'products', items: sourceCards, display: 'grid', accent: 'navy', subtitle: `${sourceCards.length} منتج` }]
+    : usingDemoAds ? [demoSection] : realSections.filter((s) => s.items.length > 0);
 
   // «تصفّح حسب الفئة»: فئات تربط بالبحث الحالي (لا نظام أقسام — الأقسام مُزالة من المشروع).
   // نصوص مبدئية للعرض؛ تنتظر تعريف الفئات الحقيقية من الإدارة.
@@ -176,10 +180,10 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
         <button type="submit" className="min-h-11 rounded-xl bg-primary px-5 font-bold text-white">بحث</button>
         {q&&<Link href={preview?'/shop?preview=1':'/shop'} className="px-3 text-sm underline">مسح البحث</Link>}
       </form>
-      {q&&<p data-search-scope="trbhh-products" data-search-mode={qVariants.length?'intent':'literal'} className="text-sm text-muted-foreground">نتائج المنتجات: {products.length}</p>}
+      {q&&<p data-search-scope="trbhh-products" data-search-mode={searchResult?.mode ?? 'literal'} className="text-sm text-muted-foreground">نتائج المنتجات: {products.length}</p>}
       {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {sourceCards.length === 0
-        ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">{preview ? 'لا توجد إعلانات حيّة مطابقة لعرضها كبيانات توضيحية.' : 'لا توجد منتجات معتمدة للعرض حالياً.'}</p>
+        ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">{q ? 'لا توجد منتجات معتمدة مطابقة لبحثك.' : preview ? 'لا توجد إعلانات حيّة مطابقة لعرضها كبيانات توضيحية.' : 'لا توجد منتجات معتمدة للعرض حالياً.'}</p>
         : <CommerceHome hero={hero} sections={sections} banners={banners} categories={categories} />}
     </div>
   );

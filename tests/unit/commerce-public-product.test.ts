@@ -1,12 +1,25 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const state=vi.hoisted(()=>({query:vi.fn(),ready:vi.fn()}));
+const state=vi.hoisted(()=>({query:vi.fn(),ready:vi.fn(),semantic:vi.fn()}));
+vi.mock('@/lib/ai/product-search',()=>({semanticProductSearch:state.semantic}));
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:state.query}}));
 vi.mock('@/lib/commerce/schema',()=>({assertCommerceSchemaReady:state.ready,COMMERCE_DDL:[]}));
-import {readPublicCommerceProduct,searchPublicCommerceProducts} from '@/lib/commerce/public-product';
+import {readPublicCommerceProduct,searchPublicCommerceProducts,searchTrbhhProducts} from '@/lib/commerce/public-product';
 const row={id:20n,title:'<b>مطرقة اختبار</b>',price_minor:1000,stock_available:10,stock_reserved:1,images:['http://unsafe.test/x.webp','https://images.example/a.webp','/media/b.webp'],description:'<script>bad()</script> وصف صحيح',brand:'علامة',options:[{name:'اللون',values:['أسود','أحمر']}],variants:[{externalId:'variant-4',name:'أسود / XL / 220V / EU',sku:'CJ-XL-BLK',publicPriceMinor:1200,quantity:5,available:true,image:'https://images.example/black-xl.webp',options:{Color:'Black',Size:'XL',Voltage:'220V',Plug:'EU',Material:'Steel'}}],available:1,quantity:8,featured:1,source_id:8n,cj_source_id:null,cj_availability_json:null,cj_details_json:null};
 const cjProof=(vid='VID-1',stock=7)=>JSON.stringify({checkedAt:new Date().toISOString(),stockQuantity:stock,variants:[{vid,stockQuantity:stock,shippingOptions:[{name:'CJ Packet',priceMinor:1575,currency:'SAR',deliveryDays:'8-15 days',originCountry:'CN'}]}],shippingOptions:[{name:'CJ Packet',priceMinor:1575,currency:'SAR',deliveryDays:'8-15 days',originCountry:'CN'}]});
 describe('public commerce product filtering',()=>{
  beforeEach(()=>{vi.resetAllMocks();state.ready.mockResolvedValue(undefined);state.query.mockResolvedValue([row]);});
+ it('rehydrates semantic rank with fresh eligibility and suppresses unavailable candidates',async()=>{
+  state.semantic.mockResolvedValue({mode:'semantic',ids:['21','20','22']});
+  state.query.mockResolvedValue([{...row,id:20n},{...row,id:21n},{...row,id:22n,cj_source_id:1n,cj_availability_json:null}]);
+  const result=await searchTrbhhProducts('drill');expect(result.mode).toBe('semantic');expect(result.products.map(p=>p.id)).toEqual(['21','20']);
+  expect(state.query.mock.calls[0][0].sql).toContain('cp.approved=1 AND cp.visible=1 AND cp.enabled=1');
+  expect(state.query.mock.calls[0][0].values).toEqual([21n,20n,22n]);
+ });
+ it('reports literal fallback with original query and no generated interpretations',async()=>{
+  state.semantic.mockResolvedValue({mode:'fallback',ids:[]});
+  expect((await searchTrbhhProducts('drill 18V')).mode).toBe('literal');
+  expect(state.query.mock.calls[0][0].values).toEqual(['drill','drill','drill','18V','18V','18V',100]);
+ });
  it('searches saved eligible products before the result limit using bound text parameters only',async()=>{
   const products=await searchPublicCommerceProducts('شي يرتب مطبخ', ['منظم مطبخ']);
   expect(products).toHaveLength(1);

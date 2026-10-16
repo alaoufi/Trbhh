@@ -26,6 +26,21 @@ function validateIntentQueries(text,result,publicSearch=false){
 }
 /** Source constraints are search terms, never evidence of a supplier product's specifications. */
 function finalizeSupplierQueries(source,result){
+ // Some runtimes ignore maxItems. Accept equivalent alternatives only, never
+ // discard a contradictory model answer to manufacture a passing result.
+ if(!Array.isArray(result?.queries)||result.queries.length<1||result.queries.length>3)return [];
+ const results=result.queries.map(query=>finalizeSingleSupplierQuery(source,{queries:[query]}));
+ if(results.some(value=>value.length!==1))return [];
+ // Only move the water-resistance modifier; retain noun order and all other
+ // words so different products cannot collapse to the same bag of tokens.
+ const canonical=value=>{
+  const text=joinedUnits(value).toLowerCase(),water=/\b(?:waterproof|water[- ]resistant)\b/;
+  return text.replace(/\b(?:waterproof|water[- ]resistant)\b/g,'').replace(/\s+/g,' ').trim()+(water.test(text)?'|water-resistance':'');
+ };
+ const first=results[0][0],key=canonical(first);
+ return results.every(value=>canonical(value[0])===key)?[first]:[];
+}
+function finalizeSingleSupplierQuery(source,result){
  const text=asciiDigits(String(source).normalize('NFC').trim().replace(/\s+/g,' '));
  const raw=validateIntentQueries('',result)[0];if(!text||text.length>100||!raw)return [];
  const normalized=text.toLowerCase().replace(/[ً-ٰٟـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');

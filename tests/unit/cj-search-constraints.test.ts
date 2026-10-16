@@ -1,6 +1,24 @@
 import {createRequire} from 'node:module';
 import {expect,it} from 'vitest';
 const {finalizeSupplierQueries}=createRequire(import.meta.url)('../../scripts/local-ai/protocol.cjs');
+it('normalizes the full recorded server response to one constraint-preserving query',()=>{
+ expect(finalizeSupplierQueries('جزمة للمشي ضد الموية مقاس 42',{queries:['walking shoe','waterproof walking shoe']})).toEqual(['walking shoe water-resistant size 42']);
+});
+it('accepts at most three equivalent alternatives and still returns only one',()=>{
+ expect(finalizeSupplierQueries('حذاء ضد الماء مقاس 42',{queries:['walking shoe','waterproof walking shoe','walking shoe water-resistant size 42']})).toEqual(['walking shoe water-resistant size 42']);
+});
+it.each([
+ {queries:['walking shoe','shoe cover']},
+ {queries:['dog toy','toy dog']},
+ {queries:['walking shoe','walking shoe size 41']},
+ {queries:['walking shoe','not waterproof walking shoe']},
+ {queries:['walking shoe',null]},
+ {queries:['walking shoe','حذاء']},
+ {queries:['walking shoe','walking shoe','walking shoe','walking shoe']},
+ {queries:[]}
+])('does not hide conflicting or invalid alternatives: %j',value=>{
+ expect(finalizeSupplierQueries('حذاء ضد الماء مقاس 42',value)).toEqual([]);
+});
 it.each([
  ['جزمة للمشي ضد الموية مقاس 42','walking shoe','walking shoe water-resistant size 42'],
  ['حذاء مقاوم للماء قياس ٣٨','walking shoes','walking shoes water-resistant size 38'],
@@ -36,4 +54,5 @@ it.each([
 });
 it('does not invent constraints that the source did not request',()=>{
  expect(finalizeSupplierQueries('حذاء للمشي',{queries:['walking shoe']})).toEqual(['walking shoe']);
+ expect(finalizeSupplierQueries('حذاء للمشي',{queries:['walking shoe','waterproof walking shoe']})).toEqual([]);
 });

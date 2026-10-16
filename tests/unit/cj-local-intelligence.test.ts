@@ -13,6 +13,11 @@ describe('local intelligence boundary',()=>{
   expect(fetcher).toHaveBeenCalledOnce();
   expect(JSON.parse(fetcher.mock.calls[0][1].body).options).toMatchObject({num_thread:4,num_ctx:2048,num_predict:64});
  });
+ it('normalizes the actual multi-answer server response without a second inference',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['walking shoe','waterproof walking shoe']}));
+  expect(await localSearchQueries('جزمة للمشي ضد الموية مقاس 42')).toEqual(['walking shoe water-resistant size 42']);
+  expect(fetcher).toHaveBeenCalledOnce();
+ });
  it('gives simultaneous search priority over a background reservation before fetch starts',async()=>{
   fetcher.mockResolvedValue(answer({queries:['kitchen organizer']}));
   const jobs=await Promise.all([localTranslation('pending background','ar',45000,{priority:'background'}),localSearchQueries('منظم المطبخ')]);

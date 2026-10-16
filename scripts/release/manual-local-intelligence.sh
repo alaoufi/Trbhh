@@ -7,15 +7,17 @@ release=46d7d108ff1511c3f991eff645050152481e7adb
 if [[ ${1:-} != --run ]]; then
   [[ ${1:-} =~ ^[a-f0-9]{40}$ ]]
   revision=$1
+  mode=${2:-}
+  [[ -z $mode || $mode == --translation-probe ]]
   target=/root/trbhh-release-tools/local-intelligence-$(date +%s)
   [[ ! -e $target ]]
   mkdir -m 700 "$target"
-  for file in manual-local-intelligence.sh local-intelligence-activation.cjs verify-runtime.cjs; do git show "$revision:scripts/release/$file" > "$target/$file"; done
+  for file in manual-local-intelligence.sh local-intelligence-activation.cjs translation-proofread.cjs verify-runtime.cjs; do git show "$revision:scripts/release/$file" > "$target/$file"; done
   for file in protocol.cjs update-model.cjs inference-pool.cjs; do git show "$release:scripts/local-ai/$file" > "$target/$file"; done
   bash -n "$target/manual-local-intelligence.sh"
   unit=trbhh-local-intelligence-${target##*-}
   touch "$target/result.log"
-  systemd-run --unit="$unit" --property=Type=exec --property=RuntimeMaxSec=330 /bin/bash "$target/manual-local-intelligence.sh" --run "$target"
+  systemd-run --unit="$unit" --property=Type=exec --property=RuntimeMaxSec=330 /bin/bash "$target/manual-local-intelligence.sh" --run "$target" "$mode"
   printf 'RESULT: tail -n 30 %s/result.log\n' "$target"
   (while systemctl is-active --quiet "$unit.service"; do sleep 3; done) &
   watcher=$!
@@ -25,6 +27,10 @@ if [[ ${1:-} != --run ]]; then
   exit 0
 fi
 target=${2:?}
+mode=${3:-}
+[[ -z $mode || $mode == --translation-probe ]]
+node_mode=
+[[ $mode != --translation-probe ]] || node_mode=--probe-only
 [[ $target =~ ^/root/trbhh-release-tools/local-intelligence-[0-9]+$ && -d $target && ! -L $target ]]
 exec > "$target/result.log" 2>&1
 exec 9>/run/lock/trbhh-finance-deploy.lock
@@ -56,10 +62,15 @@ echo 'LOCAL_INTELLIGENCE_GATE — installed model only; no app restart, product 
   printf 'globalThis.%s=(()=>{const module={exports:{}};\n' "$name"
   cat "$target/$file"
   printf '\nreturn module.exports;})();\n'
+  if [[ $mode == --translation-probe && $name == __trbhhLocalProtocol ]]; then
+   printf 'globalThis.__trbhhLocalProtocol=(()=>{const module={exports:{}};\n'
+   cat "$target/translation-proofread.cjs"
+   printf '\nreturn module.exports(globalThis.__trbhhLocalProtocol);})();\n'
+  fi
  done
  cat "$target/local-intelligence-activation.cjs"
-} | docker exec -i trbhh-app timeout --signal=TERM --kill-after=20s 300s nice -n 10 node -
+} | docker exec -i trbhh-app timeout --signal=TERM --kill-after=20s 300s nice -n 10 node - "$node_mode"
 docker inspect trbhh-app > "$target/after.json"
 node "$target/verify-runtime.cjs" "$target/before.json" "$target/after.json"
 [[ $(sha256sum .env | cut -d' ' -f1) == "$env_hash" ]]
-echo 'LOCAL_INTELLIGENCE_RUNTIME_UNCHANGED — inspect LOCAL_INTELLIGENCE_READY proof above; distinct-query throughput remains unverified.'
+echo 'LOCAL_INTELLIGENCE_RUNTIME_UNCHANGED — inspect gate result above; candidate probe does not activate or deploy.'

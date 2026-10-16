@@ -49,8 +49,19 @@ test('missing negation, wrong accessory and lost voltage are quality failures',a
  for(const override of [
   {'غطاء Samsung S24':{queries:['Samsung S24 smartphone']}},
   {'أبغى دريل بدون سلك 18V':{queries:['cordless drill']}},
-  {'USB-C cable, 2 m. Charger not included.':{translation:'كابل USB-C بطول 2 متر مع الشاحن'}}
+  {'USB-C cable, 2 m. Charger not included.':{translation:'كابل USB-C بطول 2 متر مع الشاحن'}},
+  {'USB-C cable, 2 m. Charger not included.':{translation:'كابل USB-C، طوله 2 متر. لا يشمل الشحان.'}}
  ]){const f=modelCall(override);await assert.rejects(verifyQuality(f.call,'qwen3.5:9b',protocol,smoke,poolFactory),/smoke_failed|quality_or_latency_rejected/);}
+});
+test('proofreading candidate adds general spelling guidance without changing search or accepting the observed typo',()=>{
+ const revised=require('./translation-proofread.cjs')(protocol);
+ assert.equal(revised.searchTask,protocol.searchTask);assert.equal(revised.request,protocol.request);assert.equal(revised.validateIntentQueries,protocol.validateIntentQueries);
+ assert.equal(revised.translationTask('ar'),protocol.translationTask('ar')+' Proofread spelling and grammar silently before returning.');
+ assert.doesNotMatch(revised.translationTask('ar'),/charger|USB|شاحن|الشحان/i);
+ const shell=fs.readFileSync('scripts/release/manual-local-intelligence.sh','utf8'),code=fs.readFileSync('scripts/release/local-intelligence-activation.cjs','utf8');
+ assert.ok(shell.includes('mode == --translation-probe && $name == __trbhhLocalProtocol'));assert.ok(shell.includes('node_mode=--probe-only'));
+ const branch=code.slice(code.indexOf("if(process.argv.includes('--probe-only'))"),code.indexOf('const result=await activate(call,model=>'));
+ assert.ok(branch.includes('activated:false'));assert.ok(branch.includes('return;'));assert.doesNotMatch(branch,/await activate|copy|delete/);
 });
 test('a correct answer outside the production latency budget is still rejected',async()=>{
  const old=Date.now;let clock=0;Date.now=()=>{clock+=12000;return clock;};

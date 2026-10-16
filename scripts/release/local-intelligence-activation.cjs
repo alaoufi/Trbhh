@@ -77,6 +77,10 @@ async function main(){
  try{
   await guard();const rows=await db.$queryRawUnsafe("SELECT v FROM site_settings WHERE k='local_ai_enabled' LIMIT 1");if((rows[0]?.v??'1')!=='1')throw Error('local_ai_disabled_setting_preserved');
   monitor=setInterval(()=>{if(checking)return;checking=true;guard().catch(()=>controller.abort()).finally(()=>{checking=false;});},2000);
+  if(process.argv.includes('--probe-only')){
+   const proof=await verifyQuality(call,SOURCE,protocol,updater.smoke,pool.createInferencePool);await guard();
+   log({status:'LOCAL_INTELLIGENCE_CANDIDATE_PASSED',proof,release:RELEASE,activated:false,localOnly:true,databaseWrites:0,downloads:0});return;
+  }
   const result=await activate(call,model=>verifyQuality(call,model,protocol,updater.smoke,pool.createInferencePool),guard);log({...result,release:RELEASE,localOnly:true,downloads:0,databaseWrites:0,storeChanged:false});
  }finally{clearTimeout(timer);clearInterval(monitor);controller.abort();await db.$disconnect();}
 }

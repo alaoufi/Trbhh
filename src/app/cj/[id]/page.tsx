@@ -192,7 +192,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     {view.isStaff && session && displayVariants.length > 0 && <div className="fixed inset-x-0 bottom-[4.5rem] z-30 border-t border-slate-200 bg-white/95 px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur md:bottom-0">
       {/* مسافة يسارية (pe في RTL) تترك ركن ختم «متجر موثّق» العائم حرّاً فلا يُغطّي الزر. */}
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 pe-24 md:pe-0">
-        <a href="#cj-buy" className="inline-flex min-h-12 w-1/2 max-w-xs items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-white">اختر وأضف إلى السلة</a>
+        <a href="#cj-buy" className="inline-flex min-h-12 w-1/2 max-w-xs items-center justify-center rounded-xl bg-primary px-5 text-sm font-extrabold text-white">خيارات الشراء والتحقق</a>
       </div>
     </div>}
   </div>;

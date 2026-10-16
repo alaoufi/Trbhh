@@ -7,6 +7,12 @@ beforeEach(()=>{settings.enabled='1';clearLocalInferenceCache();fetcher.mockRese
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs();});
 const answer=(value:unknown)=>new Response(JSON.stringify({done:true,message:{content:JSON.stringify(value)}}));
 describe('local intelligence boundary',()=>{
+ it('retains explicit attributes after incomplete model output with just one inference',async()=>{
+  fetcher.mockResolvedValue(answer({queries:['walking shoe']}));
+  expect(await localSearchQueries('جزمة للمشي ضد الموية مقاس 42')).toEqual(['walking shoe water-resistant size 42']);
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).options).toMatchObject({num_thread:4,num_ctx:2048,num_predict:64});
+ });
  it('gives simultaneous search priority over a background reservation before fetch starts',async()=>{
   fetcher.mockResolvedValue(answer({queries:['kitchen organizer']}));
   const jobs=await Promise.all([localTranslation('pending background','ar',45000,{priority:'background'}),localSearchQueries('منظم المطبخ')]);

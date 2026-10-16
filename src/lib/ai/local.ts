@@ -1,6 +1,6 @@
 import 'server-only';
 import {getSetting} from '@/lib/settings';
-import {request,searchTask,searchFormat,publicSearchTask,publicSearchFormat,translationFormat,translationTask,asciiDigits,validateIntentQueries} from '../../../scripts/local-ai/protocol.cjs';
+import {request,searchTask,searchFormat,publicSearchTask,publicSearchFormat,translationFormat,translationTask,asciiDigits,validateIntentQueries,finalizeSupplierQueries} from '../../../scripts/local-ai/protocol.cjs';
 import {createInferencePool} from '../../../scripts/local-ai/inference-pool.cjs';
 
 /** Service identities are deployment-owned: saved URLs must never enable cloud inference. */
@@ -68,7 +68,7 @@ export async function localTranslation(text:string,target:'ar'|'en',budgetMs=12_
 
 export async function localSearchQueries(query:string):Promise<string[]> {
  const text=asciiDigits(query.normalize('NFC').trim().replace(/\s+/g,' ').slice(0,100));
- return validateIntentQueries(text,await localGenerate(text,searchTask,searchFormat));
+ return finalizeSupplierQueries(text,await localGenerate(text,searchTask,searchFormat));
 }
 /** A bounded local interpretation; callers retain the original text and every visibility filter. */
 export async function localPublicSearchQueries(query:string):Promise<string[]> {

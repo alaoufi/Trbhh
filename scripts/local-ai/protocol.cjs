@@ -24,4 +24,26 @@ function validateIntentQueries(text,result,publicSearch=false){
   .filter(value=>value.length>0&&value.length<=100&&(publicSearch?/\p{Script=Arabic}/u.test(value):/[a-z]/i.test(value))&&!(publicSearch?/[\p{Cc}<>]/u:/[\p{Script=Arabic}\p{Cc}<>]/u).test(value)
    &&[...required,...brands.map(word=>word.toLowerCase())].every(word=>joinedUnits(value).toLowerCase().split(/[^a-z0-9.-]+/).includes(word))))].slice(0,3);
 }
-module.exports={request,searchTask,searchFormat,publicSearchTask,publicSearchFormat,translationFormat,translationTask,asciiDigits,validateIntentQueries};
+/** Source constraints are search terms, never evidence of a supplier product's specifications. */
+function finalizeSupplierQueries(source,result){
+ const text=asciiDigits(String(source).normalize('NFC').trim().replace(/\s+/g,' '));
+ const raw=validateIntentQueries('',result)[0];if(!text||text.length>100||!raw)return [];
+ const normalized=text.toLowerCase().replace(/[ً-ٰٟـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي');
+ const numbers=value=>(joinedUnits(value).match(/[A-Za-z]*\d+[A-Za-z\d.-]*|\d+(?:\.\d+)?/g)||[]).map(x=>x.toLowerCase());
+ const allowed=numbers(text);
+ if(numbers(raw).some(value=>!allowed.includes(value)))return [];
+ // An explicitly negated property needs contextual interpretation; never turn it positive.
+ const negativeEnglish=/\b(?:not|non|no|without)[ -]+(?:waterproof|water[- ]resistan(?:t|ce)|cordless|wireless|height[- ]adjustable|adjustable height|(?:for\s+)?travel)\b/i;
+ const negativeArabic=/(?:^|\s)(?:غير|ليس|ليست|مو|بدون)\s*(?:ال)?(?:مقاوم|ضد|لاسلكي|بدون\s*سلك|قابله?\s*لتعديل\s*الارتفاع|(?:مخصصه?\s*)?للسفر)/i;
+ if(negativeArabic.test(normalized)||negativeEnglish.test(normalized)||negativeEnglish.test(raw))return [];
+ let query=raw;
+ const add=(value,match,conflict)=>{if(conflict?.test(query))return false;if(!match.test(query))query+=' '+value;return true;};
+ if(/(?:ضد\s*(?:الماء|المويه)|مقاومه?\s*للماء|waterproof|water[- ]resistant)/i.test(normalized)&&!add('water-resistant',/\b(?:waterproof|water[- ]resistant)\b/i,/\b(?:non[- ]waterproof|not\s+waterproof|without\s+water\s+resistance)\b/i))return [];
+ if(/(?:بدون\s*سلك|لاسلكي|cordless|wireless)/i.test(normalized)&&!add('cordless',/\b(?:cordless|wireless|without (?:a )?cable)\b/i,/\b(?:wired|corded)\b/i))return [];
+ if(/(?:قابله?\s*لتعديل\s*الارتفاع|ارتفاع\s*قابل\s*للتعديل|height[- ]adjustable|adjustable height)/i.test(normalized)&&!add('height-adjustable',/\b(?:height[- ]adjustable|adjustable height)\b/i,/\bfixed[- ]height\b/i))return [];
+ if(/(?:للسفر|travel)/i.test(normalized))add('travel',/\btravel\b/i);
+ const size=normalized.match(/(?:^|[\s،,])(?:مقاس|قياس|سايز|size)\s*(\d+(?:\.\d+)?)(?=$|[\s،,])/i)?.[1];
+ if(size&&!new RegExp('(?:^|[^a-z0-9.])'+size.replace('.','\\.')+'(?:$|[^a-z0-9.])','i').test(query))query+=' size '+size;
+ return validateIntentQueries(text,{queries:[query]});
+}
+module.exports={request,searchTask,searchFormat,publicSearchTask,publicSearchFormat,translationFormat,translationTask,asciiDigits,validateIntentQueries,finalizeSupplierQueries};

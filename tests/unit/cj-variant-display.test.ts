@@ -2,6 +2,10 @@ import {describe,expect,it} from 'vitest';
 import {cjVariantDisplayOptions,cleanCjDisplayDescription} from '@/lib/cj/variant-display';
 import {cjProductDisplayTitle} from '@/lib/cj/presentation';
 describe('CJ product customer display',()=>{
+  it('uses readable supplier metadata when the primary key is technical or empty',()=>{
+    expect(cjVariantDisplayOptions({variantKey:'CJYD322988402BY',variantName:'Women Sneakers Purple 36'})).toEqual([{label:'اللون',value:'بنفسجي',source:'parsed'},{label:'المقاس',value:'36',source:'parsed'}]);
+    expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{variantKeyEn:'Purple-36'}})).toEqual([{label:'اللون',value:'بنفسجي',source:'parsed'},{label:'المقاس',value:'36',source:'parsed'}]);
+  });
   it('extracts the actual cable clip pack and color after its repeated product title',()=>{
     const title='Magnetic Cable Clip Under Desk Cable Management Adjustable Cord Holder Wire Organizer And Cable Management Wire Keeper';
     for(const suffix of ['6 Pack White','3Packwhite','White 6pcs'])expect(cjVariantDisplayOptions({variantKey:'',variantName:`${title} ${suffix}`},title)).toEqual([

@@ -8,6 +8,7 @@ const inventory=(vid:string,storageNum:number,origin='CN'):CjInventory=>({vid,st
 const options=()=>[{logisticName:'Saudi Standard',logisticPrice:2,logisticAging:'7-12 days',logisticPriceCn:0}];
 
 describe('CJ live availability proof',()=>{
+  it('rejects changed SKU and duplicate source VIDs before freight',async()=>{const freight=vi.fn(async()=>ok(options()));for(const variants of [[{...variant('v'),variantSku:'other'}],[variant('v'),variant('v')]]){expect((await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',8)]),getVariants:async()=>ok(variants),calculateFreight:freight})).status).toBe('variant_changed');}expect(freight).not.toHaveBeenCalled();});
   it('rejects inventory aggregates outside safe integer precision',async()=>{
     const result=await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',Number.MAX_SAFE_INTEGER),inventory('v',1)]),getVariants:async()=>ok([variant('v')]),calculateFreight:async()=>ok(options())},375);
     expect(result.status).toBe('inventory_error');

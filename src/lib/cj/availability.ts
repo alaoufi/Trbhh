@@ -32,8 +32,9 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   ]);
   if(!inventoryResult?.ok)return {status:'inventory_error',checkedAt};
   if(!variantResult?.ok)return {status:'variant_changed',checkedAt};
-  const liveVariant=variantResult.data.find(variant=>variant.vid===selected.vid);
-  if(!liveVariant)return {status:'variant_changed',checkedAt};
+  const matches=variantResult.data.filter(variant=>variant.vid===selected.vid);
+  const liveVariant=matches[0];
+  if(matches.length!==1||!liveVariant||!selected.variantSku||liveVariant.variantSku!==selected.variantSku)return {status:'variant_changed',checkedAt};
   // CJ يبيع من مخزون مستودعه (cjInventoryQuantity) ومن مخزون المورّد/المصنع المُبلَّغ
   // (storageNum) معاً — فالاكتفاء بمخزون CJ وحده كان يرفض سلعاً متوفّرة فعلاً كـ out_of_stock.
   // نعتمد كمية CJ إن وُجدت، وإلا الكمية الكلية المُبلَّغة من CJ. يبقى الشحن هو الحَكَم النهائي

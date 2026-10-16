@@ -22,7 +22,7 @@ vi.mock('@/lib/cj/import', () => ({ importCjProductByPid: vi.fn() }));
 vi.mock('@/lib/cj/translate', () => ({ translateToArabic: vi.fn(), translateManyCached: vi.fn(), learnTranslation: vi.fn(), translateManyForDisplay: async () => new Map<string, string>() }));
 vi.mock('@/lib/cj/highlight', () => ({ cjHighlights: async () => [{ label: 'متميز', color: '#dc2626' }], cjHighlightsText: async () => 'متميز | #dc2626', saveCjHighlights: vi.fn(), allowedHighlightValues: async () => ['متميز|#dc2626'], parseHighlightValue: () => null }));
 vi.mock('@/lib/data', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/data')>()), getCategories: async () => [], getSubCategories: async () => [] }));
-vi.mock('@/lib/cj/client', () => ({ getCategories: vi.fn(), getProduct: state.sourceFetch }));
+vi.mock('@/lib/cj/client', () => ({ getCategories: vi.fn(), getProduct: state.sourceFetch, getVariants: vi.fn(async()=>({ok:false,error:"fixture"})) }));
 vi.mock('@/lib/cj/orders/store', () => ({ createOrder: vi.fn(), transitionOrder: vi.fn(), setOrderTracking: vi.fn() }));
 vi.mock('@/lib/cj/translate-warm', () => ({ warmCjTranslations: vi.fn(), refreshCjMedia: vi.fn() }));
 vi.mock('@/components/ad-card', () => ({ AdGrid: () => null }));
@@ -87,7 +87,7 @@ describe('CJ storefront precise capabilities', () => {
     // والتحقّق يتم حيّاً عند الاختيار قبل الإضافة للسلة.
     expect(result).toContain('تجربة إدارية');
     // محرّك الشراء يظهر للإدارة (اختيار بالسمات ثم إضافة للسلة بعد التحقّق الحيّ).
-    expect(result).toContain('اختر المنتج');
+    expect(result).toContain('خيارات الشراء');
   });
   it('keeps the new trial private even if the legacy public switch is enabled', async () => {
     state.public = true; state.keys.clear();

@@ -1,30 +1,37 @@
 import type {CjVariant} from './types';
+import {cjNamedVariantAttributes} from './variant-attributes';
 
 export type DisplayOption={label:string;value:string;source:'attribute'|'parsed'};
-const SIZE=/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,3}(?:xs|xl)|\d{1,2}|\d+(?:\.\d+)?(?:cm|mm|inch|in))$/i;
+const SIZE=/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,3}(?:xs|xl)|(?:(?:US|EU|UK)\s*)?\d{1,2}(?:\.\d+)?|\d+(?:\.\d+)?(?:cm|mm|inch|in))$/i;
 const LABELS:[RegExp,string][]=[[/color|colour/i,'اللون'],[/size/i,'المقاس'],[/voltage|volt/i,'الفولت'],[/plug|socket/i,'القابس'],[/model/i,'الموديل'],[/capacity|volume/i,'السعة'],[/material|fabric/i,'الخامة'],[/warehouse|area/i,'المستودع']];
 const VALUES=new Map(Object.entries({black:'أسود',white:'أبيض',red:'أحمر',blue:'أزرق',green:'أخضر',yellow:'أصفر',pink:'وردي',purple:'بنفسجي',orange:'برتقالي',brown:'بني',grey:'رمادي',gray:'رمادي',silver:'فضي',gold:'ذهبي',beige:'بيج',navy:'كحلي','navy blue':'كحلي','dark blue':'أزرق داكن','light blue':'أزرق فاتح',eu:'أوروبي',european:'أوروبي',us:'أمريكي',uk:'بريطاني',china:'صيني'}));
 const COLOR_KEYS=['navy blue','dark blue','light blue','black','white','red','blue','green','yellow','pink','purple','orange','brown','grey','gray','silver','gold','beige','navy'];
-const SIZE_SUFFIX='(?:xxxs|xxs|xxl|xxxl|xs|xl|s|m|l|\\d{1,3}(?:xs|xl)|\\d{1,2}|\\d+(?:\\.\\d+)?(?:cm|mm|inch|in))';
+const SIZE_SUFFIX='(?:xxxs|xxs|xxl|xxxl|xs|xl|s|m|l|\\d{1,3}(?:xs|xl)|(?:(?:US|EU|UK)\\s*)?\\d{1,2}(?:\\.\\d+)?|\\d+(?:\\.\\d+)?(?:cm|mm|inch|in))';
 function labelFor(key:string):string{return LABELS.find(([pattern])=>pattern.test(key))?.[1]??key.trim().replace(/[_-]+/g,' ');}
 function safeText(value:unknown):string|null{if(typeof value!=='string'&&typeof value!=='number'&&typeof value!=='boolean')return null;const text=String(value).trim();return text&&text.length<=160?text:null;}
 function translateKnownValue(value:string):string{return VALUES.get(value.trim().toLowerCase())??value;}
+function normalizedValue(label:string,value:string):string{
+ if(label!=='المقاس')return value;
+ return value.trim().replace(/^(us|eu|uk)\s*/i,(_,system:string)=>system.toUpperCase()+' ').replace(/^(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl)$/i,v=>v.toUpperCase());
+}
 
 /** Uses only values actually present in CJ attributes/variant key; raw source is not mutated. */
-export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'variantName'|'attributes'>,productName=''):DisplayOption[]{
+function parseCjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'variantName'|'attributes'>,productName=''):DisplayOption[]{
   const options:DisplayOption[]=[];
   const attrs=variant.attributes??{};
-  for(const [key,value] of Object.entries(attrs)){
+  for(const [key,value] of cjNamedVariantAttributes(attrs)){
     // استبعاد الحقول التقنية الخام القادمة من CJ (باركود/أبعاد/أسعار/وقت/معايير) فلا تظهر
     // كخيارات للمشتري؛ نُبقي الخيارات الحقيقية (لون/مقاس/فولت/قابس/سعة/موديل/خامة/مخصّص).
     const clean=safeText(value);
     if(!clean
-      ||/^(?:vid|pid|sku|id|price|weight|barcode|createtime|updatetime|addtime)$/i.test(key)
-      ||/^variant(?:id|sku|name|image|price|weight|key|unit|length|width|height|standard|sellprice|sugsellprice|volume)/i.test(key))continue;
-    options.push({label:labelFor(key),value:translateKnownValue(clean),source:'attribute'});
+      ||/^(?:vid|pid|sku|id|price|weight|barcode|createtime|updatetime|addtime|stock|inventory|quantity|currency|status|isDefault|sellPrice|createUserId|productId)$/i.test(key)
+      ||/^variant(?:id|sku|name|image|price|weight|key|property|unit|length|width|height|standard|sellprice|sugsellprice|volume)/i.test(key))continue;
+    const label=labelFor(key),translated=translateKnownValue(clean);
+    if(!options.some(o=>o.label===label&&o.value===translated))options.push({label,value:translated,source:'attribute'});
   }
   if(options.length){
-    const parsed=cjVariantDisplayOptions({...variant,attributes:{}},productName);
+    const parsed=parseCjVariantDisplayOptions({...variant,attributes:{}},productName);
+    if(parsed.some(o=>options.some(existing=>existing.label===o.label&&normalizedValue(o.label,existing.value)!==normalizedValue(o.label,o.value))))return [{label:'الخيار',value:'بيانات متعارضة لدى المورد',source:'parsed'}];
     return [...options,...parsed.filter(o=>o.label!=='الخيار'&&!options.some(existing=>existing.label===o.label))];
   }
   let source=(variant.variantKey||variant.variantName||'').trim();
@@ -49,7 +56,7 @@ export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'var
   const parts=source.split(/\s*[-–—]\s*/).filter(Boolean);
   if(parts.length===2){
     const sizeIndex=SIZE.test(parts[0])?0:SIZE.test(parts[1])?1:-1;
-    if(sizeIndex>=0)return [{label:'اللون',value:translateKnownValue(parts[1-sizeIndex]),source:'parsed'},{label:'المقاس',value:parts[sizeIndex],source:'parsed'}];
+    if(sizeIndex>=0&&(COLOR_KEYS.includes(parts[1-sizeIndex].toLowerCase())||[...VALUES.values()].includes(parts[1-sizeIndex])))return [{label:'اللون',value:translateKnownValue(parts[1-sizeIndex]),source:'parsed'},{label:'المقاس',value:parts[sizeIndex],source:'parsed'}];
   }
   // CJ sometimes repeats the complete product title in every variant, with the
   // actual option values appended (for example "... Coat For Men Red S").
@@ -88,4 +95,24 @@ export function cleanCjDisplayDescription(raw:string):string{
     out.push(line);
   }
   return out.join('\n\n').slice(0,20000);
+}
+
+/** Prefer meaningful source properties over technical keys; retain exact VID/SKU elsewhere. */
+export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'variantName'|'attributes'>,productName=''):DisplayOption[]{
+ const attrs=variant.attributes??{};
+ const candidates=[variant.variantKey,attrs.variantKeyEn,attrs.variantProperty,variant.variantName,attrs.variantNameEn,attrs.nameEn];
+ let fallback:DisplayOption[]=[],best:DisplayOption[]=[];
+ const evidence=new Map<string,string>();
+ for(const candidate of candidates){
+  const source=safeText(candidate);if(!source)continue;
+  const parsed=parseCjVariantDisplayOptions({...variant,variantKey:source,variantName:source},productName).map(o=>({...o,value:normalizedValue(o.label,o.value)}));
+  if(parsed.some(o=>o.value==='بيانات متعارضة لدى المورد'))return [];
+  for(const option of parsed.filter(o=>o.label!=='الخيار')){
+   if(evidence.has(option.label)&&evidence.get(option.label)!==option.value)return [];
+   evidence.set(option.label,option.value);
+  }
+  if(parsed.some(o=>o.label!=='الخيار')&&parsed.length>best.length)best=parsed;
+  if(!fallback.length)fallback=parsed;
+ }
+ return (best.length?best:fallback.length?fallback:parseCjVariantDisplayOptions(variant,productName)).map(o=>({...o,value:normalizedValue(o.label,o.value)}));
 }

@@ -24,6 +24,7 @@ import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation'
 
 import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
+import {enrichCjOptionMetadata} from '@/lib/cj/option-metadata-server';
 import { getCategories, getSubCategories } from '@/lib/data';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
@@ -61,7 +62,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const verifiedVariants = getVerifiedCjVariants(p);
   // في معاينة المشرف (بلا شحن حيّ محقّق) نعرض الخيارات من التفاصيل المخزّنة (details_json)
   // حتى تظهر المقاسات/الألوان كاملة كما في المصدر؛ العرض العام يبقى على المتغيّرات المحقّقة.
-  const displayVariants = verifiedVariants.length ? verifiedVariants : (details?.variants ?? []);
+  const displayVariants = await enrichCjOptionMetadata(p.cj_product_id,verifiedVariants.length ? verifiedVariants : (details?.variants ?? []),p.name);
   const weightMin = details?.weightMin;
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0

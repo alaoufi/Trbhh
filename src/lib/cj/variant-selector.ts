@@ -6,7 +6,7 @@ export function groupCjVariantFamilies(per:Entry[]){
  for(const entry of per){const key=JSON.stringify([...new Set(entry.opts.map(o=>o.label))].sort());groups.set(key,[...(groups.get(key)??[]),entry]);}
  return [...groups].map(([key,entries])=>{
   const labels=entries[0].opts.map(o=>o.label);
-  const title=labels.length===1?(labels[0]==='المجموعة'?'مجموعات المورد — محتوياتها غير موضحة نصيًا':labels[0]==='التشكيلة'?'عبوة مختلطة الألوان':labels[0]==='عدد القطع في العبوة'?'عبوة حسب عدد القطع — اللون غير محدد':labels[0]==='اللون'?'خيار لون — عدد القطع غير محدد':labels[0]):labels.join(' و');
+  const title=labels.length===1?(labels[0]==='المجموعة'?'مجموعات المورد — محتوياتها غير موضحة نصيًا':labels[0]==='التشكيلة'?'عبوة مختلطة الألوان':labels[0]==='عدد القطع في العبوة'?'عبوة حسب عدد القطع — اللون غير محدد':labels[0]==='اللون'?'حسب اللون':labels[0]):labels.join(' و');
   return {key,entries,title:title||'خيارات المورد'};
  });
 }
@@ -14,7 +14,7 @@ export function groupCjVariantFamilies(per:Entry[]){
 export function buildCjVariantSelector(per:Entry[]):Selector|null{
  if(!per.length||per.some(p=>!p.vid||!p.opts.length||p.opts.some(o=>o.label==='الخيار'||!o.value)))return null;
  const labels=per[0].opts.map(o=>o.label);
- if(labels.length>4||new Set(labels).size!==labels.length)return null;
+ if(labels.length>32||new Set(labels).size!==labels.length||new Set(per.map(p=>p.vid)).size!==per.length)return null;
  const combo=new Map<string,string>();
  for(const p of per){
   if(p.opts.length!==labels.length||new Set(p.opts.map(o=>o.label)).size!==labels.length||!labels.every(l=>p.opts.some(o=>o.label===l)))return null;

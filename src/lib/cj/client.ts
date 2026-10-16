@@ -1,4 +1,5 @@
 import 'server-only';
+import {preserveCjVariantAttributes} from './variant-attributes';
 import {createHash} from 'node:crypto';
 import {parseCjCatalogFilters,type CatalogFilterValues} from './catalog-filters';
 import { cjConfig, type CjConfig } from './config';
@@ -454,12 +455,12 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
   return {
     vid: String(v.vid ?? v.variantId ?? v.id ?? ''),
     variantSku: String(v.variantSku ?? v.sku ?? ''),
-    variantName: str(v.variantNameEn ?? v.variantName ?? v.nameEn ?? v.nameen ?? v.variantKey),
-    variantKey: str(v.variantKey ?? v.variantKeyEn ?? v.variantProperty),
+    variantName: str(v.variantNameEn) || str(v.variantName) || str(v.nameEn) || str(v.nameen) || str(v.variantKeyEn) || str(v.variantKey),
+    variantKey: str(v.variantKeyEn) || str(v.variantKey) || str(v.variantProperty),
     variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice ?? v.sellprice),
     variantImage: str(v.variantImage) || str(v.bigImg) || str(v.bigimg) || str(v.img),
     variantWeight: num(v.variantWeight ?? v.weight),
-    attributes: Object.fromEntries(Object.entries(v).filter(([,value])=>['string','number','boolean'].includes(typeof value))),
+    attributes: preserveCjVariantAttributes(v),
   };
 }
 function mapInventory(s: Record<string, unknown>): CjInventory {

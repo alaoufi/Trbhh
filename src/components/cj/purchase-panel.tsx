@@ -18,7 +18,7 @@ const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
 export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
-  const [manualVariantId,setVariantId]=useState(''),[qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
+  const [qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
   const [checkedSelection,setCheckedSelection]=useState<VerifiedSelection|null>(null);
   // التسميات مُترجمة مسبقاً من الخادم (الإجراء الموحّد). عند غياب خيار واضح (رقم مجرّد) نُلحق
   // رمز السلعة SKU ليتمكّن المستخدم من التمييز بدل «الخيار N» غير المفيد.
@@ -35,13 +35,13 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   const familyVariants=family?variants.filter(v=>family.entries.some(e=>e.vid===v.vid)):[];
   const selector=useMemo(()=>family?buildCjVariantSelector(family.entries):null,[family]);
   const [chosen,setChosen]=useState<Record<string,string>>({});
-  const variantId=selector?resolveCjVariantSelection(selector,chosen):familyVariants.some(v=>v.vid===manualVariantId)?manualVariantId:'';
+  const variantId=selector?resolveCjVariantSelection(selector,chosen):'';
   const selected=variants.find(item=>item.vid===variantId),selectedIndex=variants.findIndex(item=>item.vid===variantId);
   const options=useMemo(()=>selected?(optionsByVid?.[selected.vid]??cjVariantDisplayOptions(selected)):[],[selected,optionsByVid]);
   const alreadyInCart=items.find(item=>item.id===productId&&item.variantId===variantId)?.qty??0;
   const verificationQuantity=qty+alreadyInCart;
   useEffect(()=>{
-    if(!selected){setStatus('');setCheck(null);return;}
+    if(!selected){setStatus('');setCheck(null);setAdded(false);setNotice('');return;}
     let active=true;const controller=new AbortController();setStatus('checking');setCheck(null);setNotice('');setAdded(false);
     const timer=setTimeout(async()=>{
       try{
@@ -62,13 +62,13 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   function add(){
     if(!quote||!ship||!selected||!ready)return;
     const previous=latest().find(item=>item.id===productId&&item.variantId===selected.vid)?.qty??0;
-    const attributes=Object.fromEntries(Object.entries(selected.attributes??{}).filter((entry):entry is [string,string|number|boolean]=>['string','number','boolean'].includes(typeof entry[1])));
+    const attributes=Object.fromEntries(options.slice(0,30).map(option=>[option.label.slice(0,80),option.value.slice(0,160)]));
     const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
     try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');setAdded(true);}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5">
-    <h2 className="text-[15px] font-extrabold text-primary">اختر المنتج</h2>
-    {families.length>1&&<label className="block text-sm font-bold">نوع الخيار<select value={familyKey} onChange={e=>{setFamilyKey(e.target.value);setChosen({});setVariantId('');}} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="">اختر نوع العبوة أو التشكيلة</option>{families.map(f=><option key={f.key} value={f.key}>{f.title}</option>)}</select></label>}
+    <h2 className="text-[15px] font-extrabold text-primary">خيارات الشراء</h2>
+    {families.length>1&&<label className="block text-sm font-bold">نوع الخيار<select value={familyKey} onChange={e=>{setFamilyKey(e.target.value);setChosen({});}} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="">اختر نوع الخيارات</option>{families.map(f=><option key={f.key} value={f.key}>{f.title}</option>)}</select></label>}
     {selected&&<p className="break-all rounded-lg bg-slate-50 p-2 text-xs">رمز الخيار المختار (SKU): <b dir="ltr">{selected.variantSku}</b></p>}
     {selector
       ? <div className="space-y-2.5">{selector.groups.map(group=><div key={group.label}>
@@ -76,14 +76,10 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
           <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>Object.fromEntries(selector.groupLabels.slice(0,selector.groupLabels.indexOf(group.label)+1).map(l=>[l,l===group.label?e.target.value:c[l]||''])))} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{cjVariantValues(selector,group.label,chosen).map(val=><option key={val} value={val}>{group.label==='المجموعة'?`مجموعة المورد ${val} — راجع محتوياتها قبل الشراء`:group.label==='عدد القطع في العبوة'?`${val} قطع في العبوة`:val}</option>)}</select>
         </div>)}
       </div>
-      : family&&<label htmlFor={`${id}-variant`} className="block text-sm font-bold">الخيار المتاح
-          <select id={`${id}-variant`} value={variantId} onChange={event=>setVariantId(event.target.value)} className="mt-2 block min-h-12 w-full max-w-full rounded-xl border border-slate-300 bg-white px-3" required>
-            <option value="">اختر الخيار</option>{familyVariants.map((variant,index)=><option key={variant.vid||index} value={variant.vid}>{labelFor(variant,index)} · SKU: {variant.variantSku}</option>)}
-          </select>
-        </label>}
+      : family&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">بيانات خيارات المورد غير مكتملة أو ملتبسة؛ أُوقف اختيارها حتى تتضح مواصفاتها. لم يُحجز مخزون ولم يبدأ دفع.</p>}
     {selected&&<div className="grid grid-cols-2 gap-1.5 text-[13px]">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500" dir="auto">{option.label}</span><b className="break-words leading-tight" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500">الوزن</span><b className="leading-tight">{selected.variantWeight} غ</b></div>}</div>}
     {selected&&options.some(o=>o.label==='المجموعة')&&<p className="text-xs text-amber-800">رقم المجموعة تسمية لدى المورد، وليس عدد القطع. تفاصيل محتوياتها غير موضحة نصيًا؛ لا تعتمدها قبل التأكد من محتوياتها.</p>}
-    <p role="status" aria-live="polite" className={`text-sm font-bold ${quote?'text-emerald-700':'text-amber-800'}`}>{!selected?'أكمل خيارات العبوة لبدء التحقق من السعر والمخزون والشحن.':quote?`${quote.priceChanged?'تم تحديث السعر · ':''}متوفر · الكمية المتاحة: ${quote.stockQuantity}`:!status||status==='checking'?'جارٍ التحقق من الخيار المختار…':failureMessage[status]||'تعذّر التحقق من الخيار؛ أعد اختياره للمحاولة مرة أخرى.'}</p>
+    <p role="status" aria-live="polite" className={`text-sm font-bold ${quote?'text-emerald-700':'text-amber-800'}`}>{!selected?'أكمل خيارات السلعة لبدء التحقق من السعر والمخزون والشحن.':quote?`${quote.priceChanged?'تم تحديث السعر · ':''}متوفر · الكمية المتاحة: ${quote.stockQuantity}`:!status||status==='checking'?'جارٍ التحقق من الخيار المختار…':failureMessage[status]||'تعذّر التحقق من الخيار؛ أعد اختياره للمحاولة مرة أخرى.'}</p>
     {quote&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm">
       {/* يُعرض سعر المنتج النهائي فقط (شامل ربح تربح) — بلا أي ذكر للتكلفة أو المورّد أو المستودع. */}
       <p className="text-slate-700">سعر المنتج: <b className="text-lg text-emerald-800" dir="ltr">{money(quote.salePriceMinor)}</b></p>

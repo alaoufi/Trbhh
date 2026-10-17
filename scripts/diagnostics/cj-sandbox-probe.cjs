@@ -23,6 +23,11 @@ async function probe({productId,pid,vid,api,reference='trbhh-sbx-'+randomUUID()}
  if(!Array.isArray(lines)||lines.length!==1||lines[0].vid!==vid||Number(lines[0].quantity)!==1)throw Error('sandbox_line_readback_unverified');
  return {event:'CJ_SANDBOX_VERIFIED',reference,productId,pid,vid,orderId:result.orderId,isSandbox:detail.isSandbox,status:detail.orderStatus,variantAndQuantityMatched:true,realPaymentAttempted:false,realFulfillmentRequested:false,productionOrderCreated:false};
 }
+function safeProviderMessage(value,token){if(typeof value!=='string')return null;return value.split(token).join('[REDACTED]').replace(/Bearer\s+\S+/gi,'Bearer [REDACTED]').replace(/[A-Za-z0-9_+\/=-]{32,}/g,'[REDACTED]').replace(/[\r\n\x00-\x1f]+/g,' ').slice(0,300);}
+async function readOnlyProbe(input){
+ try{await probe({...input,api:async(path,method,body)=>{if(path.startsWith('/shopping/'))throw Error('sandbox_readonly_complete');return input.api(path,method,body);}});}catch(e){if(e.message!=='sandbox_readonly_complete')throw e;}
+ return {event:'CJ_SANDBOX_READS_VERIFIED',productId:input.productId,pid:input.pid,vid:input.vid,orderCreationAttempted:false,realPaymentAttempted:false};
+}
 function guardedApi(token,fetcher=fetch){let last=0,createSent=false,calls=0;return async(path,method,body)=>{
  const allowed={'/product/query':'GET','/logistic/freightCalculate':'POST','/shopping/order/createOrderV3':'POST','/shopping/order/getOrderDetail':'GET'};
  if(allowed[path]!==method||++calls>4)throw Error('sandbox_endpoint_blocked');
@@ -31,13 +36,13 @@ function guardedApi(token,fetcher=fetch){let last=0,createSent=false,calls=0;ret
  const url=new URL(ORIGIN+path);if(method==='GET')for(const[k,v]of Object.entries(body))url.searchParams.set(k,v);
  const response=await fetcher(url,{method,headers:{'Content-Type':'application/json','CJ-Access-Token':token},...(method==='POST'?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
  if(!response.ok)throw Error('sandbox_http_'+response.status);const data=await response.json();
- if(data.code!==200||data.result!==true){const e=Error('sandbox_api_rejected');e.providerCode=typeof data.code==='number'?data.code:null;e.requestId=typeof data.requestId==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(data.requestId)?data.requestId:null;throw e;}return data.data;
+ if(data.code!==200||data.result!==true){const e=Error('sandbox_api_rejected');e.endpoint=path;e.providerMessage=safeProviderMessage(data.message,token);e.providerCode=typeof data.code==='number'?data.code:null;e.requestId=typeof data.requestId==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(data.requestId)?data.requestId:null;throw e;}return data.data;
  };}
 async function main(){const {PrismaClient}=require('@prisma/client'),{decryptToken}=require('./cj-catalog-audit.cjs'),db=new PrismaClient({log:[]});let stage='initial';const reference='trbhh-sbx-'+randomUUID();
  try{const productId=process.argv[2],vid=process.argv[3];if(!/^[1-9]\d{0,14}$/.test(productId||'')||!/^[A-Za-z0-9_-]{1,64}$/.test(vid||''))throw Error('sandbox_input_invalid');
  const rows=await db.$queryRawUnsafe('SELECT id,cj_product_id FROM cj_products WHERE id=? LIMIT 1',BigInt(productId));if(rows.length!==1)throw Error('sandbox_product_missing');
  const [auth]=await db.$queryRawUnsafe('SELECT sealed_tokens,access_expires_at FROM cj_auth WHERE id=1 LIMIT 1');const token=decryptToken(auth,process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY);
- stage='external_sandbox';console.log(JSON.stringify({event:'CJ_SANDBOX_BEGIN',reference,productId,vid,isSandbox:1,payType:3,automaticRetry:false}));console.log(JSON.stringify(await probe({productId,pid:rows[0].cj_product_id,vid,reference,api:guardedApi(token)})));
- }catch(e){console.log(JSON.stringify({event:'CJ_SANDBOX_NOT_VERIFIED',reference,stage,reason:/^sandbox_[A-Za-z0-9_]+$/.test(e.message)?e.message:'sandbox_stopped',providerCode:e.providerCode??null,requestId:e.requestId??null,automaticRetry:false,realPaymentAttempted:false}));process.exitCode=1;}finally{await db.$disconnect();}}
-module.exports={sandboxPayload,probe,guardedApi};
+ stage='external_sandbox';console.log(JSON.stringify({event:'CJ_SANDBOX_BEGIN',reference,productId,vid,readOnly:process.argv[4]==='--read-only',isSandbox:1,payType:3,automaticRetry:false}));console.log(JSON.stringify(await (process.argv[4]==='--read-only'?readOnlyProbe:probe)({productId,pid:rows[0].cj_product_id,vid,reference,api:guardedApi(token)})));
+ }catch(e){console.log(JSON.stringify({event:'CJ_SANDBOX_NOT_VERIFIED',reference,stage,reason:/^sandbox_[A-Za-z0-9_]+$/.test(e.message)?e.message:'sandbox_stopped',endpoint:e.endpoint??null,providerMessage:e.providerMessage??null,providerCode:e.providerCode??null,requestId:e.requestId??null,automaticRetry:false,realPaymentAttempted:false}));process.exitCode=1;}finally{await db.$disconnect();}}
+module.exports={sandboxPayload,probe,guardedApi,readOnlyProbe,safeProviderMessage};
 if(require.main===module)main();

@@ -41,11 +41,15 @@ function financialTransport(token,fetcher=fetch){let last=0,calls=0;const sent=n
    Object.keys(body).some(k=>!['orderId','trackNumber'].includes(k)))throw Error('sandbox_mutation_blocked');
   sent.add(path);
  }
- const wait=1600-(Date.now()-last);if(wait>0)await new Promise(r=>setTimeout(r,wait));last=Date.now();
+ for(let attempt=0;attempt<3;attempt++){
+ const wait=3000-(Date.now()-last);if(wait>0)await new Promise(r=>setTimeout(r,wait));last=Date.now();
  const url=new URL('https://developers.cjdropshipping.com/api2.0/v1'+path);
  if(method==='GET')url.searchParams.set('orderId',body.orderId);
  const r=await fetcher(url,{method,headers:{'CJ-Access-Token':token,'Content-Type':'application/json'},...(method==='POST'?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
- const j=await r.json();if(!r.ok||j.code!==200||j.result!==true){const e=Error('sandbox_api_rejected');Object.assign(e,{endpoint:path,httpStatus:r.status,providerCode:j.code,providerMessage:safeProviderMessage(j.message,token),requestId:/^[A-Za-z0-9_-]{1,100}$/.test(j.requestId||'')?j.requestId:null});throw e;}return j.data;
+ const j=await r.json();
+ if(method==='GET'&&(r.status===429||j.code===1600200)&&attempt<2){await new Promise(resolve=>setTimeout(resolve,4000*2**attempt));continue;}
+ if(!r.ok||j.code!==200||j.result!==true){const e=Error('sandbox_api_rejected');Object.assign(e,{endpoint:path,httpStatus:r.status,providerCode:j.code,providerMessage:safeProviderMessage(j.message,token),requestId:/^[A-Za-z0-9_-]{1,100}$/.test(j.requestId||'')?j.requestId:null});throw e;}return j.data;
+ }
  };}
 async function main(){
  const {PrismaClient}=require('@prisma/client'),{decryptToken}=require('./cj-catalog-audit.cjs'),fs=require('node:fs');

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { cjConfig } from '@/lib/cj/config';
 import { verifySignature, constantSecret } from '@/lib/suppliers/crypto';
 import {verifyOfficialCjSignature,cjWebhookKey} from '@/lib/cj/webhook-envelope';
+import {readCjWebhookOpenId} from '@/lib/cj/webhook-key';
 import {reconcileCjFulfillmentPayment} from '@/lib/cj/fulfillment';
 import {reconcileCjFulfillment} from '@/lib/cj/fulfillment/status';
 import {reconcileCjSettlementForFulfillment} from '@/lib/cj/settlements';
@@ -20,7 +21,7 @@ const MAX_BODY = 1_048_576;
 
 export async function POST(req: NextRequest) {
   const cfg = cjConfig();
-  const openId=(process.env.CJ_WEBHOOK_OPEN_ID||'').trim();
+  const openId=readCjWebhookOpenId();
   if (!cfg.webhookSecret&&!openId) return NextResponse.json({ ok: false, error: 'not_configured' }, { status: 503 });
 
   const raw = Buffer.from(await req.arrayBuffer());

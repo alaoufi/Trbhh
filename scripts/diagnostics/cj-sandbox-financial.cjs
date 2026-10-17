@@ -1,6 +1,7 @@
 'use strict';
 const REFERENCE='trbhh-sbx-34b1f44e-cce8-4f12-9986-be0fd1576dde';
 const VID='2610070813191630909',TRACK='TRBHH-SANDBOX-TEST-001';
+const PAID=['PENDING','PROCESSING','UNSHIPPED','SHIPPED','DELIVERED'];
 const {safeProviderMessage}=require('./cj-sandbox-probe.cjs');
 function identity(d,first){
  if(d?.isSandbox!==1||d.orderNum!==REFERENCE||typeof d.orderId!=='string'||!d.orderId||
@@ -17,19 +18,20 @@ async function sandboxFinancialProbe({api,claimOnce,report=()=>{}}){
  let d=identity(await api('/shopping/order/getOrderDetail','GET',{orderId:code}),first);
  report({event:'CJ_SANDBOX_IDENTIFIED',reference:REFERENCE,orderId:d.orderId,cjOrderCode:code,status:d.orderStatus});
  if(['CREATED','IN_CART'].includes(d.orderStatus))throw Error('sandbox_order_confirmation_required');
- if(!['UNPAID','PENDING','PROCESSING','UNSHIPPED','SHIPPED','DELIVERED'].includes(d.orderStatus))throw Error('sandbox_paid_status_unverified');
+ if(!['UNPAID',...PAID].includes(d.orderStatus))throw Error('sandbox_paid_status_unverified');
  await claimOnce();
  const read=async()=>identity(await api('/shopping/order/getOrderDetail','GET',{orderId:REFERENCE}),first);
  if(d.orderStatus==='UNPAID'){
-  if(await api('/shopping/sandbox/simulatePay','POST',{orderId:code})!==true)throw Error('sandbox_payment_response_invalid');
+  await api('/shopping/sandbox/simulatePay','POST',{orderId:code});
   d=await read();
  }
- if(!['PENDING','PROCESSING','UNSHIPPED','SHIPPED','DELIVERED'].includes(d.orderStatus))throw Error('sandbox_paid_status_unverified');
+ if(!PAID.includes(d.orderStatus))throw Error('sandbox_paid_status_unverified');
  report({event:'CJ_SANDBOX_PAYMENT_VERIFIED',cjOrderCode:code,status:d.orderStatus,realPaymentAttempted:false});
  if(d.trackNumber!==TRACK){
-  if(await api('/shopping/sandbox/updateTrackNumber','POST',{orderId:code,trackNumber:TRACK})!==true)throw Error('sandbox_tracking_response_invalid');
+  await api('/shopping/sandbox/updateTrackNumber','POST',{orderId:code,trackNumber:TRACK});
   d=await read();
  }
+ if(!PAID.includes(d.orderStatus))throw Error('sandbox_paid_status_unverified');
  if(d.trackNumber!==TRACK)throw Error('sandbox_tracking_readback_invalid');
  return {event:'CJ_SANDBOX_PAYMENT_TRACKING_VERIFIED',reference:REFERENCE,cjOrderCode:code,orderId:d.orderId,trackNumber:d.trackNumber,status:d.orderStatus,refundVerified:false,refundReason:'no_documented_sandbox_refund_endpoint',realPaymentAttempted:false,realFulfillmentRequested:false};
 }

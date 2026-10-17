@@ -30,8 +30,8 @@ const log=x=>console.log(JSON.stringify(x,(_,v)=>typeof v==='bigint'?String(v):v
    if(continueUnpaid){
     const previous=fs.lstatSync('/app/storage/cj-sandbox-confirm-created-once-34b1f44e');
     if(!previous.isDirectory()||previous.isSymbolicLink())throw Error('sandbox_previous_claim_invalid');
-    // Exact identities returned by CJ in the preceding externally observed run.
-    prepared={orderId:'261071053280661800',cjOrderCode:'SD261071053270664700'};
+    // Exact strings extracted automatically from the original CJ response log.
+    prepared=require(dir+'/cj-sandbox-identity.cjs').readExpectedIdentity(dir+'/expected-identity.json',fs);
    }
    if(confirmCreated){
     const {prepareSandboxPayment,confirmationTransport}=require(dir+'/cj-sandbox-confirm.cjs');

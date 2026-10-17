@@ -4,6 +4,20 @@ const {sandboxFinancialProbe,financialTransport}=createRequire(import.meta.url)(
 const reference='trbhh-sbx-34b1f44e-cce8-4f12-9986-be0fd1576dde';
 const detail={orderId:'261071053280661800',orderNum:reference,cjOrderCode:'SD261071053280661800',isSandbox:1,orderStatus:'UNPAID',productList:[{vid:'2610070813191630909',quantity:1}]};
 describe('isolated sandbox financial continuation',()=>{
+ it('uses independent source state rather than mutation data shape to prove the outcome',async()=>{
+  const paid={...detail,orderStatus:'UNSHIPPED'},tracked={...paid,trackNumber:'TRBHH-SANDBOX-TEST-001'};
+  const api=vi.fn().mockResolvedValueOnce(detail).mockResolvedValueOnce(detail).mockResolvedValueOnce({accepted:true}).mockResolvedValueOnce(paid).mockResolvedValueOnce(false).mockResolvedValueOnce(tracked);
+  expect(await sandboxFinancialProbe({api,claimOnce:vi.fn()})).toMatchObject({event:'CJ_SANDBOX_PAYMENT_TRACKING_VERIFIED'});
+ });
+ it('rejects an accepted mutation whose independent state stays unpaid without retry',async()=>{
+  const api=vi.fn().mockResolvedValueOnce(detail).mockResolvedValueOnce(detail).mockResolvedValueOnce({accepted:true}).mockResolvedValueOnce(detail);
+  await expect(sandboxFinancialProbe({api,claimOnce:vi.fn()})).rejects.toThrow('sandbox_paid_status_unverified');expect(api).toHaveBeenCalledTimes(4);
+ });
+ it('does not verify tracking on a cancelled order retaining the expected number',async()=>{
+  const paid={...detail,orderStatus:'UNSHIPPED'};
+  const api=vi.fn().mockResolvedValueOnce(paid).mockResolvedValueOnce(paid).mockResolvedValueOnce(true).mockResolvedValueOnce({...paid,orderStatus:'CANCELLED',trackNumber:'TRBHH-SANDBOX-TEST-001'});
+  await expect(sandboxFinancialProbe({api,claimOnce:vi.fn()})).rejects.toThrow('sandbox_paid_status_unverified');
+ });
  it.each(['CREATED','IN_CART'])('does not simulate payment for unconfirmed status %s',async(orderStatus)=>{const api=vi.fn().mockResolvedValue({...detail,orderStatus}),claimOnce=vi.fn();await expect(sandboxFinancialProbe({api,claimOnce})).rejects.toThrow('sandbox_order_confirmation_required');expect(api).toHaveBeenCalledTimes(2);expect(claimOnce).not.toHaveBeenCalled();});
  it('backs off only safe reads on QPS rejection',async()=>{vi.useFakeTimers();try{const fetcher=vi.fn().mockResolvedValueOnce(Response.json({code:1600200,result:false})).mockResolvedValueOnce(Response.json({code:200,result:true,data:{ok:true}}));const promise=financialTransport('token',fetcher)('/shopping/order/getOrderDetail','GET',{orderId:reference});await vi.runAllTimersAsync();expect(await promise).toEqual({ok:true});expect(fetcher).toHaveBeenCalledTimes(2);}finally{vi.useRealTimers();}});
  it('uses the source SD code after independent identity confirmation and verifies payment and tracking',async()=>{

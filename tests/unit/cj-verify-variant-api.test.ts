@@ -15,7 +15,7 @@ const row={id:4,hidden:0,cj_product_id:'pid-1',other_costs_minor:10,margin_bps:3
 const variant={vid:'blue-s',sku:'SKU-BS',name:'Black-XL',optionKey:'Color-Black-Size-XL',priceUsd:12,weight:100,attributes:{plug:'EU'}};
 const available={status:'available',vid:'blue-s',sku:'SKU-BS',variantName:'Black-XL',optionKey:'Color-Black-Size-XL',stockQuantity:3,warehouses:[{id:'1',name:'CN',quantity:3,originCountry:'CN'}],supplierPriceMinor:4500,salePriceMinor:5863,shippingOptions:[{name:'Standard',priceMinor:750,additionalMinor:50,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}],checkedAt:'2026-09-24T00:00:00.000Z'};
 function request(body:unknown={variantId:'blue-s',quantity:1},headers:Record<string,string>={}){return new Request(origin+'/api/cj/products/4/verify-variant',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json',...headers},body:JSON.stringify(body)});}
-beforeEach(()=>{vi.resetAllMocks();clearLiveCache();vi.stubEnv('NODE_ENV','production');mock.session.mockResolvedValue({uid:9});mock.access.mockResolvedValue(true);mock.row.mockResolvedValue(row);mock.details.mockReturnValue({variants:[variant]});mock.settings.mockResolvedValue({usdToSarX100:375});mock.verify.mockResolvedValue(available);mock.tax.mockResolvedValue({enabled:true,vatMinor:100,totalMinor:6763});});
+beforeEach(()=>{vi.resetAllMocks();clearLiveCache();vi.stubEnv('NODE_ENV','production');mock.session.mockResolvedValue({uid:9});mock.access.mockResolvedValue(true);mock.row.mockResolvedValue(row);mock.details.mockReturnValue({variants:[variant]});mock.settings.mockResolvedValue({usdToSarX100:375,marginBps:3000});mock.verify.mockResolvedValue(available);mock.tax.mockResolvedValue({enabled:true,vatMinor:100,totalMinor:6763});});
 afterEach(()=>vi.unstubAllEnvs());
 describe('staff-only CJ exact-variant live check',()=>{
  it('queries CJ again for 1, 2, 1 and returns the latest supplier price and freight',async()=>{
@@ -53,3 +53,4 @@ describe('staff-only CJ exact-variant live check',()=>{
   expect((await POST(request(undefined,{Origin:'https://evil.example'}),{params})).status).toBe(403);expect(mock.verify).not.toHaveBeenCalled();
  });
 });
+it('uses the configured automatic margin instead of stale per-product price settings',async()=>{mock.row.mockResolvedValue({...row,margin_bps:0,sale_price_override_minor:4500});const response=await POST(request(),{params});expect(response.status).toBe(200);expect(mock.verify.mock.calls[0][5]).toEqual({otherCostsMinor:10,marginBps:3000,saleOverrideMinor:null});});

@@ -59,7 +59,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
     else if (run === 'freight' && vid) result = await calculateFreightToKSA([{ vid, quantity: qty }]);
   }
 
-  const sample = computePrice(2000, 1500, 0, marginBps); // مثال: تكلفة ٢٠ + شحن ١٥ ر.س
+  const sample = computePrice(2000, 0, 0, marginBps); // مثال: تكلفة ٢٠ + شحن ١٥ ر.س
 
   return (
     <div className="space-y-4">
@@ -96,7 +96,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
           <label className="text-sm">النسبة٪<input className={`${input} ms-2 w-24`} name="marginPercent" inputMode="decimal" defaultValue={(marginBps / 100).toString()} /></label>
           <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ الهامش</SubmitButton>
         </form></AccessBoundary></AccessBoundary>
-        <p className="text-xs text-muted-foreground">مثال حساب: تكلفة ٢٠ + شحن ١٥ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · بيع {(sample.salePriceMinor / 100).toFixed(2)} ر.س. (السعر غير مثبّت في الكود.)</p>
+        <p className="text-xs text-muted-foreground">مثال حساب: تكلفة السلعة ٢٠ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · سعر السلعة {(sample.salePriceMinor / 100).toFixed(2)} ر.س، ثم يضاف الشحن ١٥ ر.س؛ الإجمالي {((sample.salePriceMinor + 1500) / 100).toFixed(2)} ر.س قبل الضريبة. (السعر غير مثبّت في الكود.)</p>
       </div>
 
       {/* أوسمة التمييز التسويقية (تظهر على صورة البطاقة باللون الأحمر) */}

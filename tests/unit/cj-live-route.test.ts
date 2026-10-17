@@ -35,7 +35,7 @@ describe('CJ live display endpoint',()=>{
   });
   it('uses the imported product pricing only when its identity matches the live PID',async()=>{
     const {GET}=await import('@/app/api/cj/live/route');await GET(req('&id=4'));
-    expect(state.verify.mock.calls[0][5]).toEqual({marginBps:4000,otherCostsMinor:200,saleOverrideMinor:null});
+    expect(state.verify.mock.calls[0][5]).toEqual({marginBps:3000,otherCostsMinor:200,saleOverrideMinor:null});
     state.row.mockResolvedValue({hidden:0,cj_product_id:'other'});
     expect(await (await GET(req('&id=5'))).json()).toEqual({status:'unavailable'});
   });

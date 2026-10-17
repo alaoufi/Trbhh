@@ -1,3 +1,4 @@
+import {automaticCjPricing} from '@/lib/cj/automatic-pricing';
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { hasAccess } from '@/lib/access-control/guards';
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
     pid, variant, 1,
     { getVariants: async () => ({ ok: true, data: product.data.variants }),
       ...(pidInventory?.ok&&pidInventory.data.some(r=>r.vid===variant.vid&&r.countryCode)?{getInventoryByVid:async(vid:string)=>({ok:true as const,data:pidInventory?.ok?pidInventory.data.filter(r=>r.vid===vid):[]})}:{}) },
-    settings.usdToSarX100, row?{marginBps:row.margin_bps,otherCostsMinor:row.other_costs_minor,saleOverrideMinor:row.sale_price_override_minor}:{ marginBps }, zip,
+    settings.usdToSarX100, row?automaticCjPricing(settings,row):{ marginBps }, zip,
   ).catch(() => null);
 
   // لا نُخزّن حالات الفشل/النفاد (قد تكون عابرة بسبب حدّ المعدّل) كي تُعاد المحاولة فوراً.

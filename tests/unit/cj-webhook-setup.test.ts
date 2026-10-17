@@ -7,6 +7,22 @@ import {readCjWebhookOpenId} from '@/lib/cj/webhook-key';
 const {seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings,claimActivation}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-webhook-setup.cjs');
 afterEach(()=>{vi.unstubAllEnvs();vi.useRealTimers();});
 describe('CJ webhook provisioning safety',()=>{
+ it('sends a required HTTPS URL for inactive topics without enabling them',()=>{
+  const config=registration({callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},logistic:{type:'CANCEL',urls:[]}}});
+  for(const name of ['product','stock'])expect(config[name]).toEqual({type:'CANCEL',callbackUrls:['https://trbhh.sa/api/integrations/cj/webhooks']});
+  expect(Object.values(config).every((v)=> (v as {callbackUrls:string[]}).callbackUrls.length===1)).toBe(true);
+  expect(verifyRegistration({callback:{...config,product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]}}},config)).toBe(true);
+  expect(verifyRegistration({callback:{...config,product:{type:'CANCEL',urls:['https://other.example']}}},config)).toBe(false);
+ });
+ it('keeps the prior resume claim and makes exactly one separate URL repair claim',()=>{
+  const settings={callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]},logistic:{type:'CANCEL',urls:[]}}};
+  const stat=vi.fn(()=>({isDirectory:()=>true,isSymbolicLink:()=>false}));let claimed=false;
+  const mkdir=vi.fn(()=>{if(claimed)throw Object.assign(Error('exists'),{code:'EEXIST'});claimed=true;});
+  expect(claimActivation(settings,'/storage','empty-url',{lstatSync:stat,mkdirSync:mkdir})).toBe('cj-webhook-empty-url-before.sealed');
+  expect(stat).toHaveBeenCalledWith(join('/storage','cj-webhook-activation-reviewed-resume-once'));
+  expect(mkdir).toHaveBeenCalledExactlyOnceWith(join('/storage','cj-webhook-empty-url-repair-once'));
+  expect(()=>claimActivation(settings,'/storage','empty-url',{lstatSync:stat,mkdirSync:mkdir})).toThrow();
+ });
  it('reads the observed logistic singular topic while writing the official logistics field',()=>{
   const settings={callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]},logistic:{type:'CANCEL',urls:[]}}};
   const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),mkdirSync:vi.fn()};

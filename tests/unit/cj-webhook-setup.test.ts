@@ -7,6 +7,19 @@ import {readCjWebhookOpenId} from '@/lib/cj/webhook-key';
 const {seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings,claimActivation}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-webhook-setup.cjs');
 afterEach(()=>{vi.unstubAllEnvs();vi.useRealTimers();});
 describe('CJ webhook provisioning safety',()=>{
+ it('reads the observed logistic singular topic while writing the official logistics field',()=>{
+  const settings={callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]},logistic:{type:'CANCEL',urls:[]}}};
+  const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),mkdirSync:vi.fn()};
+  expect(claimActivation(settings,'/storage',true,io)).toBe('cj-webhook-resume-before.sealed');
+  const expected=registration(settings);expect(expected.logistics.type).toBe('ENABLE');expect(expected).not.toHaveProperty('logistic');
+  expect(inspectSettings(settings).topics.logistics).toMatchObject({present:true,type:'CANCEL'});
+  expect(verifyRegistration({callback:{product:settings.callback.product,stock:settings.callback.stock,order:expected.order,logistic:expected.logistics}},expected)).toBe(true);
+ });
+ it('does not replace an active singular logistic callback or accept conflicting dual aliases',()=>{
+  const callback={product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},logistic:{type:'ENABLE',urls:['https://other.example/hook']}};
+  expect(()=>registration({callback})).toThrow('callback_conflict_manual_review');
+  expect(()=>registration({callback:{...callback,logistics:{type:'CANCEL',urls:[]}}})).toThrow('callback_alias_conflict');
+ });
  it('permits one reviewed resume only for the observed unregistered state without removing old claims',()=>{
   const settings={callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]}}};let claimed=false;
   const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),mkdirSync:vi.fn(()=>{if(claimed)throw Object.assign(Error('exists'),{code:'EEXIST'});claimed=true;})};
@@ -15,7 +28,7 @@ describe('CJ webhook provisioning safety',()=>{
  it('refuses a reviewed resume when source state changed or the previous claim is missing',()=>{
   const base={product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]}};
   const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),mkdirSync:vi.fn()};
-  for(const callback of [{...base,logistics:{type:'CANCEL',urls:[]}},{...base,order:{type:'ENABLE',urls:['https://other.example']}},{...base,stock:{type:'ENABLE',urls:['https://other.example']}}])expect(()=>claimActivation({callback},'/storage',true,io)).toThrow('reviewed_resume_state_changed');
+  for(const callback of [{...base,logistics:{type:'ENABLE',urls:['https://other.example']}},{...base,order:{type:'ENABLE',urls:['https://other.example']}},{...base,stock:{type:'ENABLE',urls:['https://other.example']}}])expect(()=>claimActivation({callback},'/storage',true,io)).toThrow('reviewed_resume_state_changed');
   expect(()=>claimActivation({callback:base},'/storage',true,{...io,lstatSync:()=>{throw Error('missing');}})).toThrow();expect(io.mkdirSync).not.toHaveBeenCalled();
  });
  it('runs inspect without file writes, callback registration, financial calls or event payloads',async()=>{

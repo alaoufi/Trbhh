@@ -20,8 +20,17 @@ function topic(value){
  if(value.type==='ENABLE'&&urls.length!==1)throw Error('existing_callback_settings_incomplete');
  return {type:value.type,callbackUrls:urls};
 }
+function readCallbacks(settings){
+ const source=settings.callback;
+ if(!source||typeof source!=='object'||Array.isArray(source))throw Error('existing_callback_settings_incomplete');
+ // Live /setting/get returns singular `logistic`; /webhook/set documents plural.
+ if(source.logistic!=null&&source.logistics!=null&&JSON.stringify(topic(source.logistic))!==JSON.stringify(topic(source.logistics)))throw Error('callback_alias_conflict');
+ const callback={...source};delete callback.logistic;
+ if(source.logistic!=null&&source.logistics==null)callback.logistics=source.logistic;
+ return callback;
+}
 function registration(settings){
- const callback=settings.callback;if(!callback||typeof callback!=='object')throw Error('existing_callback_settings_incomplete');
+ const callback=readCallbacks(settings);
  // Required topics must be read and preserved, never guessed or cancelled.
  const result={product:topic(callback.product),stock:topic(callback.stock)};
  for(const name of ['order','logistics']){
@@ -32,11 +41,13 @@ function registration(settings){
  return result;
 }
 function verifyRegistration(after,expected){
- return Object.entries(expected).every(([name,wanted])=>JSON.stringify(topic(after.callback?.[name]))===JSON.stringify(wanted));
+ const callback=readCallbacks(after);
+ return Object.entries(expected).every(([name,wanted])=>JSON.stringify(topic(callback[name]))===JSON.stringify(wanted));
 }
 function inspectSettings(settings){
+ const callback=readCallbacks(settings);
  const topics=Object.fromEntries(['product','stock','order','logistics','makeup','privateOrder','dispute'].map(name=>{
-  const item=settings.callback?.[name],urls=item?.urls??item?.callbackUrls;
+  const item=callback[name],urls=item?.urls??item?.callbackUrls;
   return [name,{present:!!item,type:['ENABLE','CANCEL'].includes(item?.type)?item.type:null,urlCount:Array.isArray(urls)?urls.length:null,expectedDestination:Array.isArray(urls)&&urls.length===1&&urls[0]===CALLBACK}];
  }));
  let registrationValid=false,registrationIssue=null;
@@ -46,8 +57,8 @@ function inspectSettings(settings){
 function claimActivation(settings,storage,resume=false,io=fs){
  if(resume){
   // Resume only the exact inactive state inspected after the rejected write.
-  const callback=settings.callback||{};
-  if(Object.keys(callback).filter(name=>callback[name]!=null).sort().join(',')!=='order,product,stock'||!['product','stock','order'].every(name=>{const value=callback[name],urls=value?.urls??value?.callbackUrls;return value?.type==='CANCEL'&&Array.isArray(urls)&&urls.length===0;}))throw Error('reviewed_resume_state_changed');
+  const callback=readCallbacks(settings),names=Object.keys(callback).filter(name=>callback[name]!=null).sort().join(',');
+  if(!['order,product,stock','logistics,order,product,stock'].includes(names)||!['product','stock','order',...(callback.logistics?['logistics']:[])].every(name=>{const value=callback[name],urls=value?.urls??value?.callbackUrls;return value?.type==='CANCEL'&&Array.isArray(urls)&&urls.length===0;}))throw Error('reviewed_resume_state_changed');
   const previous=io.lstatSync(path.join(storage,'cj-webhook-activation-once'));
   if(!previous.isDirectory()||previous.isSymbolicLink())throw Error('previous_setup_claim_invalid');
  }
@@ -106,7 +117,8 @@ async function main(){
   stage='receiver_verify';await verifyReceiver(openId);
   stage='registration_validate';
   const config=registration(settings);
-  const ready=['order','logistics'].every(name=>{const value=settings.callback[name];return value?.type==='ENABLE'&&(value.urls??value.callbackUrls)?.length===1&&(value.urls??value.callbackUrls)[0]===CALLBACK;});
+  const current=readCallbacks(settings);
+  const ready=['order','logistics'].every(name=>{const value=current[name];return value?.type==='ENABLE'&&(value.urls??value.callbackUrls)?.length===1&&(value.urls??value.callbackUrls)[0]===CALLBACK;});
   if(!ready){
    const backup=claimActivation(settings,storage,mode==='--reviewed-resume');
    fs.writeFileSync(path.join(storage,backup),seal({accessToken:JSON.stringify(settings.callback),refreshToken:'cj-webhook-backup-v1'},'cj:webhook-backup',key),{mode:0o600,flag:'wx'});

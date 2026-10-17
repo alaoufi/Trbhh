@@ -63,7 +63,7 @@ export default async function CjImportedPage({ searchParams }: { searchParams: P
                       {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                     </div>
                     {/* الأرقام الحقيقية الحيّة تُجلب لحظياً عند تحميل الصفحة (بلا تخزين مسبق). */}
-                    <CjLiveNumbers pid={r.cj_product_id} productId={r.id} />
+                    <CjLiveNumbers view="source" pid={r.cj_product_id} productId={r.id} />
                   </div>
                 </div>
                 <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">

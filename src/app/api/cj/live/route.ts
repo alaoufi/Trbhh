@@ -37,6 +37,7 @@ export async function GET(request: Request) {
   if(zip===null)return NextResponse.json({status:'unavailable'},{headers});
   if(!zip)return NextResponse.json({status:'destination_required'},{headers});
 
+  const sourceView=new URL(request.url).searchParams.get('view')==='source';
   const idRaw=new URL(request.url).searchParams.get('id');
   const productId=idRaw===null?null:Number(idRaw);
   if(productId!==null&&(!Number.isSafeInteger(productId)||productId<1))return NextResponse.json({error:'invalid'},{status:400,headers});
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
   if(productId!==null&&(!row||row.hidden!==0||row.cj_product_id!==pid))return NextResponse.json({status:'unavailable'},{headers});
   const settings=await readVerifiedCjPricing().catch(()=>null);
   if(!settings)return NextResponse.json({status:'unavailable'},{headers});
-  const cacheKey = JSON.stringify([session.uid,pid,zip,productId,settings.usdToSarX100,settings.marginBps,row?.margin_bps,row?.other_costs_minor,row?.sale_price_override_minor]);
+  const cacheKey = JSON.stringify([session.uid,pid,zip,productId,sourceView,settings.usdToSarX100,settings.marginBps,row?.margin_bps,row?.other_costs_minor,row?.sale_price_override_minor]);
   const refresh=new URL(request.url).searchParams.get('refresh')==='1';
   const payload=await liveCache.read(cacheKey,async()=>{
   const respond = (value: Record<string,unknown>) => value;
@@ -88,10 +89,10 @@ export async function GET(request: Request) {
   const shipMinor = cheapest ? cheapest.priceMinor + cheapest.additionalMinor : 0;
   return respond({
     status: 'available',
-    priceMinor: check.salePriceMinor,
+    priceMinor: sourceView?check.supplierPriceMinor:check.salePriceMinor,
     shipMinor,
     stock: check.stockQuantity,
-    totalMinor: check.salePriceMinor + shipMinor,
+    totalMinor: (sourceView?check.supplierPriceMinor:check.salePriceMinor) + shipMinor,
     deliveryDays: cheapest?.deliveryDays ?? null,
     checkedAt: check.checkedAt,
     vid: check.vid,

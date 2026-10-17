@@ -7,3 +7,4 @@ describe('CJ settlement immutable accounting',()=>{
  it.each(['0','-1','1e2','18446744073709551616'])('rejects unsafe identifier %s',id=>expect(()=>settlementIds([id])).toThrow());
  it('rejects corrupted immutable total and negative freight',()=>{const q={lines:[{quantity:1,supplierUnitUsdMinor:500}],supplierFreightUsdMinor:250,supplierTaxUsdMinor:0,supplierUsdMinor:750};expect(()=>supplierAmounts({...q,supplierUsdMinor:751})).toThrow();expect(()=>supplierAmounts({...q,supplierFreightUsdMinor:-1})).toThrow();});
 });
+it('excludes Trbhh customer markup from all supplier settlement amounts',()=>{const source={lines:[{quantity:2,supplierUnitUsdMinor:500,customerUnitSarMinor:999999}],supplierFreightUsdMinor:250,supplierTaxUsdMinor:50,supplierUsdMinor:1300,customerSarMinor:1999998};expect(supplierAmounts(source)).toEqual({productUsdMinor:1000,shippingUsdMinor:250,taxUsdMinor:50,totalUsdMinor:1300});});

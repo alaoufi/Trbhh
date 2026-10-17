@@ -59,3 +59,5 @@ describe('CJ live display endpoint',()=>{
     const {GET}=await import('@/app/api/cj/live/route');expect((await GET(req())).status).toBe(status);expect(state.product).not.toHaveBeenCalled();
   });
 });
+it('separates administrative source cost from the marked-up customer price and cache',async()=>{state.verify.mockResolvedValue({status:'available',vid:'v',stockQuantity:4,supplierPriceMinor:2000,salePriceMinor:2600,checkedAt:'2026-10-13T00:00:00Z',shippingOptions:[{priceMinor:1000,additionalMinor:0}]});const {GET}=await import('@/app/api/cj/live/route');const customer=await(await GET(req())).json();const source=await(await GET(req('&view=source'))).json();expect(customer).toMatchObject({priceMinor:2600,shipMinor:1000,totalMinor:3600});expect(source).toMatchObject({priceMinor:2000,shipMinor:1000,totalMinor:3000});expect(state.verify).toHaveBeenCalledTimes(2);});
+it('does not expose source prices without administrative access',async()=>{state.access.mockResolvedValue(false);const {GET}=await import('@/app/api/cj/live/route');const response=await GET(req('&view=source'));expect(response.status).toBe(403);expect(state.product).not.toHaveBeenCalled();});

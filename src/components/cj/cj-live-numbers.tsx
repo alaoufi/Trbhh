@@ -17,11 +17,11 @@ type LivePayload =
 
 const sar = (m: number) => `${(m / 100).toFixed(2)} ر.س`;
 
-export function CjLiveNumbers({ pid,productId }: { pid: string;productId?:number;priceMinor?: number | null }) {
-  return <LiveNumbersValue key={`${pid}|${productId??''}`} pid={pid} productId={productId}/>;
+export function CjLiveNumbers({ pid,productId,view='customer' }: { pid: string;productId?:number;priceMinor?: number | null;view?:'customer'|'source' }) {
+  return <LiveNumbersValue key={`${pid}|${productId??''}|${view}`} pid={pid} productId={productId} view={view}/>;
 }
 
-function LiveNumbersValue({pid,productId}:{pid:string;productId?:number}){
+function LiveNumbersValue({pid,productId,view}:{pid:string;productId?:number;view:'customer'|'source'}){
   const [data, setData] = useState<LivePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const tried = useRef(false);
@@ -33,11 +33,11 @@ function LiveNumbersValue({pid,productId}:{pid:string;productId?:number}){
     if (loading) return;
     setLoading(true);
     try {
-      const key=`${pid}|${productId??''}|${refresh}`;
+      const key=`${pid}|${productId??''}|${view}|${refresh}`;
       let request=pending.get(key);
       if(!request){const load=async():Promise<LivePayload>=>{
         if(!mounted.current)return {status:'unavailable'};
-        const res=await fetch(`/api/cj/live?pid=${encodeURIComponent(pid)}${productId?`&id=${productId}`:''}${refresh?'&refresh=1':''}`,{credentials:'same-origin',cache:'no-store'});
+        const res=await fetch(`/api/cj/live?pid=${encodeURIComponent(pid)}${productId?`&id=${productId}`:''}${view==='source'?'&view=source':''}${refresh?'&refresh=1':''}`,{credentials:'same-origin',cache:'no-store'});
         if(!res.ok)throw Error('live_read_failed');
         return await res.json() as LivePayload;
       };request=(refresh?load():passiveRead(load)).finally(()=>pending.delete(key));pending.set(key,request);}
@@ -68,11 +68,11 @@ function LiveNumbersValue({pid,productId}:{pid:string;productId?:number}){
     <div ref={boxRef}>
       {available ? (
         <div className="grid grid-cols-2 gap-1 rounded-lg border border-emerald-300 bg-emerald-50 p-1.5 text-[11px]">
-          <div><span className="text-emerald-800">السعر: </span><b className="text-emerald-900" dir="ltr">{sar(price)}</b></div>
+          <div><span className="text-emerald-800">{view==='source'?'تكلفة CJ: ':'السعر: '}</span><b className="text-emerald-900" dir="ltr">{sar(price)}</b></div>
           <div><span className="text-emerald-800">المخزون: </span><b dir="ltr">{available.stock.toLocaleString('en')}</b></div>
           <div><span className="text-emerald-800">الشحن: </span><b dir="ltr">{available.shipMinor === 0 ? 'مجاني' : sar(available.shipMinor)}</b></div>
           <div><span className="text-emerald-800">مدة الشحن: </span><b dir="ltr">{available.deliveryDays ? (/[A-Za-z؀-ۿ]/.test(available.deliveryDays) ? available.deliveryDays : `${available.deliveryDays} يوم`) : '—'}</b></div>
-          <div className="col-span-2 border-t border-emerald-200 pt-1"><span className="text-emerald-800">السعر والشحن: </span><b className="text-emerald-900" dir="ltr">{sar(price + available.shipMinor)}</b></div>
+          <div className="col-span-2 border-t border-emerald-200 pt-1"><span className="text-emerald-800">{view==='source'?'تكلفة CJ مع الشحن: ':'السعر والشحن: '}</span><b className="text-emerald-900" dir="ltr">{sar(price + available.shipMinor)}</b></div>
           <div className="col-span-2 flex justify-between gap-2 text-[10px]"><span>لكمية 1 · تم التحديث من المورد: {new Date(available.checkedAt).toLocaleString('ar-SA')}</span><button type="button" disabled={loading} onClick={()=>fetchLive(true)}>{loading?'جارٍ التحديث…':'تحديث'}</button></div>
           <div className="col-span-2 text-[10px]">إلى الرمز البريدي {available.destinationZip}</div>
         </div>

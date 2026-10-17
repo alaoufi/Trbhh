@@ -74,13 +74,13 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3">
     <h2 className="text-[15px] font-extrabold text-primary">خيارات الشراء</h2>
-    {families.length>1&&<label className="block text-sm font-bold">نوع الخيار<select value={familyKey} onChange={e=>{setFamilyKey(e.target.value);setChosen({});}} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="">اختر نوع الخيارات</option>{families.map(f=><option key={f.key} value={f.key}>{f.title}</option>)}</select>
-          {group.label==='المقاس'&&<><SizeReferenceGuide/>{sizeChart?.configured&&<CjSizeChartTable chart={sizeChart}/>}</>}</label>}
+    {families.length>1&&<label className="block text-sm font-bold">نوع الخيار<select value={familyKey} onChange={e=>{setFamilyKey(e.target.value);setChosen({});}} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="">اختر نوع الخيارات</option>{families.map(f=><option key={f.key} value={f.key}>{f.title}</option>)}</select></label>}
     {selected&&<p className="break-all rounded-lg bg-slate-50 p-2 text-xs">رمز الخيار المختار (SKU): <b dir="ltr">{selected.variantSku}</b></p>}
     {selector
       ? <div className="grid grid-cols-2 gap-2">{selector.groups.map(group=><div key={group.label} className={group.label==='المقاس'?'col-span-2 min-w-0':'min-w-0'}>
           <label htmlFor={`${id}-${group.label}`} className="mb-1 block text-[13px] font-bold text-slate-700">{group.label}</label>
           <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>Object.fromEntries(selector.groupLabels.slice(0,selector.groupLabels.indexOf(group.label)+1).map(l=>[l,l===group.label?e.target.value:c[l]||''])))} className="min-h-11 md:min-h-9 min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{cjVariantValues(selector,group.label,chosen).map(val=><option key={val} value={val}>{group.label==='المقاس'?(sizeChart?.configured?cjSizeOptionLabel(val,sizeChart):familiarSizeLabel(val)):group.label==='المجموعة'?`المجموعة ${val} — راجع محتوياتها قبل الشراء`:group.label==='عدد القطع في العبوة'?`${val} قطع في العبوة`:val}</option>)}</select>
+          {group.label==='المقاس'&&<><SizeReferenceGuide/>{sizeChart?.configured&&<CjSizeChartTable chart={sizeChart}/>}</>}
         </div>)}
       </div>
       : family&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">بيانات خيارات المورد غير مكتملة أو ملتبسة؛ أُوقف اختيارها حتى تتضح مواصفاتها. لم يُحجز مخزون ولم يبدأ دفع.</p>}

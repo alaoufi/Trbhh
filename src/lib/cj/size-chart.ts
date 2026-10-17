@@ -22,11 +22,26 @@ export function cjSizeCountryLabel(country:string){
  const labels=({eu:'أوروبي (EU)',us:'أمريكي (US)',uk:'بريطاني (UK)','us women':'نسائي أمريكي (US)','us female':'نسائي أمريكي (US)','us men':'رجالي أمريكي (US)','us male':'رجالي أمريكي (US)'} as Record<string,string>);
  return Object.hasOwn(labels,key)?labels[key]:country;
 }
+
 const normalized=(v:string)=>v.trim().replace(/\s+/g,' ').toLowerCase();
+function regionalSize(value:string):{country:string;value:string}|null{
+ const m=value.trim().match(/^(US(?:[ _-]+(?:women|female|men|male))?|EU|EUR|UK)[ :_-]*(\d+(?:[.,]\d+)?)$/i);
+ if(!m)return null;
+ return {country:m[1].toLowerCase().replace(/[ _-]+/g,' ').replace('eur','eu').replace('female','women').replace('male','men'),value:m[2].replace(',','.')};
+}
+function areaMatches(source:string,country:string,value:string):boolean{
+ const s=regionalSize(source);if(!s)return false;
+ const c=normalized(country).replace(/[()_-]+/g,' ').replace(/\s+/g,' ').replace('european','eu').replace('eur','eu').replace('female','women').replace('male','men');
+ const v=regionalSize(value);
+ return s.country===c&&s.value===(v?v.value:value.trim().replace(',','.'));
+}
 export function cjSizeOptionLabel(sourceValue:string,chart:CjSizeChart|null|undefined):string{
  if(!chart?.configured||!/^(size|المقاس)$/i.test(chart.baseVariantKey??''))return sourceValue;
- const matching=chart.rows.filter(row=>normalized(row.baseValue)===normalized(sourceValue));
+ const exact=chart.rows.filter(row=>normalized(row.baseValue)===normalized(sourceValue));
+ const matching=exact.length?exact:chart.rows.filter(row=>row.areas.some(a=>areaMatches(sourceValue,a.country,a.value)));
  if(matching.length!==1)return sourceValue;
- const extra=matching[0].areas.filter(a=>a.value.trim()&&normalized(a.country+' '+a.value)!==normalized(sourceValue)).map(a=>`${cjSizeCountryLabel(a.country)}: ${a.value}`);
- return [sourceValue,...extra].join(' · ');
+ const areas=matching[0].areas.filter(a=>a.value.trim());
+ const rank=(country:string)=>/^(eu|eur|european)$/i.test(country.trim())?0:/^us/i.test(country)?1:/^uk/i.test(country)?2:3;
+ const extra=[...areas].sort((a,b)=>rank(a.country)-rank(b.country)).map(a=>cjSizeCountryLabel(a.country)+': '+a.value);
+ return [...extra,'الأصلي: '+sourceValue].join(' · ');
 }

@@ -1,43 +1,13 @@
 'use client';
-import {useAdminNavigationAccess} from '@/components/admin-navigation-access';
 import Link from 'next/link';
-import {ADMIN_NAV,ADMIN_GROUPS} from '@/components/admin-nav-def';
-
-/**
- * شريط تنقّل موحّد لصفحات إدارة التوريد — يظهر أعلى كل صفحة ليسهُل الانتقال بينها.
- * التبويب الحالي مميّز. روابط ثابتة فقط (بلا حالة) لتبقى قابلة للتصيير على الخادم.
- */
-const TABS: { key: string; href: string; label: string }[] = [
-  { key: 'browse', href: '/admin/suppliers/cj/browse', label: 'تصفّح واستيراد' },
-  { key: 'imported', href: '/admin/suppliers/cj/imported', label: 'البضائع المستوردة' },
-  { key: 'showcase', href: '/admin/suppliers/cj/showcase', label: 'السلع المعروضة' },
-  {key:'purchases',href:'/admin/suppliers/cj/purchases',label:'شراء العميل وإرسال الطلب'},
-  { key: 'payables', href: '/admin/suppliers/cj/payables', label: 'سداد المستحقات' },
-  {key:'preparation',href:'/admin/suppliers/cj/preparation',label:'تأكيد السداد والتجهيز'},
-  {key:'tracking',href:'/admin/suppliers/cj/tracking',label:'الشحن والتتبع والاستلام'},
-  {key:'history',href:'/admin/suppliers/cj/history',label:'سجل الطلبات والحسابات'},
-  { key: 'orders', href: '/admin/suppliers/cj/orders', label: 'الطلبات' },
-  { key: 'agents', href: '/admin/suppliers/cj/agents', label: 'الوكلاء' },
-  { key: 'glossary', href: '/admin/suppliers/cj/glossary', label: 'مُسرد الترجمة' },
-  { key: 'settings', href: '/admin/suppliers/cj', label: 'الإعدادات والاختبار' },
-];
-
-export function CjAdminNav({ current }: { current: 'purchases' | 'preparation' | 'tracking' | 'history' | 'browse' | 'imported' | 'showcase' | 'orders' | 'payables' | 'agents' | 'glossary' | 'settings' }) {
-  const allowed=new Set(useAdminNavigationAccess());
-  const currentHref=TABS.find(tab=>tab.key===current)?.href;
-  const group=ADMIN_GROUPS.find(g=>g.items.some(i=>i.href===currentHref));
-  const related=new Set(group?.items.map(i=>i.href));
-  return (
-    <nav aria-label="إدارة التوريد" className="-mx-1 flex flex-wrap gap-1.5 border-b border-primary/15 pb-2">
-      {TABS.filter(tab=>allowed.has(tab.href)&&related.has(tab.href)).map(tab => {
-        const active = tab.key === current;
-        return (
-          <Link key={tab.key} href={tab.href} aria-current={active ? 'page' : undefined}
-            className={`min-h-9 rounded-lg px-3 py-1.5 text-sm font-bold ${active ? 'bg-primary text-white' : 'border border-primary/25 text-primary hover:bg-primary/5'}`}>
-            {ADMIN_NAV.find(item=>item.href===tab.href)?.label??tab.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+import {useAdminNavigationAccess} from '@/components/admin-navigation-access';
+import {ADMIN_GROUPS} from '@/components/admin-nav-def';
+type Current='purchases'|'preparation'|'tracking'|'history'|'browse'|'imported'|'showcase'|'orders'|'payables'|'agents'|'glossary'|'settings';
+export function CjAdminNav({current}:{current:Current}){
+ const allowed=new Set(useAdminNavigationAccess());
+ const items=ADMIN_GROUPS.find(g=>g.key==='cj')?.items.filter(i=>allowed.has(i.href))||[];
+ const href=current==='settings'?'/admin/suppliers/cj':'/admin/suppliers/cj/'+current;
+ return <nav aria-label="فهرس المورد CJ" className="grid gap-3 border-b border-primary/15 pb-3 sm:grid-cols-2 xl:grid-cols-3">
+ {[...new Set(items.map(i=>i.section))].map(section=><section key={section} className="min-w-0"><h3 className="mb-1 text-xs font-bold text-muted-foreground">{section}</h3><div className="flex flex-wrap gap-1">{items.filter(i=>i.section===section).map(i=><Link key={i.href} href={i.href} aria-current={href===i.href?'page':undefined} className={'min-h-9 rounded-lg px-2 py-1.5 text-sm font-bold '+(href===i.href?'bg-primary text-white':'border border-primary/25 text-primary hover:bg-primary/5')}>{i.label}</Link>)}</div></section>)}
+ </nav>;
 }

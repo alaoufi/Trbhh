@@ -1,4 +1,5 @@
 'use client';
+import {Fragment} from 'react';
 import Link from 'next/link';
 import {useState} from 'react';
 import {usePathname,useSearchParams} from 'next/navigation';
@@ -10,7 +11,7 @@ export function AdminSidebar({allowedHrefs,roles}:{allowedHrefs:string[];roles:{
  const normalized=(s:string)=>s.toLowerCase().replace(/[أإآ]/g,'ا').replace(/[\u064b-\u065f\u0640]/g,'');
  const words=normalized(query).trim().split(/\s+/).filter(Boolean);
  const pathname=usePathname(),search=useSearchParams(),allowed=new Set(allowedHrefs);
- const groups=ADMIN_GROUPS.map(group=>({...group,items:group.items.filter(item=>allowed.has(item.href)&&words.every(word=>normalized([item.label,item.description,...(item.keywords||[])].join(' ')).includes(word)))})).filter(group=>group.items.length);
+ const groups=ADMIN_GROUPS.map(group=>({...group,items:group.items.filter(item=>allowed.has(item.href)&&words.every(word=>normalized([group.title,item.section,item.label,item.description,...(item.keywords||[])].join(' ')).includes(word)))})).filter(group=>group.items.length);
  const active=resolveAdminPageTitle(groups.flatMap(group=>group.items),pathname,search.toString());
  // Keep the current department and page visible without duplicating their links.
 
@@ -22,7 +23,7 @@ export function AdminSidebar({allowedHrefs,roles}:{allowedHrefs:string[];roles:{
    const entries=group.items;
    return <details key={group.key} open={current||words.length>0} className="overflow-hidden rounded-lg border" style={{borderColor:`${group.color}40`}}>
     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-extrabold text-white" style={{background:group.color}}><span className="flex items-center gap-2"><group.icon className="h-4 w-4"/>{group.title}</span><ChevronDown className="h-4 w-4 opacity-80"/></summary>
-    <div className="space-y-0.5 p-1" style={{background:`${group.color}0d`}}>{entries.map(({href,label,icon:Icon})=><Link key={href} href={`${href}#admin-content`} aria-current={href===active?.href?'page':undefined} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold hover:bg-white/70 ${href===active?.href?'bg-white shadow-sm ring-1 ring-current':''}`} style={{color:group.color}}><Icon className="h-4 w-4"/>{label}</Link>)}</div>
+    <div className="space-y-0.5 p-1" style={{background:`${group.color}0d`}}>{entries.map(({href,label,icon:Icon,section},index)=><Fragment key={href}>{section&&section!==entries[index-1]?.section&&<h3 className="px-3 pt-3 pb-1 text-xs font-extrabold">{section}</h3>}<Link href={`${href}#admin-content`} aria-current={href===active?.href?'page':undefined} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold hover:bg-white/70 ${href===active?.href?'bg-white shadow-sm ring-1 ring-current':''}`} style={{color:group.color}}><Icon className="h-4 w-4"/>{label}</Link></Fragment>)}</div>
    </details>;
   })}<Link href="/" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-muted-foreground hover:bg-secondary"><Home className="h-4 w-4"/>العودة للموقع</Link></nav>
  </aside>;

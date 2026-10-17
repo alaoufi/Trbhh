@@ -7,7 +7,7 @@ import {
 import type { Perm } from '@/lib/roles';
 import { DEPARTMENTS, MODULES, pagePermission } from '@/lib/access-control/catalog';
 
-export type AdminNavItem = { href: string; label: string; icon: React.ElementType; perm: Perm | null; description?: string; keywords?: string[] };
+export type AdminNavItem = { href: string; label: string; icon: React.ElementType; perm: Perm | null; description?: string; keywords?: string[]; section?: string };
 export type AdminNavGroup = { key: string; title: string; icon: React.ElementType; color: string; items: AdminNavItem[] };
 
 /**
@@ -133,11 +133,34 @@ const departmentGroups: AdminNavGroup[] = DEPARTMENTS.map((department,index)=>({
 const taskGroups:AdminNavGroup[]=[
  {key:'market-categories',title:'تصنيفات السوق وحقولها',icon:Megaphone,color:'#475569',items:items.filter(i=>['/admin/categories','/admin/smart-ads'].includes(i.href))},
  {key:'market-content',title:'الإعلانات والمحتوى',icon:Megaphone,color:'#0369A1',items:items.filter(i=>['/admin/ads','/admin/classified','/admin/duplicates','/admin/promos'].includes(i.href))},
- {key:'supplier-management',title:'الموردون وربط المتاجر',icon:Store,color:'#0F766E',items:items.filter(i=>i.href==='/admin/suppliers/cj/payables'||i.href.startsWith('/admin/suppliers')&&!i.href.startsWith('/admin/suppliers/cj'))},
- {key:'cj-catalog',title:'المورد — الكتالوج والاستيراد',icon:Store,color:'#0F766E',items:items.filter(i=>['/admin/suppliers/cj/browse','/admin/suppliers/cj/imported','/admin/suppliers/cj/showcase'].includes(i.href))},
- {key:'cj-operations',title:'المورد — متابعة الطلبات',icon:Store,color:'#0369A1',items:['purchases','preparation','tracking','history'].flatMap(path=>items.filter(i=>i.href==='/admin/suppliers/cj/'+path))},
- {key:'cj-settings',title:'المورد — الإعدادات والاختبارات',icon:Settings,color:'#64748b',items:items.filter(i=>i.href.startsWith('/admin/suppliers/cj')&&!['browse','imported','showcase','purchases','payables','preparation','tracking','history'].some(path=>i.href==='/admin/suppliers/cj/'+path))},
+ {key:'supplier-management',title:'الموردون وربط المتاجر',icon:Store,color:'#0F766E',items:items.filter(i=>i.href.startsWith('/admin/suppliers')&&!i.href.startsWith('/admin/suppliers/cj'))},
+
 ];
+
+function categorize(entries:AdminNavItem[],rules:[string,(i:AdminNavItem)=>boolean][]):AdminNavItem[]{
+ const remaining=new Set(entries),result:AdminNavItem[]=[];
+ for(const [section,match] of rules)for(const i of entries)if(remaining.has(i)&&match(i)){remaining.delete(i);result.push({...i,section});}
+ return result;
+}
+const cjItems=categorize(items.filter(i=>i.href.startsWith('/admin/suppliers/cj')),[
+ ['المنتجات',i=>/(browse|imported|showcase)$/.test(i.href)],
+ ['الطلبات والتجهيز',i=>/(purchases|preparation)$/.test(i.href)],
+ ['الشحن والاستلام',i=>i.href.endsWith('/tracking')],
+ ['الحسابات والسداد',i=>/(payables|history)$/.test(i.href)],
+ ['الدعم والمفوض',i=>i.href.endsWith('/agents')],
+ ['الإعدادات والاختبارات',()=>true],
+]);
+const financeItems=categorize(items.filter(i=>i.href.startsWith('/admin/finance')||i.href.startsWith('/admin/revenue')||i.href.startsWith('/admin/payments')||['/admin/topups','/admin/commerce/accounts','/admin/commerce/commissions'].includes(i.href)),[
+ ['نظرة عامة وتقارير',i=>['/admin/finance','/admin/revenue'].includes(i.href)||/section=(budget|month-end|cashflow)/.test(i.href)],
+ ['الفواتير والضرائب',i=>/section=(invoices|tax|returns)/.test(i.href)],
+ ['المحافظ وشحن الرصيد',i=>/tab=(wallets|campaigns)/.test(i.href)||i.href==='/admin/topups'||i.href.includes('private-topup')],
+ ['حسابات الموردين والتسويات',i=>/section=(suppliers|settlements)/.test(i.href)||i.href.startsWith('/admin/commerce/')],
+ ['المصروفات',i=>i.href.includes('expenses')],
+ ['المطابقة والإقفال والتدقيق',i=>/section=(reconciliation|close|ledger)/.test(i.href)],
+ ['البنوك وبوابات الدفع',i=>i.href.startsWith('/admin/payments')||i.href.includes('tab=accounts')],
+ ['التسعير والباقات',()=>true],
+]);
+taskGroups.push({key:'cj',title:'المورد CJ',icon:Store,color:'#0F766E',items:cjItems},{key:'finance-accounting',title:'المحاسبة والمالية',icon:Coins,color:'#166534',items:financeItems});
 const taskDestinations=new Set(taskGroups.flatMap(g=>g.items.map(i=>i.href)));
 /** Presentation groups are independent of authorization departments; grants stay unchanged. */
 export const ADMIN_GROUPS:AdminNavGroup[]=[

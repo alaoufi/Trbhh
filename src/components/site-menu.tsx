@@ -1,4 +1,5 @@
 'use client';
+import {Fragment} from 'react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
@@ -102,10 +103,11 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
                     <ChevronDown className="h-5 w-5 opacity-80" />
                   </summary>
                   <div className="space-y-0.5 p-1" style={{ background: `${g.color}0d` }}>
-                    {g.items.map((n) => (
+                    {g.items.map((n,index) => (
+<Fragment key={n.href}>{n.section&&n.section!==g.items[index-1]?.section&&<h3 className="px-3 pt-3 pb-1 text-xs font-extrabold">{n.section}</h3>}
                       <Link key={n.href} href={n.href} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium hover:bg-white/70" style={{ color: g.color }}>
                         <n.icon className="h-5 w-5 shrink-0" /> <span>{n.label}</span>
-                      </Link>
+                      </Link></Fragment>
                     ))}
                   </div>
                 </details>

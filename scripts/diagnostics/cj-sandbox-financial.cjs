@@ -16,9 +16,11 @@ async function sandboxFinancialProbe({api,claimOnce,report=()=>{}}){
  // Independent query of the exact SD code: never guess or construct it from numeric IDs.
  let d=identity(await api('/shopping/order/getOrderDetail','GET',{orderId:code}),first);
  report({event:'CJ_SANDBOX_IDENTIFIED',reference:REFERENCE,orderId:d.orderId,cjOrderCode:code,status:d.orderStatus});
+ if(['CREATED','IN_CART'].includes(d.orderStatus))throw Error('sandbox_order_confirmation_required');
+ if(!['UNPAID','PENDING','PROCESSING','UNSHIPPED','SHIPPED','DELIVERED'].includes(d.orderStatus))throw Error('sandbox_paid_status_unverified');
  await claimOnce();
  const read=async()=>identity(await api('/shopping/order/getOrderDetail','GET',{orderId:REFERENCE}),first);
- if(['CREATED','IN_CART','UNPAID'].includes(d.orderStatus)){
+ if(d.orderStatus==='UNPAID'){
   if(await api('/shopping/sandbox/simulatePay','POST',{orderId:code})!==true)throw Error('sandbox_payment_response_invalid');
   d=await read();
  }

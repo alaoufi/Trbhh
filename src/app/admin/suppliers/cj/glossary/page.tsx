@@ -5,7 +5,7 @@ import { listGlossary } from '@/lib/cj/glossary';
 import { addCjGlossaryTerm, removeCjGlossaryTerm } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'مُسرد ترجمة CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'مُسرد ترجمة المورد', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-3';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -25,7 +25,7 @@ export default async function CjGlossaryPage({ searchParams }: { searchParams: P
       <p className="text-sm text-muted-foreground">
         مصطلحات ثابتة (إنجليزي → عربي) تُطبَّق محلياً قبل الترجمة الآلية بلا إنترنت: مطابقة
         تامّة للحقول القصيرة (ألوان/مقاسات/أسماء الخيارات)، واستبدال المصطلح داخل العنوان
-        والوصف. أي تعديل هنا يُطبَّق على كل ترجمات CJ الجديدة تلقائياً. تُبذَر مصطلحات شائعة
+        والوصف. أي تعديل هنا يُطبَّق على كل ترجمات المورد الجديدة تلقائياً. تُبذَر مصطلحات شائعة
         تلقائياً ويمكن تعديلها أو حذفها.
       </p>
       {sp.saved && <p className="rounded-lg bg-green-50 p-2 text-sm text-green-700">تم الحفظ.</p>}

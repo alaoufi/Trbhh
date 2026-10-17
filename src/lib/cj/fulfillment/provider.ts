@@ -43,9 +43,16 @@ export function shippingPayload(c:Commitment):Record<string,string> {
  const d=c.destination;
  return {shippingCountryCode:d.country,shippingCountry:d.countryName||'Saudi Arabia',shippingProvince:d.region,shippingCity:d.city,shippingPhone:d.phone,shippingCustomerName:d.name,shippingAddress:d.address1,shippingAddress2:d.address2||'',shippingZip:d.postalCode,...(d.houseNumber?{houseNumber:d.houseNumber}:{})};
 }
+/** Keep storefront reference distinct from internal commerce IDs. Historical quotes omit it. */
+export function supplierProductReferences(c:Commitment){
+ return c.lines.map((x,index)=>{
+  if(x.storefrontProductId!==undefined&&(typeof x.storefrontProductId!=='string'||!/^[1-9]\d{0,19}$/.test(x.storefrontProductId)))throw Error('supplier_product_reference_invalid');
+  return {vid:x.vid,quantity:x.quantity,...(x.storefrontProductId?{storeProductId:x.storefrontProductId,storeLineItemId:c.supplierReference+'-'+x.storefrontProductId+'-'+index}:{})};
+ });
+}
 export function makeFulfillmentProvider(c:Commitment,snapshot?:Record<string,unknown>):FulfillmentProvider {
  return {
-  async createUnpaid(){const payload={...shippingPayload(c),orderNumber:c.supplierReference,payType:3,orderFlow:1,shopLogisticsType:2,fromCountryCode:c.originCountry,logisticName:c.logisticName,products:c.lines.map(x=>({vid:x.vid,quantity:x.quantity}))};const d=await request('/shopping/order/createOrderV3',payload);const id=str(d.orderId);if(!id||str(d.orderNumber)!==c.supplierReference)throw Error('create_identity_missing');return {orderId:id,acknowledgement:{requestHash:createHash('sha256').update(JSON.stringify(payload)).digest('hex'),requestPayload:payload,orderId:id,reference:c.supplierReference,response:d}};},
+  async createUnpaid(){const payload={...shippingPayload(c),orderNumber:c.supplierReference,payType:3,orderFlow:1,shopLogisticsType:2,fromCountryCode:c.originCountry,logisticName:c.logisticName,products:supplierProductReferences(c)};const d=await request('/shopping/order/createOrderV3',payload);const id=str(d.orderId);if(!id||str(d.orderNumber)!==c.supplierReference)throw Error('create_identity_missing');return {orderId:id,acknowledgement:{requestHash:createHash('sha256').update(JSON.stringify(payload)).digest('hex'),requestPayload:payload,orderId:id,reference:c.supplierReference,response:d}};},
   async findByReference(reference){try{const d=await request('/shopping/order/getOrderDetail',{orderId:reference});return str(d.orderNum)===reference&&str(d.orderId)?[str(d.orderId)]:[];}catch{return []; }},
   async detail(id){const d=snapshot&&str(snapshot.orderId)===id?snapshot:await request('/shopping/order/getOrderDetail',{orderId:id});const rows=Array.isArray(d.productList)?d.productList as Record<string,unknown>[]:[];
    // Query product variants to establish PID ownership instead of inventing PID from the quote.

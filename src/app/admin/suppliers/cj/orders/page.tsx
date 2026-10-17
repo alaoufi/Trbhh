@@ -11,7 +11,7 @@ import { getSetting } from '@/lib/settings';
 import { createTestCjOrder, setCjOrderCap } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'سجل طلبات CJ السابق والاختبار', robots: { index: false, follow: false } };
+export const metadata = { title: 'سجل طلبات المورد السابق والاختبار', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -37,27 +37,27 @@ export default async function CjOrdersPage({ searchParams }: { searchParams: Pro
     <div className="space-y-4">
       <CjAdminNav current="orders" />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold text-primary">سجل طلبات CJ السابق والاختبار</h1>
+        <h1 className="text-xl font-extrabold text-primary">سجل طلبات المورد السابق والاختبار</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">تصفّح/استيراد</Link>
           <AccessBoundary module={'orders'} action={'create'}>
             <Link href="/admin/suppliers/cj/orders/new" className={btn}>تجربة شراء حقيقية</Link>
           </AccessBoundary>
           <AccessBoundary module={'orders'} action={'create'}>
-            <form action={createTestCjOrder}><button className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">+ طلب اختبار (بلا CJ)</button></form>
+            <form action={createTestCjOrder}><button className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">+ طلب اختبار (بلا المورد)</button></form>
           </AccessBoundary>
         </div>
       </div>
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-        بنية دورة الطلب — <b>الشراء العام معطّل</b>. «طلب اختبار» يُنشئ سجلاً داخلياً لتجربة تحرّك الحالات (لا اتصال بـ CJ). الدفع الحقيقي من محفظة CJ يتمّ من صفحة الطلب، بعد اعتماد الإدارة وضمن السقف، ومحجوب ما لم يُفعَّل الشراء الحيّ.
+        بنية دورة الطلب — <b>الشراء العام معطّل</b>. «طلب اختبار» يُنشئ سجلاً داخلياً لتجربة تحرّك الحالات (لا اتصال بـ المورد). الدفع الحقيقي من محفظة المورد يتمّ من صفحة الطلب، بعد اعتماد الإدارة وضمن السقف، ومحجوب ما لم يُفعَّل الشراء الحيّ.
       </p>
       {sp.capset === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ سقف التكلفة.</p>}
 
       {/* المحفظة والمحاسبة والسقف */}
       <div className="grid gap-4 md:grid-cols-3">
         <div className={card}>
-          <h2 className="font-bold">محفظة CJ</h2>
-          <p className="text-xs text-muted-foreground">الشحن يتمّ على موقع CJ الرسمي مباشرةً (لا شحن محفظة عبر API).</p>
+          <h2 className="font-bold">محفظة المورد</h2>
+          <p className="text-xs text-muted-foreground">الشحن يتمّ على موقع المورد الرسمي مباشرةً (لا شحن محفظة عبر API).</p>
           {balance?.ok ? (
             <ul className="text-sm" dir="ltr">
               <li>الرصيد: <b>{usd(Math.round(balance.data.amountUsd * 100))}</b></li>
@@ -66,13 +66,13 @@ export default async function CjOrdersPage({ searchParams }: { searchParams: Pro
           ) : balance && !balance.ok ? <p className="text-xs text-red-700">تعذّر جلب الرصيد: {balance.error}</p> : <p className="text-xs text-muted-foreground">الرصيد يُجلب عند الطلب.</p>}
           <div className="flex flex-wrap gap-2 pt-1">
             <Link href="/admin/suppliers/cj/orders?balance=1" className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary">تحديث الرصيد</Link>
-            <a href={topupUrl} target="_blank" rel="noreferrer" className={`${btn} text-xs`}>شحن محفظة CJ (الموقع الرسمي) ↗</a>
+            <a href={topupUrl} target="_blank" rel="noreferrer" className={`${btn} text-xs`}>شحن محفظة المورد (الموقع الرسمي) ↗</a>
           </div>
         </div>
 
         <div className={card}>
           <h2 className="font-bold">سقف تكلفة الطلب</h2>
-          <p className="text-xs text-muted-foreground">يُمنع أي خصم يتجاوز هذا السقف (بالدولار، عملة محفظة CJ).</p>
+          <p className="text-xs text-muted-foreground">يُمنع أي خصم يتجاوز هذا السقف (بالدولار، عملة محفظة المورد).</p>
           <p className="text-lg font-extrabold text-primary" dir="ltr">{usd(capUsdMinor)}</p>
           <AccessBoundary module="orders" action="edit">
             <form action={setCjOrderCap} className="flex items-end gap-2">
@@ -87,9 +87,9 @@ export default async function CjOrdersPage({ searchParams }: { searchParams: Pro
           <ul className="text-sm" dir="ltr">
             <li>صافي الخصم (الدفتر): <b>{usd(reconcile.ledgerNetUsdMinor)}</b></li>
             <li className="text-xs text-muted-foreground">عدد القيود: {reconcile.entries.toLocaleString('en')}</li>
-            {balance?.ok && <li className="text-xs text-muted-foreground">رصيد CJ الحالي: {usd(Math.round(balance.data.amountUsd * 100))}</li>}
+            {balance?.ok && <li className="text-xs text-muted-foreground">رصيد المورد الحالي: {usd(Math.round(balance.data.amountUsd * 100))}</li>}
           </ul>
-          <p className="text-[11px] text-muted-foreground">المطابقة الدقيقة تتمّ بمقارنة قيود الدفتر بحركات كشف CJ الرسمي؛ الدفتر هو مصدر الحقيقة الداخلي.</p>
+          <p className="text-[11px] text-muted-foreground">المطابقة الدقيقة تتمّ بمقارنة قيود الدفتر بحركات كشف المورد الرسمي؛ الدفتر هو مصدر الحقيقة الداخلي.</p>
         </div>
       </div>
 

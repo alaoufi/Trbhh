@@ -1,6 +1,6 @@
 /** Durable single-attempt supplier workflow. Provider responses alone never prove debit. */
 import {isCjCardPaymentConfirmed,cjUtcTimestamp} from './provider';
-export type Commitment = {supplierReference:string;supplierUsdMinor:number;supplierFreightUsdMinor?:number;supplierTaxUsdMinor?:number;lines:{pid:string;vid:string;quantity:number;supplierUnitUsdMinor?:number}[];destination:Record<string,string>;originAreaId:string;originCountry:string;logisticName:string};
+export type Commitment = {supplierReference:string;supplierUsdMinor:number;supplierFreightUsdMinor?:number;supplierTaxUsdMinor?:number;lines:{storefrontProductId?:string;sku?:string;pid:string;vid:string;quantity:number;supplierUnitUsdMinor?:number}[];destination:Record<string,string>;originAreaId:string;originCountry:string;logisticName:string};
 export type OrderProof = Omit<Commitment,'supplierReference'|'supplierUsdMinor'> & {orderId:string;reference:string;payableUsdMinor:number|null;paymentDate:string|null;cjOrderCode:string|null;billingOrderId?:string|null;physicalStorageId?:string|null;orderStatus?:string;currency?:string};
 export type CreateAcknowledgement={requestHash:string;requestPayload:Record<string,unknown>;orderId:string;reference:string;response:Record<string,unknown>};
 export type BillingProof = {id:string;cjOrderCode:string|null;amountUsdMinor:number|null;status:string;type:string};

@@ -11,7 +11,7 @@ import { cjOrderCapUsdMinor } from '@/lib/cj/orders/payment';
 import { advanceCjOrder, setCjOrderTracking, dispatchCjOrderToSupplier } from '../../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'طلب CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'طلب المورد', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -87,23 +87,23 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
         <div className="mt-3 space-y-4">
       {sp.moved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تغيير الحالة.</p>}
       {sp.tracked === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث التتبّع.</p>}
-      {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ سجل طلب تربح للتجربة؛ الشراء لدى CJ متوقف حتى استيفاء ضمانات P0.</p>}
-      {sp.sent === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">يوجد سجل إرسال سابق؛ قبول CJ وتخصيص المخزون غير متحققين.</p>}
+      {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ سجل طلب تربح للتجربة؛ الشراء لدى المورد متوقف حتى استيفاء ضمانات P0.</p>}
+      {sp.sent === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">يوجد سجل إرسال سابق؛ قبول المورد وتخصيص المخزون غير متحققين.</p>}
       {sp.senderr === 'blocked' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">الشراء الحيّ غير مفعّل — الطلب جاهز للإرسال، ولن يُرسَل فعلياً للمورد إلا بعد التفعيل اليدوي. لم يحدث أي خصم أو شراء.</p>}
       {typeof sp.senderr === 'string' && sp.senderr !== 'blocked' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الإرسال: {sp.senderr === 'not_ready' ? 'الطلب ليس بحالة مؤكَّدة الدفع بعد' : sp.senderr === 'no_lines' ? 'لا توجد بنود قابلة للإرسال' : sp.senderr}</p>}
       {typeof sp.err === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الانتقال: {sp.err === 'invalid_transition' ? 'انتقال غير مسموح من الحالة الحالية' : sp.err}</p>}
-      {sp.payerr === 'over_cap' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">المبلغ الفعلي من CJ ({sp.amount ? usd(Number(sp.amount)) : ''}) تجاوز السقف المعتمَد ({sp.cap ? usd(Number(sp.cap)) : ''}) — مُنع الخصم. ارفع السقف أو راجع الطلب.</p>}
-      {sp.payerr === 'purchase_unverified' && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-800">الشراء متوقف (P0): لم يثبت ضمان مبلغ الخصم ومنع تكراره، أو قبول CJ وتخصيص المخزون. لا خصم ولا شراء مؤكد؛ يلزم مراجعة الإدارة.</p>}
+      {sp.payerr === 'over_cap' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">المبلغ الفعلي من المورد ({sp.amount ? usd(Number(sp.amount)) : ''}) تجاوز السقف المعتمَد ({sp.cap ? usd(Number(sp.cap)) : ''}) — مُنع الخصم. ارفع السقف أو راجع الطلب.</p>}
+      {sp.payerr === 'purchase_unverified' && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-800">الشراء متوقف (P0): لم يثبت ضمان مبلغ الخصم ومنع تكراره، أو قبول المورد وتخصيص المخزون. لا خصم ولا شراء مؤكد؛ يلزم مراجعة الإدارة.</p>}
       {sp.payerr === 'blocked' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">الشراء الحيّ غير مفعّل — اعتُمد الطلب ولن يُخصَم شيء حتى التفعيل اليدوي (مفتاح الشراء + SUPPLIER_ALLOW_LIVE_ORDERS).</p>}
-      {sp.payerr === 'no_amount' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لم يُعِد CJ مبلغاً فعلياً — مُنع الدفع حتى التحقق (لا دفع بمبلغ غير متحقق منه).</p>}
-      {sp.payerr === 'cj_create_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر إنشاء الطلب لدى CJ — راجع الخط الزمني. لم يحدث خصم.</p>}
-      {sp.payerr === 'pay_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الدفع من محفظة CJ — راجع الخط الزمني.</p>}
+      {sp.payerr === 'no_amount' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لم يُعِد المورد مبلغاً فعلياً — مُنع الدفع حتى التحقق (لا دفع بمبلغ غير متحقق منه).</p>}
+      {sp.payerr === 'cj_create_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر إنشاء الطلب لدى المورد — راجع الخط الزمني. لم يحدث خصم.</p>}
+      {sp.payerr === 'pay_error' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الدفع من محفظة المورد — راجع الخط الزمني.</p>}
       {sp.payerr === 'no_lines' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لا بنود للطلب — تعذّر الدفع.</p>}
       {sp.payerr === 'confirm_required' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">يلزم تأكيد الدفع صراحةً.</p>}
       {sp.payerr === 'pay_in_progress' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">هناك محاولة دفع قائمة على هذا الطلب — مُنع الخصم المكرّر. حدّث الصفحة بعد لحظات للتأكد من النتيجة.</p>}
       {sp.payerr === 'insufficient_balance' && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 space-y-2">
-        <p>رصيد محفظة CJ غير كافٍ — لم يُخصم شيء ولم يُكرَّر الطلب. المستحق: <b dir="ltr">{sp.amount ? usd(Number(sp.amount)) : '—'}</b> · الرصيد: <b dir="ltr">{sp.bal ? usd(Number(sp.bal)) : '—'}</b> · الفرق: <b dir="ltr">{sp.amount && sp.bal ? usd(Number(sp.amount) - Number(sp.bal)) : '—'}</b></p>
-        <a href={topupUrl} target="_blank" rel="noreferrer" className={`${btn} inline-block text-xs`}>شحن محفظة CJ (الموقع الرسمي) ↗</a>
+        <p>رصيد محفظة المورد غير كافٍ — لم يُخصم شيء ولم يُكرَّر الطلب. المستحق: <b dir="ltr">{sp.amount ? usd(Number(sp.amount)) : '—'}</b> · الرصيد: <b dir="ltr">{sp.bal ? usd(Number(sp.bal)) : '—'}</b> · الفرق: <b dir="ltr">{sp.amount && sp.bal ? usd(Number(sp.amount) - Number(sp.bal)) : '—'}</b></p>
+        <a href={topupUrl} target="_blank" rel="noreferrer" className={`${btn} inline-block text-xs`}>شحن محفظة المورد (الموقع الرسمي) ↗</a>
         <p className="text-xs">بعد الشحن، عُد لهذه الصفحة واضغط «اعتماد ودفع» على نفس الطلب — سيُعاد فحص الرصيد والمبلغ قبل الخصم.</p>
       </div>}
 
@@ -133,16 +133,16 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
 
         {/* الدفع والاعتماد — الطبقة المالية */}
         <div className={card}>
-          <h2 className="font-bold">الدفع من محفظة CJ</h2>
+          <h2 className="font-bold">الدفع من محفظة المورد</h2>
           <ul className="grid gap-1 text-sm">
-            <li>حالة الدفع: {order.paid_at ? <span className="font-bold text-emerald-700">سجل دفع سابق غير مطابق مع CJ · {dt(order.paid_at)}</span> : <span className="font-bold text-amber-700">لا يوجد دليل دفع CJ مطابق</span>}</li>
-            <li>مبلغ CJ المسجل سابقًا (غير متحقق حاليًا): <span className="font-bold" dir="ltr">{order.actual_payment_usd_minor ? usd(order.actual_payment_usd_minor) : '—'}</span></li>
+            <li>حالة الدفع: {order.paid_at ? <span className="font-bold text-emerald-700">سجل دفع سابق غير مطابق مع المورد · {dt(order.paid_at)}</span> : <span className="font-bold text-amber-700">لا يوجد دليل دفع المورد مطابق</span>}</li>
+            <li>مبلغ المورد المسجل سابقًا (غير متحقق حاليًا): <span className="font-bold" dir="ltr">{order.actual_payment_usd_minor ? usd(order.actual_payment_usd_minor) : '—'}</span></li>
             <li>السقف المعتمَد: <span dir="ltr">{usd(capUsdMinor)}</span></li>
             <li className="text-xs text-muted-foreground">التحقق: {order.verified_source || '—'} · {dt(order.verified_at)}</li>
             {order.approved_at && <li className="text-xs text-muted-foreground">اعتُمد: {dt(order.approved_at)}{order.approved_by ? ` · بواسطة #${String(order.approved_by)}` : ''}</li>}
             {order.cj_shipment_order_id && <li className="text-xs text-muted-foreground" dir="ltr">shipmentOrderId: {order.cj_shipment_order_id}</li>}
           </ul>
-          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">الشراء والخصم متوقفان (P0). بيانات الدفع السابقة لا تثبت قبول CJ أو تخصيص المخزون. يلزم مطابقة الإدارة وضمان موثق للمبلغ ومنع التكرار قبل إتاحة الدفع.</p>
+          <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">الشراء والخصم متوقفان (P0). بيانات الدفع السابقة لا تثبت قبول المورد أو تخصيص المخزون. يلزم مطابقة الإدارة وضمان موثق للمبلغ ومنع التكرار قبل إتاحة الدفع.</p>
           <div className="border-t pt-2">
             <div className="text-sm font-bold">الدفتر المحاسبي ({ledger.length})</div>
             {!ledger.length ? <p className="text-xs text-muted-foreground">لا قيود.</p> : (

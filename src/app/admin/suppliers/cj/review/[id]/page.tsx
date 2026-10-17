@@ -9,7 +9,7 @@ import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { approveCjProduct, removeCjProduct, saveCjReview, toggleCjHidden } from '../../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'مراجعة سلعة CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'مراجعة سلعة المورد', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -43,12 +43,12 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
       </div>
       {sp.saved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ المراجعة.</p>}
       {sp.edited === '1' && <p role="status" className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث حالة السلعة.</p>}
-      <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">تحرير بيانات العرض (عربية) دون المساس ببيانات المصدر من CJ. لا شراء ولا نشر تلقائي؛ السلعة تبقى في التخزين الوسيط.</p>
+      <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">تحرير بيانات العرض (عربية) دون المساس ببيانات المصدر من المورد. لا شراء ولا نشر تلقائي؛ السلعة تبقى في التخزين الوسيط.</p>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* بيانات المصدر (CJ) — للقراءة */}
         <details className={card}>
-          <summary className="cursor-pointer font-bold">بيانات المصدر الأصلية (CJ) — للقراءة فقط</summary>
+          <summary className="cursor-pointer font-bold">بيانات المصدر الأصلية (المورد) — للقراءة فقط</summary>
           <div className="flex flex-wrap gap-1">
             {(detail && detail.ok ? detail.data.images : [row.image].filter(Boolean)).slice(0, 8).map((src, i) => (
               // eslint-disable-next-line @next/next/no-img-element
@@ -59,8 +59,8 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
             <li dir="ltr">PID: {row.cj_product_id}</li>
             <li dir="ltr">SKU: {row.cj_sku || '—'}</li>
             <li dir="ltr" className="font-bold text-foreground">{row.name}</li>
-            <li>تصنيف CJ: {detail && detail.ok ? (detail.data.category || '—') : '—'}</li>
-            <li>سعر CJ: {detail && detail.ok ? usd(detail.data.priceUsd) : '—'} · إجمالي المخزون (عيّنة): {detail && detail.ok ? detail.data.totalStock : '—'}</li>
+            <li>تصنيف المورد: {detail && detail.ok ? (detail.data.category || '—') : '—'}</li>
+            <li>سعر المورد: {detail && detail.ok ? usd(detail.data.priceUsd) : '—'} · إجمالي المخزون (عيّنة): {detail && detail.ok ? detail.data.totalStock : '—'}</li>
           </ul>
           {row.source_description && <details className="text-xs"><summary className="cursor-pointer font-bold">الوصف الأصلي</summary><p className="mt-1 whitespace-pre-wrap" dir="ltr">{row.source_description.slice(0, 2000)}</p></details>}
           {detail && detail.ok && detail.data.variants.length > 0 && (
@@ -117,7 +117,7 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
           <input type="hidden" name="id" value={row.id} />
           <input type="hidden" name="back" value="/admin/suppliers/cj/browse" />
           <h2 className="font-bold text-rose-900">حذف السلعة من تربح</h2>
-          <p className="text-sm leading-6 text-rose-900">يحذف سجل السلعة المستوردة من تربح فقط، ولا يحذفها من CJ. قد يُرفض الحذف إذا كانت مرتبطة بطلبات سابقة.</p>
+          <p className="text-sm leading-6 text-rose-900">يحذف سجل السلعة المستوردة من تربح فقط، ولا يحذفها من المورد. قد يُرفض الحذف إذا كانت مرتبطة بطلبات سابقة.</p>
           <label className="flex items-start gap-2 text-sm text-rose-900"><input className="mt-1 h-4 w-4" type="checkbox" required />أؤكد حذف هذه السلعة من تربح.</label>
           <button className="w-fit rounded-lg border border-rose-300 px-4 py-2 text-sm font-bold text-rose-800">تأكيد الحذف</button>
         </form></AccessBoundary>

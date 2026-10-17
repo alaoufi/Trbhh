@@ -14,7 +14,7 @@ import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 import { saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, refreshCjImportedAvailability, removeCjProduct } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'البضائع المستوردة من CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'البضائع المستوردة من المورد', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white disabled:opacity-40';

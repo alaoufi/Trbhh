@@ -40,7 +40,7 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
   return <section className="card-3d space-y-4 rounded-xl p-5">
     <AccessPage href="/admin/orders"><Link href="/admin/orders" className="text-primary underline">العودة إلى السلع والطلبات</Link></AccessPage>
     <h1 className="text-xl font-bold text-primary">تفاصيل الطلب #{order.id.toString()}</h1>
-    {objectionReasons.map((reason,i)=><section key={i} className="rounded-lg border border-red-300 p-3"><h2 className="font-bold">اعتراض العميل — يتطلب مراجعة</h2><p>{reason}</p><p>الإقفال محجوب. تُراجع الأدلة ويُتابع الاعتراض مع CJ؛ لا استرداد أو سداد إضافي تلقائي.</p></section>)}
+    {objectionReasons.map((reason,i)=><section key={i} className="rounded-lg border border-red-300 p-3"><h2 className="font-bold">اعتراض العميل — يتطلب مراجعة</h2><p>{reason}</p><p>الإقفال محجوب. تُراجع الأدلة ويُتابع الاعتراض مع المورد؛ لا استرداد أو سداد إضافي تلقائي.</p></section>)}
     <p className="text-sm">رقم العضو: {order.member_id.toString()}</p>
     <p>حالة دفع العميل: {paymentLabels[order.status] ?? 'حالة غير معروفة — راجع المسؤول'}</p>
     <p>حالة التنفيذ الداخلي: {fulfillmentLabels[order.fulfillment_status] ?? 'حالة غير معروفة — راجع المسؤول'}</p>

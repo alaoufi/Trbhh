@@ -12,7 +12,7 @@ export function CjAdminCatalogControls({ path, catalog, categories }: { path: st
       <button type="submit" className="min-h-11 rounded-xl bg-primary px-4 text-sm font-bold text-white">تصفية</button>
       {catalog.cat ? <Link href={path} className="px-3 text-sm font-bold text-primary">إلغاء التصفية</Link> : null}
     </form>
-    <nav aria-label="صفحات سلع CJ" className="flex items-center gap-3 text-sm">
+    <nav aria-label="صفحات سلع المورد" className="flex items-center gap-3 text-sm">
       {catalog.page > 1 ? <Link href={href(catalog.page - 1)} className="rounded-xl border px-3 py-3 font-bold text-primary">السابق</Link> : null}
       <span>الصفحة {catalog.page} من {catalog.pageCount}</span>
       {catalog.page < catalog.pageCount ? <Link href={href(catalog.page + 1)} className="rounded-xl border px-3 py-3 font-bold text-primary">التالي</Link> : null}

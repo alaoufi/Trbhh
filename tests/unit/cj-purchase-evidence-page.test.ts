@@ -17,10 +17,10 @@ describe('Admin CJ purchase evidence display', () => {
     const html = renderToStaticMarkup(await Page({ params: Promise.resolve({id:'7'}), searchParams: Promise.resolve({paid, sent:'1'}) }));
     expect(html).toContain('الشراء والخصم متوقفان');
     expect(html).toContain('سجل دفع سابق غير مطابق');
-    expect(html).not.toContain('تمّ الدفع من محفظة CJ بنجاح');
+    expect(html).not.toContain('تمّ الدفع من محفظة المورد بنجاح');
     expect(html).not.toContain('لم يُكرَّر الخصم');
     expect(html).not.toContain('أؤكّد الخصم');
-    expect(html).toContain('قبول CJ وتخصيص المخزون غير متحققين');
+    expect(html).toContain('قبول المورد وتخصيص المخزون غير متحققين');
   });
   it('does not render evidence to an unauthorized user', async () => {
     state.allowed = false;

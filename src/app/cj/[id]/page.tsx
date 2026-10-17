@@ -1,3 +1,4 @@
+import {ProductReference} from '@/components/cj/product-reference';
 import {readCjSizeChart} from '@/lib/cj/size-chart-server';
 import {CjSizeChartTable} from '@/components/cj/size-chart';
 import Link from 'next/link';
@@ -97,7 +98,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-2 lg:col-start-2 lg:row-start-1 lg:row-span-2">
         {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl"><CjText original={p.name} ar={title}/></h1>
-        <p className="break-all text-xs text-slate-600">رقم المنتج في تربح: {id} · رقم المورد: <b dir="ltr">{p.cj_product_id}</b> · رمز المنتج: <b dir="ltr">{p.cj_sku}</b></p>
+        <ProductReference id={id} pid={p.cj_product_id} sku={p.cj_sku}/>
+        {p.last_sync_at&&<p className="text-xs text-slate-500">آخر تحديث بيانات المنتج من المورد: <time dateTime={p.last_sync_at.toISOString()}>{p.last_sync_at.toLocaleString('ar-SA')}</time></p>}
         <ShareButtons compact url={`${primaryOrigin}/cj/${id}`} title={title}/>
         {/* سعر بارز (السعر النهائي بالريال، شامل ربح تربح) — يُخفى إن لم تُسعّر السلعة بعد. */}
 

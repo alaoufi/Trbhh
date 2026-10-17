@@ -134,7 +134,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
       const selectedVariantKey=item.variantKey||'';
       let rawVariant=selectedVariantKey?sourceVariants.find(raw=>raw&&typeof raw==='object'&&[String((raw as Record<string,unknown>).externalId||''),String((raw as Record<string,unknown>).vid||''),String((raw as Record<string,unknown>).id||'')].includes(selectedVariantKey)):undefined;
       let cjVariantFound=false;
-      if(liveLine){rawVariant={vid:liveLine.vid,quantity:item.quantity,available:true,publicPriceMinor:liveLine.customerUnitSarMinor};cjVariantFound=true;}
+      if(liveLine){rawVariant={vid:liveLine.vid,sku:liveLine.sku,quantity:item.quantity,available:true,publicPriceMinor:liveLine.customerUnitSarMinor};cjVariantFound=true;}
       if(selectedVariantKey&&!rawVariant){
         const [cjSource]=await tx.$queryRaw<{details_json:unknown;availability_json:unknown;availability_checked_at:Date|null}[]>`SELECT details_json,availability_json,availability_checked_at FROM cj_products WHERE commerce_product_id=${item.productId} AND hidden=0 AND status='ready' ORDER BY availability_checked_at DESC,id LIMIT 1 FOR SHARE`;
         const decode=(value:unknown)=>{if(typeof value!=='string')return value;try{return JSON.parse(value) as unknown;}catch{return null;}};
@@ -152,6 +152,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
       if(needsVariant&&!rawVariant)throw new Error(Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0?'supplier_variant_checkout_required':'product_variant_required');
       if(!needsVariant&&selectedVariantKey)throw new Error('product_variant_required');
       const chosen=rawVariant?chosenVariantSnapshot(selectedVariantKey,rawVariant):null;
+      if(chosen&&liveLine){if(liveLine.storefrontProductId)chosen.storefrontProductId=liveLine.storefrontProductId;chosen.pid=liveLine.pid;}
       if(rawVariant&&!chosen)throw new Error('product_variant_invalid');
       const variantData=rawVariant as Record<string,unknown>|undefined;
       const variantStock=Number(variantData?.quantity??variantData?.stock);

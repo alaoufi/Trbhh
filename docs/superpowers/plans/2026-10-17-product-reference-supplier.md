@@ -1,0 +1,7 @@
+# Product references and supplier provenance — 2026-10-17
+P1. Use existing imported-product row ID as the public customer reference. Do not substitute commerce_products.id, supplier PID, VID or order/payment IDs.
+Show public reference in cards, product details (copy button), cart, persisted customer/admin variant snapshots and supplier settlement/journey lines. Preserve exact PID/VID/SKU.
+Quote stores authoritative storefrontProductId from server row, keeps it through fulfillment commitment and sends documented createOrderV3 storeProductId/storeLineItemId. Provider order/payment IDs remain the financial reconciliation keys. Historical quotes omit unknown references; no fabricated backfill or data migration.
+Supplier wording replaces CJ in Arabic-facing catalog and workflow labels; source codes, URLs and carrier names remain intact. Display last supplier catalog sync and successful current price/stock/freight check timestamps; failed checks never assert refresh success.
+Reference UX reviewed against Nike size guidance and IKEA availability/delivery guidance. Mobile/desktop layout uses existing responsive components, wrapping identifiers and secondary expandable details.
+Validation: quote/commitment/payload reference identity, malformed/historical references, rendered customer and settlement references; full tests, type/lint/build, local mobile390/desktop1366 UI. No live purchase, payment, store enablement, pricing or production data change. Deployment remains manual.

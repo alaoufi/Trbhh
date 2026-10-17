@@ -29,6 +29,7 @@ export function CjProductCard({ product }: { product: CjProductRow }) {
         </div>}
       </div>
       <div className="flex min-w-0 flex-col gap-1 p-2.5 pb-1.5 sm:p-3 sm:pb-1.5">
+        <p className="text-xs font-bold text-primary">رقم المنتج: <b dir="ltr">{String(product.id)}</b></p>
         <h3 className="line-clamp-2 min-h-9 break-words text-[13px] font-bold leading-[1.35] text-slate-800">{compactAdTitle(title)}</h3>
       </div>
     </Link>

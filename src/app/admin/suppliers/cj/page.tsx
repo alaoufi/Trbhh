@@ -17,7 +17,7 @@ import { SubmitButton } from '@/components/cj/submit-button';
 import { CjAdminNav } from '@/components/cj/admin-nav';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'تكامل CJ — وضع الاختبار' };
+export const metadata = { title: 'تكامل المورد — وضع الاختبار' };
 
 const input = 'min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm';
 const btn = 'rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white';
@@ -63,7 +63,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-4">
       <CjAdminNav current="settings" />
-      <AccessBoundary module="orders" action="view"><AccessBoundary module="wallets" action="view"><Link href="/admin/suppliers/cj/payables" className="inline-block rounded-lg border border-primary/30 px-4 py-2 font-bold text-primary">مستحقات CJ — تجميع ومطابقة سداد المورد</Link></AccessBoundary></AccessBoundary>
+      <AccessBoundary module="orders" action="view"><AccessBoundary module="wallets" action="view"><Link href="/admin/suppliers/cj/payables" className="inline-block rounded-lg border border-primary/30 px-4 py-2 font-bold text-primary">مستحقات المورد — تجميع ومطابقة سداد المورد</Link></AccessBoundary></AccessBoundary>
       <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
@@ -75,13 +75,13 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
       <div className={card}>
         <h2 className="font-bold">الحالة</h2>
         <ul className="grid gap-1 text-sm sm:grid-cols-2">
-          <li>إعداد CJ: {cfg.configured ? <b className="text-emerald-700">جاهز</b> : <b className="text-red-700">ناقص (اضبط متغيّرات البيئة)</b>}</li>
+          <li>إعداد المورد: {cfg.configured ? <b className="text-emerald-700">جاهز</b> : <b className="text-red-700">ناقص (اضبط متغيّرات البيئة)</b>}</li>
           <li>البريد: <span dir="ltr">{cfg.email || '—'}</span></li>
           <li>مفتاح API: {cfg.apiKey ? '••••••' : '—'}</li>
           <li>مفتاح التشفير: {/^[a-fA-F0-9]{64}$/.test(cfg.encryptionKey) ? 'صحيح' : 'ناقص/غير صالح'}</li>
           <li>تفعيل الشراء (مركزي): {commerce?.purchasingEnabled ? <b className="text-red-700">مفعّل</b> : <b className="text-emerald-700">معطّل ✓</b>}</li>
           <li>SUPPLIER_ALLOW_LIVE_ORDERS: {liveAllowed ? <b className="text-red-700">true</b> : <b className="text-emerald-700">false ✓</b>}</li>
-          <li>منتجات CJ المربوطة: {mapped}</li>
+          <li>منتجات المورد المربوطة: {mapped}</li>
           <li>الهامش الافتراضي: {(marginBps / 100).toFixed(2)}٪</li>
         </ul>
       </div>
@@ -115,9 +115,9 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
 
       {/* مزامنة الكتالوج */}
       <div className={card}>
-        <h2 className="font-bold">مزامنة كتالوج CJ (قراءة فقط)</h2>
+        <h2 className="font-bold">مزامنة كتالوج المورد (قراءة فقط)</h2>
         <p className="text-xs text-muted-foreground">
-          تجلب منتجات CJ إلى جدول التخزين الوسيط <code>cj_products</code> وتحتسب سعر البيع من التكلفة (سعر CJ بالدولار
+          تجلب منتجات المورد إلى جدول التخزين الوسيط <code>cj_products</code> وتحتسب سعر البيع من التكلفة (سعر المورد بالدولار
           × سعر الصرف) + الشحن + الهامش الافتراضي. لا يُنشَر أي منتج تلقائياً في المتجر ولا يُشترى شيء. المزامنة المجدولة
           تعمل فقط عند تفعيلها أدناه (كرون داخلي <code>/api/internal/cj/sync</code>).
         </p>
@@ -135,13 +135,13 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
           <label className="text-sm">تقدير الشحن/منتج (ر.س)<input className={`${input} ms-2 w-24`} name="shippingSar" inputMode="decimal" defaultValue={(sync.shippingMinor / 100).toString()} /></label>
           <label className="text-sm sm:col-span-2">مدّة التوصيل التقديرية (نصّ يظهر للعميل)<input className={`${input} ms-2 w-48`} name="deliveryDays" defaultValue={deliveryDays} placeholder="مثال: ٧–١٥ يوم عمل" /></label>
           <p className="rounded-lg border border-primary/15 bg-primary/5 p-2 text-xs text-muted-foreground sm:col-span-2">
-            التصنيفات موحّدة مع إعلانات تربح — تُدار من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link> (نفس جدول الأقسام/الفرعية)، وتُختار على كل سلعة من صفحتها. لا توجد قائمة تصنيفات منفصلة لـ CJ.
+            التصنيفات موحّدة مع إعلانات تربح — تُدار من <Link href="/admin/categories" className="font-bold text-primary underline">إدارة الأقسام</Link> (نفس جدول الأقسام/الفرعية)، وتُختار على كل سلعة من صفحتها. لا توجد قائمة تصنيفات منفصلة لـ المورد.
           </p>
           <div className="sm:col-span-2"><SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ إعدادات المزامنة</SubmitButton></div>
         </form></AccessBoundary>
         <AccessBoundary module="integrations" action="sync"><form action={runCjSync}>
           <SubmitButton className={btn} disabled={!cfg.configured} pendingText="جارٍ المزامنة…">مزامنة الآن (يدوية)</SubmitButton>
-          {!cfg.configured && <span className="ms-2 text-xs text-red-700">اضبط متغيّرات CJ أولاً.</span>}
+          {!cfg.configured && <span className="ms-2 text-xs text-red-700">اضبط متغيّرات المورد أولاً.</span>}
         </form></AccessBoundary>
 
         <p className="mt-2 text-xs text-muted-foreground">زر «المعالجة الشاملة» (ترجمة + بيانات + صور + شحن حقيقي) موجود أعلى قائمة <Link href="/admin/suppliers/cj/browse" className="font-bold text-primary underline">المنتجات المستوردة</Link>.</p>
@@ -150,7 +150,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
       {/* اختبارات القراءة */}
       <div className={card}>
         <h2 className="font-bold">اختبارات القراءة (بلا شراء)</h2>
-        {!cfg.configured && <p className="text-sm text-red-700">اضبط متغيّرات CJ في البيئة أولاً لتشغيل الاختبارات.</p>}
+        {!cfg.configured && <p className="text-sm text-red-700">اضبط متغيّرات المورد في البيئة أولاً لتشغيل الاختبارات.</p>}
         <p className="text-xs text-muted-foreground">«اختبار الاتصال»: النجاح يعني ظهور <code dir="ltr">connected: true</code> مع البريد (تمّت المصادقة وجُلب التوكن). ظهور البريد بلا خطأ أحمر = الاتصال سليم.</p>
         <div className="flex flex-wrap gap-2">
           <AccessPage href="/admin/suppliers/cj?run=connection"><Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link></AccessPage>

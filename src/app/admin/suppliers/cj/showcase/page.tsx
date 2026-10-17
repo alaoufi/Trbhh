@@ -10,7 +10,7 @@ import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'معاينة سلع CJ المختارة', robots: { index: false, follow: false } };
+export const metadata = { title: 'معاينة سلع المورد المختارة', robots: { index: false, follow: false } };
 
 
 /**
@@ -32,7 +32,7 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold text-primary">معاينة السلع المختارة</h1>
         <div className="flex flex-wrap gap-2">
-          <Link href="/cj" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">افتح تجربة CJ الخاصة ←</Link>
+          <Link href="/cj" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">افتح تجربة المورد الخاصة ←</Link>
           <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">إدارة/استيراد ←</Link>
         </div>
       </div>
@@ -45,11 +45,11 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
       <CjAdminCatalogControls path="/admin/suppliers/cj/showcase" catalog={catalog} categories={categories} />
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-        افتح تجربة CJ لمراجعة الصور وتفاصيل الجوال وتجميع السلع في السلة. يتطلب الوصول صلاحية عرض المنتجات؛ لا شراء ولا دفع.
+        افتح تجربة المورد لمراجعة الصور وتفاصيل الجوال وتجميع السلع في السلة. يتطلب الوصول صلاحية عرض المنتجات؛ لا شراء ولا دفع.
       </p>
 
       {!items.length ? (
-        <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground">لا سلع مختارة بعد. استورد سلعاً من صفحة «تصفّح منتجات CJ».</p>
+        <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground">لا سلع مختارة بعد. استورد سلعاً من صفحة «تصفّح منتجات المورد».</p>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">عدد السلع المعروضة: <b className="text-primary">{items.length}</b></p>

@@ -7,7 +7,7 @@ import { listAgents, defaultAgentWeeklyQuota } from '@/lib/cj/agents';
 import { saveAgentQuota, saveAgent, toggleAgent } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'وكلاء CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'وكلاء المورد', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-2';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';

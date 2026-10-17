@@ -29,10 +29,10 @@ export function BrowseFilter({ q, cat, categories,suppliers=[],filters={} }: { q
         <label className="text-sm">بلد المستودع<input name="country" maxLength={2} defaultValue={filters.country} placeholder="مثل CN أو US" className={field} dir="ltr"/></label>
         <label className="text-sm">المخزون من<input name="minStock" type="number" min="0" max="999999999" step="1" defaultValue={filters.minStock} className={field}/></label>
         <label className="text-sm">نوع المخزون<select name="verified" defaultValue={filters.verified||''} className={field}><option value="">جميع المخزونات</option><option value="1">مخزون متحقق منه</option></select></label>
-        <label className="text-sm">الشهادات<select name="certified" defaultValue={filters.certified||''} className={field}><option value="">جميع المنتجات</option><option value="1">لديها شهادة حسب CJ</option></select></label>
+        <label className="text-sm">الشهادات<select name="certified" defaultValue={filters.certified||''} className={field}><option value="">جميع المنتجات</option><option value="1">لديها شهادة حسب المورد</option></select></label>
         <label className="text-sm">انتقاء المنتجات<select name="flag" defaultValue={filters.flag||''} className={field}><option value="">جميع المنتجات</option><option value="0">رائجة</option><option value="1">جديدة</option><option value="2">لها فيديو</option></select></label>
-      </div><p className="mt-3 text-xs text-muted-foreground">المنصة اقتراح للبيع وليست مصدر التوريد. أسماء الموردين مستخرجة من أول 200 منتج للموردين يعيدها CJ، وليست دليلًا شاملًا لكل الموردين. لا تحتاج إدخال أي معرف.</p></details>
-      <p className="w-full text-xs text-muted-foreground">الشهادة حسب بيانات CJ وليست ضمانًا للجودة أو إثبات امتثال للسعودية. السعر بالدولار للمنتج لدى CJ دون الشحن والضرائب. المخزون وبلد المستودع لا يثبتان إمكانية التوصيل للسعودية؛ يُتحقق من الشحن عند اختيار المنتج.</p>
+      </div><p className="mt-3 text-xs text-muted-foreground">المنصة اقتراح للبيع وليست مصدر التوريد. أسماء الموردين مستخرجة من أول 200 منتج للموردين يعيدها المورد، وليست دليلًا شاملًا لكل الموردين. لا تحتاج إدخال أي معرف.</p></details>
+      <p className="w-full text-xs text-muted-foreground">الشهادة حسب بيانات المورد وليست ضمانًا للجودة أو إثبات امتثال للسعودية. السعر بالدولار للمنتج لدى المورد دون الشحن والضرائب. المخزون وبلد المستودع لا يثبتان إمكانية التوصيل للسعودية؛ يُتحقق من الشحن عند اختيار المنتج.</p>
       <button className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">تطبيق الفلاتر</button>
       {(q || cat || Object.keys(filters).length>0) && <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">مسح الفلاتر</Link>}
     </form>

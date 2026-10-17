@@ -5,7 +5,7 @@ import { listStorefrontCjProducts, getStorefrontCjProduct, parseCjDetails } from
 import { createRealCjTestOrder } from '../../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'تجربة شراء CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'تجربة شراء المورد', robots: { index: false, follow: false } };
 
 const card = 'card-3d rounded-xl p-4 space-y-3';
 const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -33,8 +33,8 @@ export default async function NewCjTestOrderPage({ searchParams }: { searchParam
         <Link href="/admin/suppliers/cj/orders" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">لوحة المراقبة ←</Link>
       </div>
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-        يُنشئ هذا طلباً حقيقياً من منتج معروض، بعد تحقّق حيّ من CJ (سعر/مخزون/شحن إلى العنوان).
-        <b> لا خصم هنا</b> — الدفع من محفظة CJ يتمّ من صفحة الطلب بعد الاعتماد وضمن السقف، ومحجوب ما لم يُفعَّل الشراء الحيّ.
+        يُنشئ هذا طلباً حقيقياً من منتج معروض، بعد تحقّق حيّ من المورد (سعر/مخزون/شحن إلى العنوان).
+        <b> لا خصم هنا</b> — الدفع من محفظة المورد يتمّ من صفحة الطلب بعد الاعتماد وضمن السقف، ومحجوب ما لم يُفعَّل الشراء الحيّ.
       </p>
       {typeof sp.err === 'string' && (
         <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{ERR[sp.err] || 'تعذّرت العملية.'}{typeof sp.reason === 'string' ? ` (${sp.reason})` : ''}</p>

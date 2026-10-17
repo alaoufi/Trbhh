@@ -24,7 +24,7 @@ import { BrowseFilter } from '@/components/cj/browse-filter';
 import { getSetting } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'تصفّح منتجات CJ واستيرادها' };
+export const metadata = { title: 'تصفّح منتجات المورد واستيرادها' };
 
 const PAGE_SIZE = 24;
 const card = 'card-3d rounded-xl p-3 space-y-2';
@@ -53,7 +53,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const cfg = cjConfig();
 
   if (!cfg.configured) {
-    return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
+    return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات المورد</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات المورد (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
   const [catsRes,supplierRes]=await Promise.all([getCategories(),getCjCatalogSuppliers()]);
@@ -150,7 +150,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-4">
       <CjAdminNav current="browse" />
-      <h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ واستيرادها</h1>
+      <h1 className="text-xl font-extrabold text-primary">تصفّح منتجات المورد واستيرادها</h1>
 
       {/* معالجة شاملة (زر واحد) — أعلى الصفحة ليسهُل إيجادها */}
       <AccessBoundary module="products" action="edit"><div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
@@ -166,13 +166,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         {sp.bulk === '1' && <div className="mt-2 space-y-1">
           <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">عولجت {sp.processed} سلعة · شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr}{Number(sp.failed) > 0 ? ` · تعذّر ${sp.failed}` : ''} · {sp.done === '1' ? 'اكتملت معالجة كل السلع ✅' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>
           {sp.processed === '0' && sp.failed === '0' && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">لا توجد سلع مستوردة لمعالجتها بعد — استورد سلعاً من الكتالوج أدناه أولاً.</p>}
-          {Number(sp.failed) > 0 && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">تعذّر جلب {sp.failed} سلعة من المورد (قد تكون مفاتيح CJ غير مضبوطة أو حدّ الطلبات). البيانات القائمة لم تُمسح. تأكّد من ضبط CJ في الإعدادات وأعد المحاولة.</p>}
-          {sp.shipped === '0' && sp.processed !== '0' && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">لم يُحتسب شحن حقيقي لأي سلعة في هذه الدفعة — تحقّق من أن مفاتيح CJ تعمل («اختبار الاتصال» في الإعدادات) ومن توفّر شحن للسعودية.</p>}
+          {Number(sp.failed) > 0 && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">تعذّر جلب {sp.failed} سلعة من المورد (قد تكون مفاتيح المورد غير مضبوطة أو حدّ الطلبات). البيانات القائمة لم تُمسح. تأكّد من ضبط المورد في الإعدادات وأعد المحاولة.</p>}
+          {sp.shipped === '0' && sp.processed !== '0' && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">لم يُحتسب شحن حقيقي لأي سلعة في هذه الدفعة — تحقّق من أن مفاتيح المورد تعمل («اختبار الاتصال» في الإعدادات) ومن توفّر شحن للسعودية.</p>}
         </div>}
       </div></AccessBoundary>
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-        عرض مباشر من CJ API (قراءة فقط). <b>لا يُستورد أو يُنشر أي منتج تلقائياً</b> — الاستيراد للمنتجات المختارة فقط،
-        التجربة للإدارة فقط. لا تُعرض أرقام البيع والشحن إلا بعد التحقق من CJ إلى عنوان الشحن المحفوظ؛ لا تُعرض قيم تقديرية.
+        عرض مباشر من المورد API (قراءة فقط). <b>لا يُستورد أو يُنشر أي منتج تلقائياً</b> — الاستيراد للمنتجات المختارة فقط،
+        التجربة للإدارة فقط. لا تُعرض أرقام البيع والشحن إلا بعد التحقق من المورد إلى عنوان الشحن المحفوظ؛ لا تُعرض قيم تقديرية.
       </p>
 
       {/* تنبيهات */}
@@ -181,13 +181,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {typeof sp.imperr === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر استيراد المنتج. أعد المحاولة من إجراء الاستيراد.</p>}
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
       {!supplierRes.ok&&<p role="status" className="text-sm">تعذر تحميل أسماء الموردين الآن؛ يمكنك استخدام بقية الفلاتر وإعادة فتح الصفحة لاحقًا.</p>}
-      {supplierRes.ok&&supplierRes.data.length===0&&<p role="status" className="text-sm">لم يعد CJ أسماء موردين مع معرفاتهم في عينة الكتالوج الحالية؛ بقية الفلاتر متاحة.</p>}
+      {supplierRes.ok&&supplierRes.data.length===0&&<p role="status" className="text-sm">لم يعد المورد أسماء موردين مع معرفاتهم في عينة الكتالوج الحالية؛ بقية الفلاتر متاحة.</p>}
       {catalogFilters.error&&<p role="alert" className="rounded border border-red-300 p-3 text-red-700">{catalogFilters.error}</p>}
-      {!listing.ok&&!catalogFilters.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
+      {!listing.ok&&!catalogFilters.error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من المورد الآن. أعد المحاولة لاحقًا.</p>}
 
       {/* بحث + فلترة بأقسام البضائع — القسم يُطبَّق فوراً عند الاختيار (بلا زر عرض) */}
       <BrowseFilter suppliers={supplierRes.ok?supplierRes.data:[]} filters={catalogFilters.values} q={q} cat={cat} categories={[{ id: '', label: 'كل أقسام المصدر' }, ...categoryOptions]} />
-      {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
+      {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر المورد.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
       <p className="text-xs text-muted-foreground">تظهر الترجمات المحفوظة مباشرة، وتُجهّز النصوص الناقصة في الخلفية عند تفعيلها. أعد تحميل الصفحة لاحقًا لعرض المكتمل. الصور تُحمَّل مباشرة، وإن تعذّرت صورة اضغط عليها لإعادة تحميلها.</p>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">إعدادات الذكاء والترجمة المحلية</summary>
         <form action={saveCjTranslationSettings} className="mt-3 space-y-3">
@@ -200,7 +200,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       </details></AccessBoundary>
       <div className="hidden">
       </div>
-      {!categories.length && <p className="text-xs text-amber-700">تعذّر جلب شجرة التصنيفات من CJ الآن — البحث بالاسم يعمل، وأعد المحاولة لاحقاً.</p>}
+      {!categories.length && <p className="text-xs text-amber-700">تعذّر جلب شجرة التصنيفات من المورد الآن — البحث بالاسم يعمل، وأعد المحاولة لاحقاً.</p>}
 
       {/* ملخّص النتائج */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -208,7 +208,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           {listing.ok ? <>إجمالي المنتجات{activeCat ? ` في «${categoryLabels.get(activeCat.id)}»` : ''}{q ? ` للبحث «${q}»` : ''}: <b className="text-primary">{total.toLocaleString('en')}</b> · صفحة {page.toLocaleString('en')} من {totalPages.toLocaleString('en')}</> : '—'}
         </span>
       </div>
-      {q && queryIsArabic && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600" dir="auto">{searchName ? <>البحث في CJ تمّ بالمصطلح الإنجليزي: <b dir="ltr">«{searchName}»</b>. إن كانت الترجمة غير دقيقة فالنتائج قد تكون غير مطابقة — جرّب كلمة إنجليزية مباشرة (مثل <code>screen</code>) للمقارنة.</> : 'تعذّرت ترجمة عبارة البحث؛ لم تُعرض منتجات عامة. أعد المحاولة أو استخدم الاسم الإنجليزي.'}</p>}
+      {q && queryIsArabic && <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600" dir="auto">{searchName ? <>البحث في المورد تمّ بالمصطلح الإنجليزي: <b dir="ltr">«{searchName}»</b>. إن كانت الترجمة غير دقيقة فالنتائج قد تكون غير مطابقة — جرّب كلمة إنجليزية مباشرة (مثل <code>screen</code>) للمقارنة.</> : 'تعذّرت ترجمة عبارة البحث؛ لم تُعرض منتجات عامة. أعد المحاولة أو استخدم الاسم الإنجليزي.'}</p>}
 
       {/* شبكة المنتجات */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -264,7 +264,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               {/* القيم الحقيقية الحيّة من CJ — الأصل: السعر والشحن والمخزون */}
               {detailLive?.status === 'available' ? (
                 <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50/60 p-3">
-                  <div className="mb-2 text-xs font-extrabold text-emerald-900">✓ قيم حقيقية حيّة من CJ (تم التحقق الآن)</div>
+                  <div className="mb-2 text-xs font-extrabold text-emerald-900">✓ قيم حقيقية حيّة من المورد (تم التحقق الآن)</div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">السعر</div><div className="text-base font-extrabold text-primary">{sar(detailLive.salePriceMinor)}</div><div className="text-[10px] text-muted-foreground" dir="ltr">تكلفة {usd(liveVariant!.priceUsd)}</div></div>
                     <div className="rounded-lg bg-white p-2"><div className="text-[11px] text-muted-foreground">الشحن الحيّ</div><div className="font-bold text-emerald-800">{liveShip ? ((liveShip.priceMinor + liveShip.additionalMinor) === 0 ? 'مجاني' : sar(liveShip.priceMinor + liveShip.additionalMinor)) : '—'}</div>{liveShip?.deliveryDays && <div className="text-[10px] text-muted-foreground">{liveShip.deliveryDays}</div>}</div>
@@ -278,7 +278,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">القسم الجديد</div><div className="font-bold" dir="auto">{arOf(detail.data.category)}</div></div>
                   </div>
-                  <p className="rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">تعذّر جلب الشحن/المخزون الحيّ الآن{detailLive ? ` (${detailLive.status})` : ''} — قد يكون الخيار غير متوفّر أو لا شحن للسعودية، أو حدّ طلبات CJ. أعد فتح التفاصيل بعد لحظات.</p>
+                  <p className="rounded-lg bg-amber-50 p-2 text-[11px] leading-5 text-amber-900">تعذّر جلب الشحن/المخزون الحيّ الآن{detailLive ? ` (${detailLive.status})` : ''} — قد يكون الخيار غير متوفّر أو لا شحن للسعودية، أو حدّ طلبات المورد. أعد فتح التفاصيل بعد لحظات.</p>
                 </div>
               )}
               {/* المتغيّرات — بطاقات بسطرين بلا تمرير أفقي */}

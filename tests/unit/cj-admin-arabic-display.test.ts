@@ -147,7 +147,7 @@ it('does not call the catalog for an invalid price range',async()=>{expect(await
 it('offers suppliers by name without asking for an id and preserves the certification filter',async()=>{
  const html=await browse({supplier:'SUP-1',certified:'1'});
  expect(html).toContain('<option value="SUP-1" selected="">Supplier One</option>');
- expect(html).not.toMatch(/<input(?![^>]*type="hidden")[^>]*name="supplier"/);expect(html).toContain('لديها شهادة حسب CJ');
+ expect(html).not.toMatch(/<input(?![^>]*type="hidden")[^>]*name="supplier"/);expect(html).toContain('لديها شهادة حسب المورد');
  expect(state.list).toHaveBeenCalledWith(1,24,{productName:undefined,categoryId:undefined,filters:{supplier:'SUP-1',certified:'1'}});
 });
 

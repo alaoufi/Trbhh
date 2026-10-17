@@ -1,3 +1,4 @@
+import {SizeReferenceGuide} from '@/components/size-reference-guide';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
@@ -147,6 +148,7 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
           </div>
         </div>
       )}
+    <SizeReferenceGuide/>
     </div>
   );
 }

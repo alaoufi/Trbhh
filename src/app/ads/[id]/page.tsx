@@ -1,3 +1,4 @@
+import {SizeReferenceGuide} from '@/components/size-reference-guide';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
@@ -605,6 +606,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>}
         {ad.subcategoryName && <p className="mb-2 text-sm font-bold text-primary">{ad.subcategoryName}</p>}
         <AdCategorySummary fields={ad.categoryFields}/>
+        <SizeReferenceGuide/>
         <ExpandableDetail text={ad.detail || ""} />
       </div>
 

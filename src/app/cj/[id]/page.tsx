@@ -1,3 +1,4 @@
+import {SizeReferenceGuide} from '@/components/size-reference-guide';
 import {ProductReference} from '@/components/cj/product-reference';
 import {readCjSizeChart} from '@/lib/cj/size-chart-server';
 import {CjSizeChartTable} from '@/components/cj/size-chart';
@@ -133,6 +134,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       </section>
       <div className="min-w-0 space-y-2 lg:col-start-1 lg:row-start-2">
       {hasSize&&<CjSizeChartTable chart={sizeChart}/>}
+      <SizeReferenceGuide/>
     {(p.trbhh_category||details?.weightMin)&&<section className="card-3d min-w-0 rounded-2xl p-3" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-2 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["القسم",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 py-1.5"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
     {!!descriptionAr&&<section className="card-3d min-w-0 rounded-2xl p-3" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-2 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
       </div>

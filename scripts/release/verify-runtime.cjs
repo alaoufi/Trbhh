@@ -5,6 +5,16 @@ const before = JSON.parse(fs.readFileSync(beforePath, 'utf8'))[0];
 const after = JSON.parse(fs.readFileSync(afterPath, 'utf8'))[0];
 const env = (c) => Object.fromEntries(c.Config.Env.map((v) => { const at = v.indexOf('='); return [v.slice(0, at), v.slice(at + 1)]; }));
 const first = env(before); const last = env(after);
+// Salla provisioning is the only legacy mode that intentionally changes env.
+// Every other release must retain all credentials and operational switches.
+const sallaChanges=new Set(['SALLA_CLIENT_ID','SALLA_CLIENT_SECRET','SALLA_WEBHOOK_SECRET','SUPPLIER_TOKEN_ENCRYPTION_KEY','SUPPLIER_RECONCILE_SECRET','SUPPLIER_PUBLIC_ORIGIN','SUPPLIER_ALLOW_LIVE_ORDERS']);
+const cjGates=new Set(['CJ_FULFILLMENT_WORKER_ENABLED','CJ_LIVE_TRIAL_ENABLED','CJ_ALLOW_LIVE_ORDERS']);
+for(const key of new Set([...Object.keys(first),...Object.keys(last)])){
+  if(process.argv[4]==='salla'&&sallaChanges.has(key))continue;
+  if(first[key]!==last[key]&&!(cjGates.has(key)&&first[key]===undefined&&last[key]==='false')){
+    console.error('Runtime environment preservation failed; values withheld.');process.exit(1);
+  }
+}
 for (const key of ['CJ_FULFILLMENT_WORKER_ENABLED', 'CJ_LIVE_TRIAL_ENABLED', 'CJ_ALLOW_LIVE_ORDERS']) {
   if (first[key] !== last[key] && !(first[key] === undefined && last[key] === 'false')) {
     console.error('CJ runtime gate preservation failed; values withheld.'); process.exit(1);

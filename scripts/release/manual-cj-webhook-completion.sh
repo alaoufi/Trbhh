@@ -62,6 +62,6 @@ node - "$target/sandbox-result.log" <<'NODE'
 const fs=require('node:fs');
 const events=fs.readFileSync(process.argv[2],'utf8').split(/\r?\n/).flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
 const result=events.findLast(x=>x.event==='TRBHH_INBOUND_RESULT');
-if(result?.cjSimulationVerified&&result.paidStatusReceived&&result.trackingReceived){console.log('SANDBOX_PAYMENT_TRACKING_AND_INBOUND_VERIFIED — refund remains unverified; real purchase remains disabled');}
+if(result?.cjSimulationVerified&&result.paidStatusReceived&&result.trackingReceived){console.log('SANDBOX_PAYMENT_TRACKING_AND_INBOUND_VERIFIED — refund remains unverified; no real payment attempted');}
 else {console.log('CJ_COMPLETION_PENDING — inspect diagnostics; do not repeat mutation automatically');process.exitCode=2;}
 NODE

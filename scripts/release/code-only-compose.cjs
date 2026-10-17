@@ -15,5 +15,24 @@ function runtimeMatches(config,container){
   return typeof actual==='string'&&(actual===expected||actual.replace(/\$\$/g,()=> '$')===expected);
  });
 }
-module.exports={compose,runtimeMatches};
+/** Input must be `docker compose config --format json`, with resolved volume names.
+ * Never rewrite mounts to repair drift: refuse the switch before touching runtime. */
+function mountsMatch(config,container){
+ try{
+  const expected=container.Mounts.map(m=>{
+   if(!['volume','bind'].includes(m.Type)||typeof m.RW!=='boolean')throw Error('unsupported_mount');
+   return {type:m.Type,source:m.Type==='volume'?m.Name:m.Source,target:m.Destination,readOnly:!m.RW};
+  });
+  const actual=(config.services.app.volumes||[]).map(m=>{
+   if(!m||!['volume','bind'].includes(m.type)||typeof m.source!=='string'||typeof m.target!=='string'||m.volume?.subpath)throw Error('unsupported_mount');
+   const source=m.type==='volume'?config.volumes?.[m.source]?.name:m.source;
+   if(typeof source!=='string'||!source||!m.target.startsWith('/')||m.type==='bind'&&!source.startsWith('/'))throw Error('unresolved_mount');
+   return {type:m.type,source,target:m.target,readOnly:m.read_only===true};
+  });
+  if(config.services.app.tmpfs?.length)throw Error('unsupported_mount');
+  const canonical=mounts=>JSON.stringify(mounts.sort((a,b)=>a.target.localeCompare(b.target)));
+  return canonical(actual)===canonical(expected);
+ }catch{return false;}
+}
+module.exports={compose,runtimeMatches,mountsMatch};
 if(require.main===module){const [config,before,image,out]=process.argv.slice(2);try{fs.writeFileSync(out,JSON.stringify(compose(JSON.parse(fs.readFileSync(config)),JSON.parse(fs.readFileSync(before))[0],image)),{mode:0o600,flag:'wx'});}catch{process.stderr.write('Runtime preparation failed; sensitive details withheld.\n');process.exitCode=1;}}

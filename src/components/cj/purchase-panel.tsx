@@ -1,6 +1,7 @@
 'use client';
 
 import {cjSourceOptions,sameCjSourceOptions,type CjSourceOptions} from '@/lib/cj/source-option-identity';
+import {familiarSizeLabel} from '@/lib/sizing/display';
 import {cjSizeOptionLabel,type CjSizeChart} from '@/lib/cj/size-chart';
 
 import {useEffect,useId,useMemo,useState} from 'react';
@@ -76,7 +77,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     {selector
       ? <div className="grid grid-cols-2 gap-2">{selector.groups.map(group=><div key={group.label} className="min-w-0">
           <label htmlFor={`${id}-${group.label}`} className="mb-1 block text-[13px] font-bold text-slate-700">{group.label}</label>
-          <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>Object.fromEntries(selector.groupLabels.slice(0,selector.groupLabels.indexOf(group.label)+1).map(l=>[l,l===group.label?e.target.value:c[l]||''])))} className="min-h-11 md:min-h-9 min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{cjVariantValues(selector,group.label,chosen).map(val=><option key={val} value={val}>{group.label==='المقاس'?cjSizeOptionLabel(val,sizeChart):group.label==='المجموعة'?`المجموعة ${val} — راجع محتوياتها قبل الشراء`:group.label==='عدد القطع في العبوة'?`${val} قطع في العبوة`:val}</option>)}</select>
+          <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>Object.fromEntries(selector.groupLabels.slice(0,selector.groupLabels.indexOf(group.label)+1).map(l=>[l,l===group.label?e.target.value:c[l]||''])))} className="min-h-11 md:min-h-9 min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{cjVariantValues(selector,group.label,chosen).map(val=><option key={val} value={val}>{group.label==='المقاس'?(sizeChart?.configured?cjSizeOptionLabel(val,sizeChart):familiarSizeLabel(val)):group.label==='المجموعة'?`المجموعة ${val} — راجع محتوياتها قبل الشراء`:group.label==='عدد القطع في العبوة'?`${val} قطع في العبوة`:val}</option>)}</select>
         </div>)}
       </div>
       : family&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">بيانات خيارات المورد غير مكتملة أو ملتبسة؛ أُوقف اختيارها حتى تتضح مواصفاتها. لم يُحجز مخزون ولم يبدأ دفع.</p>}

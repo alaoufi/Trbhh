@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import {isSizeField,familiarSizeLabel} from '@/lib/sizing/display';
 import type { CategoryField, CategoryValues, CategoryValue } from '@/lib/ad-categories/validation';
 
 const control = 'mt-1 min-h-9 w-full rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-primary/30';
@@ -18,12 +19,13 @@ export function AdCategoryFields({ fields, values, onChange }: {
     const label = `${f.label}${f.unit ? ` (${f.unit})` : ''}${f.required ? ' *' : ''}`;
     return <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
       <label htmlFor={id} className="text-sm font-medium">{label}</label>
+      {isSizeField(f.key,f.label)&&<p className="text-xs text-muted-foreground">حدّد نظام المقاس والفئة عند الحاجة. المقاسات المكافئة تُضاف من جدول المنتج فقط.</p>}
       {f.type === 'select' || f.type === 'multiselect'
         ? <select id={id} className={control} required={f.required} multiple={f.type === 'multiselect'}
           value={f.type === 'multiselect' ? (Array.isArray(value) ? value : []) : String(value ?? '')}
           onChange={e => update(f.key, f.type === 'multiselect' ? [...e.currentTarget.selectedOptions].map(o => o.value) : e.target.value)}>
           {f.type === 'select' && <option value="">—</option>}
-          {f.options.map(option => <option key={option} value={option}>{option}</option>)}
+          {f.options.map(option => <option key={option} value={option}>{isSizeField(f.key,f.label)?familiarSizeLabel(option):option}</option>)}
         </select>
         : f.type === 'boolean' ? <select id={id} className={control} required={f.required} value={typeof value === 'boolean' ? String(value) : ''}
           onChange={e => {

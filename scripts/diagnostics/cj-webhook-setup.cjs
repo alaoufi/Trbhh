@@ -34,6 +34,15 @@ function registration(settings){
 function verifyRegistration(after,expected){
  return Object.entries(expected).every(([name,wanted])=>JSON.stringify(topic(after.callback?.[name]))===JSON.stringify(wanted));
 }
+function inspectSettings(settings){
+ const topics=Object.fromEntries(['product','stock','order','logistics','makeup','privateOrder','dispute'].map(name=>{
+  const item=settings.callback?.[name],urls=item?.urls??item?.callbackUrls;
+  return [name,{present:!!item,type:['ENABLE','CANCEL'].includes(item?.type)?item.type:null,urlCount:Array.isArray(urls)?urls.length:null,expectedDestination:Array.isArray(urls)&&urls.length===1&&urls[0]===CALLBACK}];
+ }));
+ let registrationValid=false,registrationIssue=null;
+ try{registration(settings);registrationValid=true;}catch(e){registrationIssue=/^[a-z_]+$/.test(e.message)?e.message:'settings_invalid';}
+ return {topics,registrationValid,registrationIssue};
+}
 async function verifyReceiver(openId,fetcher=fetch){
  const options={method:'POST',redirect:'error',signal:AbortSignal.timeout(10000)};
  const unsigned=await fetcher(CALLBACK,{...options,headers:{'Content-Type':'application/json'},body:'null'});
@@ -49,21 +58,31 @@ async function setupApi(token,pathName,body,fetcher=fetch){
   await new Promise(r=>setTimeout(r,attempt?4000*2**attempt:3000));
   const r=await fetcher('https://developers.cjdropshipping.com/api2.0/v1'+pathName,{method:body?'POST':'GET',headers:{'CJ-Access-Token':token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
   const j=await r.json();if(!body&&(r.status===429||j.code===1600200)&&attempt<2)continue;
-  if(!r.ok||j.code!==200||j.result!==true){const e=Error('cj_setup_rejected');Object.assign(e,{providerCode:j.code,providerMessage:safeProviderMessage(j.message,token)});throw e;}return j.data;
+  if(!r.ok||j.code!==200||j.result!==true){const e=Error('cj_setup_rejected');Object.assign(e,{endpoint:pathName,httpStatus:r.status,requestId:typeof j.requestId==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(j.requestId)?j.requestId:null,providerCode:j.code,providerMessage:safeProviderMessage(j.message,token)});throw e;}return j.data;
  }
 }
 async function main(){
  const {PrismaClient}=require('@prisma/client'),{decryptToken}=require('./cj-catalog-audit.cjs'),db=new PrismaClient({log:[]});
+ let stage='initial';const secrets=[];
  try{
-  const mode=process.argv[2];if(!['--prepare','--activate'].includes(mode))throw Error('setup_mode_required');
+  const mode=process.argv[2];if(!['--prepare','--activate','--inspect'].includes(mode))throw Error('setup_mode_required');
   const key=process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY||'',apiKey=process.env.CJ_API_KEY||'';
+  secrets.push(key,apiKey);
   if(!/^[a-f0-9]{64}$/i.test(key)||!apiKey)throw Error('encryption_configuration_missing');
   const [auth]=await db.$queryRawUnsafe('SELECT sealed_tokens,access_expires_at FROM cj_auth WHERE id=1 LIMIT 1');
-  const token=decryptToken(auth,key),settings=await setupApi(token,'/setting/get');
+  const token=decryptToken(auth,key);secrets.push(token);stage='settings_read';const settings=await setupApi(token,'/setting/get');
   const openId=typeof settings.openId==='string'?settings.openId:Number.isSafeInteger(settings.openId)?String(settings.openId):'';
   if(!/^[1-9]\d{0,63}$/.test(openId))throw Error('source_signing_identity_invalid');
+  secrets.push(openId);
   if(process.env.CJ_WEBHOOK_OPEN_ID&&process.env.CJ_WEBHOOK_OPEN_ID.trim()!==openId)throw Error('configured_account_mismatch');
   const storage=path.resolve(process.env.STORAGE_DIR||'/app/storage'),file=path.join(storage,'cj-webhook-auth.sealed');
+  if(mode==='--inspect'){
+   const facts=inspectSettings(settings);stage='inspect_receiver';
+   console.log(JSON.stringify({event:'CJ_WEBHOOK_SETTINGS_INSPECTED',...facts,activationPreviouslyAttempted:fs.existsSync(path.join(storage,'cj-webhook-activation-once')),privateKeyPresent:fs.existsSync(file),configurationWriteAttempted:false,realPaymentAttempted:false}));
+   await verifyReceiver(openId);
+   console.log(JSON.stringify({event:'CJ_WEBHOOK_RECEIVER_VERIFIED',configurationWriteAttempted:false,realPaymentAttempted:false}));return;
+  }
+  stage='private_key_prepare';
   if(fs.existsSync(file)){
    const stat=fs.lstatSync(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>4096||(stat.mode&0o077)!==0)throw Error('existing_private_key_invalid');
    const saved=unseal(fs.readFileSync(file,'utf8').trim(),keyContext(apiKey),key);
@@ -72,19 +91,20 @@ async function main(){
   console.log(JSON.stringify({event:'CJ_WEBHOOK_KEY_PREPARED',encrypted:true,credentialsPrinted:false,accountQpsLimit:Number.isSafeInteger(settings.setting?.qpsLimit)?settings.setting.qpsLimit:null}));
   if(mode==='--prepare')return;
   // null is rejected before event insertion; differential status proves official auth.
-  await verifyReceiver(openId);
+  stage='receiver_verify';await verifyReceiver(openId);
+  stage='registration_validate';
   const config=registration(settings);
   const ready=['order','logistics'].every(name=>{const value=settings.callback[name];return value?.type==='ENABLE'&&(value.urls??value.callbackUrls)?.length===1&&(value.urls??value.callbackUrls)[0]===CALLBACK;});
   if(!ready){
    fs.mkdirSync(path.join(storage,'cj-webhook-activation-once'));
    fs.writeFileSync(path.join(storage,'cj-webhook-callbacks-before.sealed'),seal({accessToken:JSON.stringify(settings.callback),refreshToken:'cj-webhook-backup-v1'},'cj:webhook-backup',key),{mode:0o600,flag:'wx'});
-   if(await setupApi(token,'/webhook/set',config)!==true)throw Error('callback_write_unverified');
+   stage='callback_write';if(await setupApi(token,'/webhook/set',config)!==true)throw Error('callback_write_unverified');
   }
-  const after=await setupApi(token,'/setting/get');
+  stage='callback_readback';const after=await setupApi(token,'/setting/get');
   if(!verifyRegistration(after,config))throw Error('callback_readback_unverified');
   console.log(JSON.stringify({event:'CJ_WEBHOOK_REGISTERED',orderEnabled:true,logisticsEnabled:true,deliveryVerified:false,realPaymentAttempted:false}));
- }catch(e){console.log(JSON.stringify({event:'CJ_WEBHOOK_SETUP_STOPPED',reason:e.code==='EEXIST'?'previous_setup_attempt_review_required':/^[a-z_]+$/.test(e.message)?e.message:'setup_failed',providerCode:e.providerCode??null,realPaymentAttempted:false}));process.exitCode=1;}
+ }catch(e){let message=e.providerMessage??null;if(message)for(const secret of secrets.filter(Boolean))message=message.split(secret).join('[REDACTED]');console.log(JSON.stringify({event:'CJ_WEBHOOK_SETUP_STOPPED',stage,reason:e.code==='EEXIST'?'previous_setup_attempt_review_required':/^[a-z_]+$/.test(e.message)?e.message:'setup_failed',endpoint:e.endpoint??null,httpStatus:e.httpStatus??null,requestId:e.requestId??null,providerMessage:message,providerCode:e.providerCode??null,realPaymentAttempted:false}));process.exitCode=1;}
  finally{await db.$disconnect();}
 }
-module.exports={seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration};
+module.exports={seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings};
 if(require.main===module)main().catch(()=>{console.log('SETUP_START_FAILED');process.exitCode=1;});

@@ -1,9 +1,25 @@
 import {createRequire} from 'node:module';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {describe,it,expect,vi,afterEach} from 'vitest';
 import {readCjWebhookOpenId} from '@/lib/cj/webhook-key';
-const {seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-webhook-setup.cjs');
+const {seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-webhook-setup.cjs');
 afterEach(()=>{vi.unstubAllEnvs();vi.useRealTimers();});
 describe('CJ webhook provisioning safety',()=>{
+ it('runs inspect without file writes, callback registration, financial calls or event payloads',async()=>{
+  const realRequire=createRequire(import.meta.url),logs:string[]=[],requests:{url:string;options:Record<string,unknown>}[]=[];
+  const fileWrite=vi.fn(()=>{throw Error('write_forbidden');}),disconnect=vi.fn();
+  const settings={openId:'123456',callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]}}};
+  const db={async $queryRawUnsafe(){return [{}];},$disconnect:disconnect};
+  const sandbox={require:(name:string)=>name==='node:fs'?{existsSync:()=>false,writeFileSync:fileWrite,mkdirSync:fileWrite}:name==='@prisma/client'?{PrismaClient:class{constructor(){return db;}}}:name==='./cj-catalog-audit.cjs'?{decryptToken:()=> 'sensitive-token'}:realRequire(name.startsWith('./')?'../../scripts/diagnostics/'+name.slice(2):name),module:{exports:{}},process:{argv:['node','script','--inspect'],env:{SUPPLIER_TOKEN_ENCRYPTION_KEY:'ab'.repeat(32),CJ_API_KEY:'sensitive-api-key'},exitCode:0},Buffer,AbortSignal,setTimeout:(fn:()=>void)=>fn(),console:{log:(value:string)=>logs.push(value)},fetch:async(url:string,options:Record<string,unknown>)=>{requests.push({url,options});if(url.endsWith('/setting/get'))return Response.json({code:200,result:true,data:settings});return new Response(null,{status:(options.headers as Record<string,string>).sign?400:401});}};
+  runInNewContext(readFileSync('scripts/diagnostics/cj-webhook-setup.cjs','utf8'),sandbox);
+  await (sandbox as unknown as {main:()=>Promise<void>}).main();
+  expect(sandbox.process.exitCode,logs.join('')).toBe(0);expect(fileWrite).not.toHaveBeenCalled();expect(disconnect).toHaveBeenCalledOnce();expect(requests).toHaveLength(3);
+  expect(requests[0].options.method).toBe('GET');for(const r of requests.slice(1)){expect(r.url).toBe('https://trbhh.sa/api/integrations/cj/webhooks');expect(r.options.body).toBe('null');}
+  expect(logs.join('')).toContain('CJ_WEBHOOK_RECEIVER_VERIFIED');expect(logs.join('')).not.toMatch(/123456|sensitive-token|sensitive-api-key/);
+ });
+ it('exposes only bounded topic facts during read-only inspection',()=>{const data=inspectSettings({openId:'secret-account',callback:{product:{type:'ENABLE',urls:['https://other.example/?token=private-query-test']},stock:{type:'CANCEL',urls:[]},order:{type:'ENABLE',urls:['https://trbhh.sa/api/integrations/cj/webhooks']},logistics:{type:'CANCEL',urls:[]}}});expect(data.topics.order.expectedDestination).toBe(true);expect(data.topics.product.urlCount).toBe(1);expect(data.registrationValid).toBe(true);expect(JSON.stringify(data)).not.toMatch(/secret-account|other.example|private-query-test/);});
+ it('retains safe HTTP endpoint and request identity when configuration is rejected',async()=>{vi.useFakeTimers();const fetcher=vi.fn().mockResolvedValue(Response.json({code:1600300,result:false,message:'configuration rejected',requestId:'request-123'},{status:400}));const promise=setupApi('token','/webhook/set',{},fetcher);const rejected=expect(promise).rejects.toMatchObject({endpoint:'/webhook/set',httpStatus:400,requestId:'request-123',providerCode:1600300});await vi.runAllTimersAsync();await rejected;expect(fetcher).toHaveBeenCalledTimes(1);});
  it('requires signed rejection after authentication without submitting any event',async()=>{const fetcher=vi.fn().mockResolvedValueOnce(new Response(null,{status:401})).mockResolvedValueOnce(new Response(null,{status:400}));await verifyReceiver('123456',fetcher);expect(fetcher.mock.calls[1][1].body).toBe('null');expect(fetcher.mock.calls[1][1].headers.sign).toBeTruthy();const legacyOnly=vi.fn().mockResolvedValue(new Response(null,{status:401}));await expect(verifyReceiver('123456',legacyOnly)).rejects.toThrow('official_signature_not_verified');});
  it('checks every preserved topic during readback',()=>{const config=registration({callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]}}});expect(verifyRegistration({callback:config},config)).toBe(true);expect(verifyRegistration({callback:{...config,stock:{type:'ENABLE',callbackUrls:['https://other.example']}}},config)).toBe(false);});
  it('produces encrypted material the receiver can decrypt for the same account',()=>{const key='ab'.repeat(32);vi.stubEnv('CJ_WEBHOOK_OPEN_ID','');vi.stubEnv('CJ_API_KEY','account');vi.stubEnv('SUPPLIER_TOKEN_ENCRYPTION_KEY',key);const data=seal({accessToken:'123456',refreshToken:'cj-webhook-auth-v1'},keyContext('account'),key);expect(data).not.toContain('123456');expect(readCjWebhookOpenId(()=>data)).toBe('123456');});

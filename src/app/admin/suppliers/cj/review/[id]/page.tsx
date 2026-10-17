@@ -42,7 +42,7 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
         <h1 className="text-xl font-extrabold text-primary">مراجعة وتحرير السلعة</h1>
         <Link href="/admin/suppliers/cj/browse" className={ghost}>عودة للبضائع المستوردة ←</Link>
       </div>
-      <DelegateMessage issue={{productId:String(row.id),sourceProductId:row.cj_product_id,problem:'مراجعة بيانات المنتج وخياراته أو توفره من المصدر',requested:'مطابقة بيانات المنتج والخيارات والشحن مع المصدر وتوضيح أي اختلاف.'}}/>{sp.saved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ المراجعة.</p>}
+      <DelegateMessage issue={{productId:String(row.id),sourceProductId:row.cj_product_id,problem:'Review product details, variants, or source availability.',requested:'Verify product details, variants, and shipping against the source and explain any discrepancy.'}}/>{sp.saved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ المراجعة.</p>}
       {sp.edited === '1' && <p role="status" className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث حالة السلعة.</p>}
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">تحرير بيانات العرض (عربية) دون المساس ببيانات المصدر من المورد. لا شراء ولا نشر تلقائي؛ السلعة تبقى في التخزين الوسيط.</p>
 

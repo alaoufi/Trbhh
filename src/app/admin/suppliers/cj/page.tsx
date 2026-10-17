@@ -63,7 +63,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-4">
-      <CjAdminNav current="settings" /><DelegateMessage issue={{problem:'تعذر إكمال التعامل مع CJ؛ يرجى وصف المشكلة وإضافة رمز الخطأ المتاح.',requested:'التحقق من سبب المشكلة والمراجع وتحديد الإجراء المطلوب دون إعادة دفع غير مؤكد.'}}/>
+      <CjAdminNav current="settings" /><DelegateMessage issue={{problem:'Unable to complete the CJ operation. Please describe the issue and include the available error code.',requested:'Investigate the issue and references, and advise the next action without retrying an unverified payment.'}}/>
       <AccessBoundary module="orders" action="view"><AccessBoundary module="wallets" action="view"><Link href="/admin/suppliers/cj/payables" className="inline-block rounded-lg border border-primary/30 px-4 py-2 font-bold text-primary">مستحقات المورد — تجميع ومطابقة سداد المورد</Link></AccessBoundary></AccessBoundary>
       <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
 

@@ -85,7 +85,7 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
           <span className="font-bold text-primary">الإجراءات الداخلية (إدارة فقط — لا يراها العميل)</span>
           <span className="text-xs text-muted-foreground">▾</span>
         </summary>
-        <div className="mt-3 space-y-4"><DelegateMessage issue={{orderId:String(order.id),operationId:order.internal_ref,supplierOrderId:order.cj_order_id,trackingNumber:order.tracking_number,products:orderLines.map(line=>({storefrontProductId:null,pid:order.cj_product_id||'',vid:line.vid,quantity:line.quantity})),problem:'مراجعة الطلب وحالته: '+statusLabel(order.status),requested:'تحديد سبب التوقف ومطابقة المنتج والخيار والمبلغ والشحن قبل أي متابعة مالية.'}}/>
+        <div className="mt-3 space-y-4"><DelegateMessage issue={{orderId:String(order.id),operationId:order.internal_ref,supplierOrderId:order.cj_order_id,trackingNumber:order.tracking_number,products:orderLines.map(line=>({storefrontProductId:null,pid:order.cj_product_id||'',vid:line.vid,quantity:line.quantity})),problem:'Review order status: '+order.status,requested:'Identify the hold reason and reconcile the product, variant, amount, and shipping before any financial action.'}}/>
       {sp.moved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تغيير الحالة.</p>}
       {sp.tracked === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث التتبّع.</p>}
       {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ سجل طلب تربح للتجربة؛ الشراء لدى المورد متوقف حتى استيفاء ضمانات P0.</p>}

@@ -3,8 +3,8 @@ import {delegateMessage,delegateWhatsappUrl} from '@/lib/cj/delegate-message';
 describe('delegate escalation message',()=>{
  it('keeps exact references and does not manufacture missing operation numbers',()=>{
   const message=delegateMessage({problem:'رفض 803',requested:'تحقق من المطابقة',orderId:'42',operationId:'77',supplierOrderId:'SD123',products:[{storefrontProductId:'281',pid:'123',vid:'456',quantity:1}]});
-  expect(message).toContain('رقم المنتج: 281');expect(message).toContain('رقم العملية: 77');expect(message).toContain('الطلب الخارجي: SD123');expect(message).toContain('معرّف الخيار: 456');
-  expect(delegateMessage({problem:'خطأ',requested:'مراجعة'})).not.toContain('رقم العملية:');
+  expect(message).toContain('Product ID: 281');expect(message).toContain('Operation reference: 77');expect(message).toContain('Supplier order reference: SD123');expect(message).toContain('Variant ID: 456');
+  expect(delegateMessage({problem:'خطأ',requested:'مراجعة'})).not.toContain('Operation reference:');
  });
  it('redacts tokens and customer contacts from pasted diagnostics',()=>{
   const message=delegateMessage({problem:'CJ-Access-Token: secret-value user@example.com +966501234567',requested:'مراجعة'});

@@ -1,4 +1,13 @@
 import type {ChosenVariantSnapshot} from './types';
+import {validCjSourceOptions,type CjSourceOptions} from '@/lib/cj/source-option-identity';
+
+/** Called only with a verified server quote, never the posted client snapshot. */
+export function chosenCjVariantSnapshot(line:{vid:string;sku?:string;pid:string;storefrontProductId?:string;sourceOptions?:CjSourceOptions}):ChosenVariantSnapshot{
+ if(!validCjSourceOptions(line.sourceOptions)||!line.sku)throw Error('cj_selected_options_unverified');
+ const chosen=chosenVariantSnapshot(line.vid,{vid:line.vid,sku:line.sku,attributes:line.sourceOptions.attributes});
+ if(!chosen)throw Error('cj_selected_options_unverified');
+ return {...chosen,pid:line.pid,...(line.storefrontProductId?{storefrontProductId:line.storefrontProductId}:{}),sourceOptions:structuredClone(line.sourceOptions)};
+}
 
 const hidden=/token|secret|password|cost|margin|supplier|api|internal|profit|purchase.?price|external.?id/i;
 function text(value:unknown,max=200):string{return typeof value==='string'||typeof value==='number'||typeof value==='boolean'?String(value).replace(/[\u0000-\u001f\u007f]/g,' ').trim().slice(0,max):'';}

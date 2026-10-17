@@ -1,6 +1,7 @@
 /** Durable single-attempt supplier workflow. Provider responses alone never prove debit. */
-import {isCjCardPaymentConfirmed,cjUtcTimestamp} from './provider';
-export type Commitment = {supplierReference:string;supplierUsdMinor:number;supplierFreightUsdMinor?:number;supplierTaxUsdMinor?:number;lines:{storefrontProductId?:string;sku?:string;pid:string;vid:string;quantity:number;supplierUnitUsdMinor?:number}[];destination:Record<string,string>;originAreaId:string;originCountry:string;logisticName:string};
+import type {CjSourceOptions} from '../source-option-identity';
+import {isCjCardPaymentConfirmed} from './provider';
+export type Commitment = {supplierReference:string;supplierUsdMinor:number;supplierFreightUsdMinor?:number;supplierTaxUsdMinor?:number;lines:{storefrontProductId?:string;sku?:string;sourceOptions?:CjSourceOptions;pid:string;vid:string;quantity:number;supplierUnitUsdMinor?:number}[];destination:Record<string,string>;originAreaId:string;originCountry:string;logisticName:string};
 export type OrderProof = Omit<Commitment,'supplierReference'|'supplierUsdMinor'> & {orderId:string;reference:string;payableUsdMinor:number|null;paymentDate:string|null;cjOrderCode:string|null;billingOrderId?:string|null;physicalStorageId?:string|null;orderStatus?:string;currency?:string};
 export type CreateAcknowledgement={requestHash:string;requestPayload:Record<string,unknown>;orderId:string;reference:string;response:Record<string,unknown>};
 export type BillingProof = {id:string;cjOrderCode:string|null;amountUsdMinor:number|null;status:string;type:string};
@@ -39,10 +40,11 @@ export async function runFulfillment(id:string,store:FulfillmentStore,provider:F
   // Cart/parent uses SD cjOrderCode; wallet billing identifies the separate CJ cjOrderId.
   const billingId=order.billingOrderId===undefined?order.cjOrderCode:order.billingOrderId;
   const bills=billingId?await provider.billing(billingId):[];
-  const matching=bills.filter(b=>b.id&&b.cjOrderCode===billingId&&b.type==='Order Payment'&&b.status==='1'&&b.amountUsdMinor===c.supplierUsdMinor);
-  const paymentTime=cjUtcTimestamp(order.paymentDate);
-  if(Number.isFinite(paymentTime)&&paymentTime<=Date.now()&&order.payableUsdMinor===c.supplierUsdMinor&&matching.length===1)await patch({status:'supplier_paid',evidence:{order,bill:matching[0]},lastError:undefined});
-  else await patch({status:'debit_uncertain',lastError:'payment_proof_incomplete'});
+  // Count every successful payment for this order before comparing its amount:
+  // an additional debit with a different amount is still conflicting evidence.
+  const successful=bills.filter(b=>b.cjOrderCode===billingId&&b.type==='Order Payment'&&b.status==='1');
+  if(isCjCardPaymentConfirmed({paymentDate:order.paymentDate,orderStatus:order.orderStatus,currency:order.currency})&&order.payableUsdMinor===c.supplierUsdMinor&&successful.length===1&&successful[0].id&&successful[0].amountUsdMinor===c.supplierUsdMinor)await patch({status:'supplier_paid',evidence:{order,bill:successful[0]},lastError:undefined});
+  else await patch({status:'debit_uncertain',evidence:{order,bills},lastError:'payment_proof_incomplete'});
   return;
  }
  // External card receipts are proved by authenticated CJ order reads, not by

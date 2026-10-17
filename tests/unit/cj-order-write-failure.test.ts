@@ -1,6 +1,6 @@
 import {describe,it,expect,vi} from 'vitest';
 const db=vi.hoisted(()=>({cj_orders:{findUnique:vi.fn(),update:vi.fn()},cj_order_events:{createMany:vi.fn()}}));
-vi.mock('@/lib/prisma',()=>({prisma:db}));
+vi.mock('@/lib/prisma',()=>({prisma:{...db,$queryRaw:async()=>[{id:1n,status:'sent_to_cj',internal_ref:'r',tracking_number:''}],$transaction:async(run:(tx:unknown)=>Promise<unknown>)=>run({...db,$queryRaw:async()=>[{id:1n,status:'sent_to_cj',internal_ref:'r',tracking_number:''}]})}}));
 db.cj_order_events.createMany.mockResolvedValue({count:1});
 import {transitionOrder,setOrderTracking} from '@/lib/cj/orders/store';
 describe('order persistence does not acknowledge failed writes',()=>{

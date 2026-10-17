@@ -11,7 +11,7 @@ export type LegacyShippingSnapshot = Pick<ShippingSnapshot,'name'|'phone'|'addre
 export type CreateOrderInput = {memberId: bigint; requestKey: string; items: readonly OrderLineInput[]; shipping: ShippingSnapshot};
 /** Trusted server configuration, NEVER browser fields. Fee must be explicit, including zero. */
 export type OrderPolicy = {shippingFeeMinor: number;liveCjQuotes?:readonly import('@/lib/cj/live-quote').LiveCjQuote[];staffCjTrial?:true};
-export type ChosenVariantSnapshot={storefrontProductId?:string;pid?:string;key:string;vid:string|null;sku:string|null;attributes:Record<string,string>};
+export type ChosenVariantSnapshot={storefrontProductId?:string;pid?:string;sourceOptions?:import('@/lib/cj/source-option-identity').CjSourceOptions;key:string;vid:string|null;sku:string|null;attributes:Record<string,string>};
 export type OrderItemSnapshot = {productId: bigint; title: string; quantity: number; unitPriceMinor: number; totalMinor: number;variantSnapshot:ChosenVariantSnapshot|null;listUnitPriceMinor?:number|null;discountMinor?:number};
 export type OrderSnapshot = {id: bigint; memberId: bigint; status: OrderStatus; currency: 'SAR'; subtotalMinor: number; shippingFeeMinor: number; totalMinor: number; shipping: ShippingSnapshot|LegacyShippingSnapshot; items: OrderItemSnapshot[]};
 export type PaymentAttempt = {id: bigint; orderId: bigint; provider: string; reference: string | null; redirectUrl: string | null; merchantOrderId: string; amountMinor: number; currency: 'SAR'; status: AttemptStatus};

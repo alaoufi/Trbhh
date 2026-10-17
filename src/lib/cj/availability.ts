@@ -1,9 +1,12 @@
 import 'server-only';
-import { calculateFreightToKSA, getInventoryByPid, getInventoryByVid, getVariants } from './client';
+import type {CjSourceOptions} from './source-option-identity';
+import {verifyCjSourceOptions} from './verified-source-options';
+import { calculateFreightToKSA, getInventoryByPid, getInventoryByVid, getVariants, getProduct } from './client';
 import type { CjFreightOption, CjInventory, CjResult, CjVariant } from './types';
 import { computePrice } from './pricing';
 
 export type AvailabilityDeps = {
+  getProduct?:typeof getProduct;
   getInventoryByPid?: typeof getInventoryByPid;
   calculateFreight?: typeof calculateFreightToKSA;
   getInventoryByVid?: typeof getInventoryByVid;
@@ -12,7 +15,7 @@ export type AvailabilityDeps = {
 export type VariantCheckStatus = 'available'|'out_of_stock'|'quantity_exceeds_stock'|'inventory_error'|'variant_changed'|'no_shipping'|'freight_error'|'invalid_price';
 export type SaudiShippingOption = {name:string;priceMinor:number;additionalMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string};
 export type VariantCheck =
-  | {status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:SaudiShippingOption[];checkedAt:string}
+  | {status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;sourceOptions:CjSourceOptions;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:SaudiShippingOption[];checkedAt:string}
   | {status:Exclude<VariantCheckStatus,'available'>;checkedAt:string};
 
 const nowIso=()=>new Date().toISOString();
@@ -35,6 +38,8 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   const matches=variantResult.data.filter(variant=>variant.vid===selected.vid);
   const liveVariant=matches[0];
   if(matches.length!==1||!liveVariant||!selected.variantSku||liveVariant.variantSku!==selected.variantSku)return {status:'variant_changed',checkedAt};
+  const sourceOptions=await verifyCjSourceOptions(pid,selected,liveVariant,deps.getProduct??getProduct);
+  if(!sourceOptions)return {status:'variant_changed',checkedAt};
   // CJ يبيع من مخزون مستودعه (cjInventoryQuantity) ومن مخزون المورّد/المصنع المُبلَّغ
   // (storageNum) معاً — فالاكتفاء بمخزون CJ وحده كان يرفض سلعاً متوفّرة فعلاً كـ out_of_stock.
   // نعتمد كمية CJ إن وُجدت، وإلا الكمية الكلية المُبلَّغة من CJ. يبقى الشحن هو الحَكَم النهائي
@@ -78,7 +83,7 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   if(pricing?.saleOverrideMinor!=null)salePriceMinor=pricing.saleOverrideMinor;
   else salePriceMinor=computePrice(supplierPriceMinor,0,pricing?.otherCostsMinor??0,pricing?.marginBps??3000).salePriceMinor;
   if(!Number.isSafeInteger(salePriceMinor)||salePriceMinor<=0)return {status:'invalid_price',checkedAt};
-  return {status:'available',vid:liveVariant.vid,sku:liveVariant.variantSku,variantName:liveVariant.variantName??null,optionKey:liveVariant.variantKey??null,stockQuantity,priceChanged:typeof selected.variantSellPrice==='number'&&Number.isFinite(selected.variantSellPrice)&&selected.variantSellPrice!==liveVariant.variantSellPrice,warehouses:deliverableWarehouses,supplierPriceMinor,salePriceMinor,shippingOptions,checkedAt};
+  return {status:'available',sourceOptions:sourceOptions!,vid:liveVariant.vid,sku:liveVariant.variantSku,variantName:liveVariant.variantName??null,optionKey:liveVariant.variantKey??null,stockQuantity,priceChanged:typeof selected.variantSellPrice==='number'&&Number.isFinite(selected.variantSellPrice)&&selected.variantSellPrice!==liveVariant.variantSellPrice,warehouses:deliverableWarehouses,supplierPriceMinor,salePriceMinor,shippingOptions,checkedAt};
 }
 
 function validOrigin(value:string|null):boolean{return typeof value==='string'&&/^[A-Za-z]{2}$/.test(value.trim());}

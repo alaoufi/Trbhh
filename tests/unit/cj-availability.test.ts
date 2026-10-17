@@ -8,6 +8,25 @@ const inventory=(vid:string,storageNum:number,origin='CN'):CjInventory=>({vid,st
 const options=()=>[{logisticName:'Saudi Standard',logisticPrice:2,logisticAging:'7-12 days',logisticPriceCn:0}];
 
 describe('CJ live availability proof',()=>{
+  it.each([{schema:['Color','Size'],pid:'p',status:'available'},{schema:['Size','Color'],pid:'p',status:'variant_changed'},{schema:['Color','Size'],pid:'other',status:'variant_changed'}])('corroborates missing variant schema using exact current product %j',async fixture=>{
+    const selected={...variant('v'),optionSchema:['Color','Size']};
+    const getProduct=vi.fn(async()=>ok({pid:fixture.pid,optionSchema:fixture.schema,variants:[{...variant('v'),optionSchema:fixture.schema}]}));
+    const result=await verifyCjVariantForSaudi('p',selected,1,{getProduct:getProduct as never,getInventoryByVid:async()=>ok([inventory('v',8)]),getVariants:async()=>ok([variant('v')]),calculateFreight:async()=>ok(options())});
+    expect(result.status).toBe(fixture.status);expect(getProduct).toHaveBeenCalledExactlyOnceWith('p');
+  });
+  it.each(['missing','different-options','missing-schema','unavailable'])('rejects uncorroborated live product %s without freight',async failure=>{
+    const selected={...variant('v'),optionSchema:['Color','Size']};
+    const freight=vi.fn(async()=>ok(options()));
+    const getProduct=vi.fn(async()=>failure==='unavailable'?{ok:false,error:'offline'}:ok({pid:'p',optionSchema:failure==='missing-schema'?undefined:['Color','Size'],variants:failure==='missing'?[]:[{...variant('v'),variantKey:failure==='different-options'?'White-S':variant('v').variantKey}]}));
+    const result=await verifyCjVariantForSaudi('p',selected,1,{getProduct:getProduct as never,getInventoryByVid:async()=>ok([inventory('v',8)]),getVariants:async()=>ok([variant('v')]),calculateFreight:freight});
+    expect(result.status).toBe('variant_changed');expect(freight).not.toHaveBeenCalled();
+  });
+  it.each([{variantKey:'White-S'}, {variantKey:null}, {attributes:{color:'White'}}, {optionSchema:['Different']}])('rejects changed or missing source options %j',async change=>{
+    const selected={...variant('v'),optionSchema:['Color','Size'],attributes:{color:'Black'}};
+    const freight=vi.fn(async()=>ok(options()));
+    const result=await verifyCjVariantForSaudi('p',selected,1,{getInventoryByVid:async()=>ok([inventory('v',8)]),getVariants:async()=>ok([{...selected,...change}]),calculateFreight:freight});
+    expect(result.status).toBe('variant_changed');expect(freight).not.toHaveBeenCalled();
+  });
   it('rejects changed SKU and duplicate source VIDs before freight',async()=>{const freight=vi.fn(async()=>ok(options()));for(const variants of [[{...variant('v'),variantSku:'other'}],[variant('v'),variant('v')]]){expect((await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',8)]),getVariants:async()=>ok(variants),calculateFreight:freight})).status).toBe('variant_changed');}expect(freight).not.toHaveBeenCalled();});
   it('rejects inventory aggregates outside safe integer precision',async()=>{
     const result=await verifyCjVariantForSaudi('p',variant('v'),1,{getInventoryByVid:async()=>ok([inventory('v',Number.MAX_SAFE_INTEGER),inventory('v',1)]),getVariants:async()=>ok([variant('v')]),calculateFreight:async()=>ok(options())},375);

@@ -27,11 +27,12 @@ beforeEach(() => {
   mock.setOrderTracking.mockResolvedValue(undefined);
   mock.ordersUpdate.mockResolvedValue({});
   mock.whUpdate.mockResolvedValue({});
+  mock.getCjOrderDetail.mockResolvedValue({ok:true,data:{proof:{orderId:'CJ-1',orderNum:'R1',isSandbox:0,orderStatus:'Shipped',trackNumber:'LP1'}}});
 });
 
 describe('applyCjWebhookEvent — ربط الحدث بطلبه وتطبيقه', () => {
   it('يطابق بمعرّف CJ ويطبّق الحالة + التتبّع', async () => {
-    mock.findFirst.mockResolvedValue({ id: 7n, internal_ref: 'R1', status: 'sent_to_cj' });
+    mock.findFirst.mockResolvedValue({ id: 7n, internal_ref: 'R1', cj_order_id: 'CJ-1', status: 'sent_to_cj' });
     const r = await applyCjWebhookEvent({ eventKey: 'e1', cjOrderId: 'CJ-1', orderNumber: '', rawStatus: 'Shipped', trackNumber: 'LP1' });
     expect(r).toEqual({ applied: true, matched: true });
     expect(mock.applyCjStatus).toHaveBeenCalledWith(7n, 'Shipped', expect.anything());
@@ -40,7 +41,8 @@ describe('applyCjWebhookEvent — ربط الحدث بطلبه وتطبيقه', 
 
   it('يطابق برقمنا (internal_ref) عند غياب معرّف CJ', async () => {
     mock.findFirst.mockResolvedValue(null);
-    mock.findUnique.mockResolvedValue({ id: 8n, internal_ref: 'R2', status: 'paid' });
+    mock.findUnique.mockResolvedValue({ id: 8n, internal_ref: 'R2', cj_order_id: 'CJ-2', status: 'paid' });
+    mock.getCjOrderDetail.mockResolvedValue({ok:true,data:{proof:{orderId:'CJ-2',orderNum:'R2',isSandbox:0,orderStatus:'delivered'}}});
     const r = await applyCjWebhookEvent({ eventKey: 'e2', cjOrderId: '', orderNumber: 'R2', rawStatus: 'delivered', trackNumber: '' });
     expect(r.matched).toBe(true);
     expect(mock.applyCjStatus).toHaveBeenCalledWith(8n, 'delivered', expect.anything());
@@ -58,7 +60,7 @@ describe('applyCjWebhookEvent — ربط الحدث بطلبه وتطبيقه', 
 describe('processPendingWebhookEvents — معالجة الدفعة', () => {
   it('يعلّم الأحداث المطابَقة معالَجة', async () => {
     mock.whFindMany.mockResolvedValue([{ id: 1n, event_key: 'e1', cj_order_id: 'CJ-1', order_number: '', raw_status: 'shipped', track_number: '' }]);
-    mock.findFirst.mockResolvedValue({ id: 7n, internal_ref: 'R1', status: 'sent_to_cj' });
+    mock.findFirst.mockResolvedValue({ id: 7n, internal_ref: 'R1', cj_order_id: 'CJ-1', status: 'sent_to_cj' });
     const r = await processPendingWebhookEvents(10);
     expect(r).toEqual({ processed: 1, matched: 1 });
     expect(mock.whUpdate).toHaveBeenCalledWith({ where: { id: 1n }, data: { processed: 1 } });
@@ -77,7 +79,7 @@ describe('processPendingWebhookEvents — معالجة الدفعة', () => {
 describe('pollOpenCjOrders — الاستطلاع الدوري (شبكة أمان، قراءة فقط)', () => {
   it('يستعلم عن الطلبات المفتوحة ويطبّق الحالة والتتبّع ويختم آخر استطلاع', async () => {
     mock.ordersFindMany.mockResolvedValue([{ id: 7n, internal_ref: 'R1', cj_order_id: 'CJ-1' }]);
-    mock.getCjOrderDetail.mockResolvedValue({ ok: true, data: { orderStatus: 'Shipped', trackNumber: 'LP1' } });
+    mock.getCjOrderDetail.mockResolvedValue({ ok: true, data: { proof:{orderId:'CJ-1',orderNum:'R1',isSandbox:0,orderStatus:'Shipped',trackNumber:'LP1'} } });
     mock.getTracking.mockResolvedValue({ ok: true, data: { trackStatus: 'in transit', logisticName: 'CJPacket' } });
     const r = await pollOpenCjOrders(10);
     expect(r).toEqual({ polled: 1, updated: 1 });

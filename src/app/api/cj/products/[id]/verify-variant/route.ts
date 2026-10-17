@@ -34,7 +34,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     const settings=await readVerifiedCjPricing();
     const destinationZip=await getCjDestinationZip(session.uid);
     if(!destinationZip)return NextResponse.json({status:'destination_required'},{headers});
-    const checked=await verifyCjVariantForSaudi(row.cj_product_id,{vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes},Number(body.quantity),{},settings.usdToSarX100,{otherCostsMinor:row.other_costs_minor,marginBps:row.margin_bps,saleOverrideMinor:row.sale_price_override_minor},destinationZip);
+    const checked=await verifyCjVariantForSaudi(row.cj_product_id,{vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes,optionSchema:variant.optionSchema},Number(body.quantity),{},settings.usdToSarX100,{otherCostsMinor:row.other_costs_minor,marginBps:row.margin_bps,saleOverrideMinor:row.sale_price_override_minor},destinationZip);
     if(checked.status!=='available')return NextResponse.json({status:checked.status,checkedAt:checked.checkedAt},{headers});
     const shippingOptions=await Promise.all(checked.shippingOptions.map(async option=>{
       const tax=await quoteCjVat(checked.salePriceMinor,Number(body.quantity),option.priceMinor+option.additionalMinor);

@@ -1,5 +1,6 @@
 'use client';
 
+import {cjSourceOptions,sameCjSourceOptions,type CjSourceOptions} from '@/lib/cj/source-option-identity';
 import {cjSizeOptionLabel,type CjSizeChart} from '@/lib/cj/size-chart';
 
 import {useEffect,useId,useMemo,useState} from 'react';
@@ -14,7 +15,7 @@ import {CjText} from './cj-text';
 import {quoteMatchesSelection,type VerifiedSelection} from '@/lib/cj/display-freshness';
 
 type Variant=CjVariant;
-type Check={status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string}[];checkedAt:string;destinationZip?:string}|{status:'out_of_stock'|'quantity_exceeds_stock'|'inventory_error'|'variant_changed'|'no_shipping'|'freight_error'|'invalid_price'|'verification_failed';checkedAt:string};
+type Check={status:'available';sourceOptions:CjSourceOptions;vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string}[];checkedAt:string;destinationZip?:string}|{status:'out_of_stock'|'quantity_exceeds_stock'|'inventory_error'|'variant_changed'|'no_shipping'|'freight_error'|'invalid_price'|'verification_failed';checkedAt:string};
 const failureMessage:Record<string,string>={checking:'جاري التحقق من المخزون والشحن...',destination_required:'أكمل عنوان الشحن والرمز البريدي في ملفك؛ لا تُعرض أرقام غير مؤكدة.',out_of_stock:'غير متوفر حاليًا',quantity_exceeds_stock:'الكمية المطلوبة أكبر من المخزون المتاح',inventory_error:'تعذّر التحقق من المخزون، حاول مرة أخرى',variant_changed:'تغيّرت بيانات الخيار، حدّث الصفحة واختره مجدّداً',no_shipping:'لا يوجد شحن متاح للسعودية لهذا الخيار',freight_error:'تعذّر الحصول على سعر الشحن، حاول مرة أخرى',invalid_price:'تعذّر التحقق من السعر الحالي، لا يمكن الإضافة'};
 const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
@@ -62,10 +63,10 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   const maxQty=quote?Math.max(1,quote.stockQuantity-alreadyInCart):99;
   useEffect(()=>{if(qty>maxQty)setQty(maxQty);},[maxQty,qty]);
   function add(){
-    if(!quote||!ship||!selected||!ready)return;
+    if(!quote||!ship||!selected||!ready||!sameCjSourceOptions(cjSourceOptions(selected),quote.sourceOptions))return;
     const previous=latest().find(item=>item.id===productId&&item.variantId===selected.vid)?.qty??0;
     const attributes=Object.fromEntries(options.slice(0,30).map(option=>[option.label.slice(0,80),option.value.slice(0,160)]));
-    const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
+    const snapshot:TrialCartSnapshot={sourceOptions:quote.sourceOptions,pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
     try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');setAdded(true);}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
   }
   return <section aria-label="خيارات الشراء التجريبي" className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3">

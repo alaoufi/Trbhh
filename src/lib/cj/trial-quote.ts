@@ -1,4 +1,5 @@
 import 'server-only';
+import {storedCjSourceOptions,sameCjSourceOptions} from './source-option-identity';
 import {getStorefrontCjProduct,parseCjDetails} from './mapping';
 import {cjImg,cjProductImages} from './storefront';
 import {readVerifiedCjPricing} from './verified-pricing';
@@ -29,9 +30,11 @@ export async function quoteCjTrialCart(value:unknown,deps:TrialQuoteDeps={}):Pro
     if(!saved){result.rejected.push({id:item.id,variantId:item.variantId,reason:'variant_unavailable'});continue;}
     if(item.snapshot.verifiedQuantity!==item.qty){result.rejected.push({id:item.id,variantId:item.variantId,reason:'verification_required'});continue;}
     settings??=await (deps.settings??readVerifiedCjPricing)();
-    const providerVariant:CjVariant={vid:saved.vid,variantSku:saved.sku,variantName:saved.name,variantKey:saved.optionKey,variantSellPrice:saved.priceUsd,variantImage:null,variantWeight:saved.weight,attributes:saved.attributes};
+    const providerVariant:CjVariant={vid:saved.vid,variantSku:saved.sku,variantName:saved.name,variantKey:saved.optionKey,variantSellPrice:saved.priceUsd,variantImage:null,variantWeight:saved.weight,attributes:saved.attributes,optionSchema:saved.optionSchema};
     const live=await (deps.verify??((product:TrialRow,variant:CjVariant,qty:number)=>verifyCjVariantForSaudi(product.cj_product_id,variant,qty,{},settings!.usdToSarX100,{otherCostsMinor:product.other_costs_minor,marginBps:product.margin_bps,saleOverrideMinor:product.sale_price_override_minor},deps.destinationZip)))(row,providerVariant,item.qty);
     if(live.status!=='available'){result.rejected.push({id:item.id,variantId:item.variantId,reason:live.status==='quantity_exceeds_stock'||live.status==='out_of_stock'?'stock_changed':'variant_unavailable'});continue;}
+    const sourceOptions=storedCjSourceOptions(saved);
+    if((live.optionKey??'').trim()!==sourceOptions?.key||(live.variantName??'').trim()!==sourceOptions?.name||!sameCjSourceOptions(sourceOptions,live.sourceOptions)||!sameCjSourceOptions(sourceOptions,item.snapshot.sourceOptions)||item.snapshot.pid!==row.cj_product_id||item.snapshot.sku!==saved.sku||item.snapshot.optionKey!==saved.optionKey||item.snapshot.rawVariantName!==saved.name){result.rejected.push({id:item.id,variantId:item.variantId,reason:'variant_unavailable'});continue;}
     if(live.salePriceMinor!==item.snapshot.unitMinor){result.rejected.push({id:item.id,variantId:item.variantId,reason:'price_changed'});continue;}
     if(live.stockQuantity!==item.snapshot.stockQuantity){result.rejected.push({id:item.id,variantId:item.variantId,reason:'stock_changed'});continue;}
     const shipping=live.shippingOptions.find(option=>option.name===item.snapshot!.shippingName&&option.originCountry===item.snapshot!.originCountry);

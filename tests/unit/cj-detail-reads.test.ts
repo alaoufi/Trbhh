@@ -4,7 +4,7 @@ import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { verifyCjVariantForSaudi } from '@/lib/cj/availability';
 import type { CjProductDetail, CjInventory } from '@/lib/cj/types';
 
-const product: CjProductDetail = { pid: 'P1', productName: 'Product', productSku: 'SKU', sellPrice: 12, productImage: null, categoryName: null, description: null, variants: [{ vid: 'V1', variantSku: 'SKU-1', variantName: 'Blue', variantSellPrice: 12, variantImage: null, variantWeight: 100 }] };
+const product: CjProductDetail = { pid: 'P1', productName: 'Product', productSku: 'SKU', sellPrice: 12, productImage: null, categoryName: null, description: null, variants: [{ vid: 'V1', variantSku: 'SKU-1', variantName: 'Blue', variantKey: 'Blue', optionSchema: ['Color'], variantSellPrice: 12, variantImage: null, variantWeight: 100 }] };
 const inventory: CjInventory[] = [{ vid: 'V1', areaId: '1', areaName: 'China', countryCode: 'CN', storageNum: 8 }];
 
 describe('CJ detail reads share fresh request-scoped supplier responses', () => {

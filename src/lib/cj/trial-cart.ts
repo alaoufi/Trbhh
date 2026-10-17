@@ -1,8 +1,9 @@
+import {validCjSourceOptions,type CjSourceOptions} from './source-option-identity';
 import {checkedMoney,lineTotal,sumMoney} from '@/lib/commerce/money';
 
 export const MAX_TRIAL_LINES=50;
 export const MAX_TRIAL_QTY=99;
-export type TrialCartSnapshot={pid:string;vid:string;sku:string;productName:string;rawVariantName:string;optionKey:string;displayLabel:string;attributes:Record<string,string|number|boolean>;verifiedQuantity:number;unitMinor:number;stockQuantity:number;shippingName:string;shippingMinor:number;shippingAdditionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;deliveryDays:string|null;originCountry:string;checkedAt:string};
+export type TrialCartSnapshot={sourceOptions?:CjSourceOptions;pid:string;vid:string;sku:string;productName:string;rawVariantName:string;optionKey:string;displayLabel:string;attributes:Record<string,string|number|boolean>;verifiedQuantity:number;unitMinor:number;stockQuantity:number;shippingName:string;shippingMinor:number;shippingAdditionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;deliveryDays:string|null;originCountry:string;checkedAt:string};
 export type TrialCartItem={id:number;qty:number;variantId?:string;snapshot?:TrialCartSnapshot};
 export type TrialCartLine=TrialCartItem&{title:string;variantName:string|null;variantSku:string|null;variantStock:number|null;image:string|null;unitMinor:number;shippingMinor:number;shippingAdditionalMinor:number;vatMinor:number;vatEnabled:boolean;shippingName:string|null;deliveryDays:string|null;currency:'SAR';totalMinor:number};
 export type TrialCartQuote={currency:'SAR';lines:TrialCartLine[];totalMinor:number;rejected:{id:number;variantId?:string;reason:'unavailable'|'invalid_price'|'variant_required'|'variant_unavailable'|'verification_required'|'price_changed'|'stock_changed'|'shipping_changed'|'tax_changed'}[]};
@@ -32,7 +33,9 @@ export function addTrialCartItem(items:TrialCartItem[],item:TrialCartItem):Trial
 }
 function validTrialSnapshot(value:TrialCartSnapshot,variantId?:string):boolean{
   const fields=['attributes','checkedAt','deliveryDays','displayLabel','originCountry','optionKey','pid','productName','rawVariantName','shippingAdditionalMinor','shippingMinor','shippingName','sku','stockQuantity','totalMinor','unitMinor','vatEnabled','vatMinor','verifiedQuantity','vid'];
+  if(value.sourceOptions!==undefined)fields.push('sourceOptions');
   if(Object.keys(value).sort().join(',')!==fields.sort().join(','))return false;
+  if(value.sourceOptions!==undefined&&!validCjSourceOptions(value.sourceOptions))return false;
   const text=(v:unknown,max:number)=>typeof v==='string'&&v.length<=max;
   const attributes=value.attributes&&typeof value.attributes==='object'&&!Array.isArray(value.attributes)?Object.entries(value.attributes):[];
   return attributes.length<=30&&attributes.every(([key,item])=>key.length<=80&&((typeof item==='string'&&item.length<=160)||typeof item==='number'&&Number.isFinite(item)||typeof item==='boolean'))&&Number.isSafeInteger(value.verifiedQuantity)&&value.verifiedQuantity>0&&text(value.pid,64)&&text(value.vid,64)&&value.vid===variantId&&text(value.sku,100)&&text(value.productName,400)&&text(value.rawVariantName,500)&&text(value.optionKey,500)&&text(value.displayLabel,500)&&Number.isSafeInteger(value.unitMinor)&&value.unitMinor>0&&Number.isSafeInteger(value.stockQuantity)&&value.stockQuantity>0&&text(value.shippingName,80)&&Number.isSafeInteger(value.shippingMinor)&&value.shippingMinor>=0&&Number.isSafeInteger(value.shippingAdditionalMinor)&&value.shippingAdditionalMinor>=0&&typeof value.vatEnabled==='boolean'&&Number.isSafeInteger(value.vatMinor)&&value.vatMinor>=0&&Number.isSafeInteger(value.totalMinor)&&value.totalMinor>=0&&(value.deliveryDays===null||text(value.deliveryDays,40))&&/^[A-Z]{2}$/.test(value.originCountry)&&Number.isFinite(Date.parse(value.checkedAt));

@@ -1,4 +1,5 @@
 'use client';
+import {sameCjSourceOptions,type CjSourceOptions} from '@/lib/cj/source-option-identity';
 import Link from 'next/link';
 import {ProductReference} from './product-reference';
 import {useEffect,useRef,useState} from 'react';
@@ -67,10 +68,11 @@ export function TrialCart({accountId,ship,checkoutMessage,setupHref}:{accountId:
     try{
       const res=await fetch(`/api/cj/products/${item.id}/verify-variant`,{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({variantId:item.variantId,quantity:newQty})});
       if(!res.ok)throw Error('verify');
-      const data=await res.json() as {salePriceMinor?:number;stockQuantity?:number;sku?:string;checkedAt?:string;shippingOptions?:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;deliveryDays:string|null;originCountry:string}[]};
+      const data=await res.json() as {sourceOptions?:CjSourceOptions;salePriceMinor?:number;stockQuantity?:number;sku?:string;checkedAt?:string;shippingOptions?:{name:string;priceMinor:number;additionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;deliveryDays:string|null;originCountry:string}[]};
       if(controller.signal.aborted||quantityRequest.current!==controller||JSON.stringify(latest())!==originalKey)return;
       if(typeof data.salePriceMinor!=='number'||!data.shippingOptions?.length){setFeedback('تعذّر تحديث الكمية — راجع التوفّر من صفحة المنتج.');setResetSignal(n=>n+1);return;}
       const prev=item.snapshot;
+      if(!sameCjSourceOptions(prev.sourceOptions,data.sourceOptions)){setFeedback('تغيّرت بيانات الخيار. أزله وأعد اختياره من صفحة المنتج.');setResetSignal(n=>n+1);return;}
       // نفس مسار الشحن الذي أُضيف به الخيار فقط — بلا أي بديل تلقائي.
       const ship=data.shippingOptions.find(o=>o.name===prev.shippingName&&o.originCountry===prev.originCountry);
       if(!ship){setFeedback('مسار الشحن المعتمد غير متاح لهذه الكمية من المورد. أزل الخيار وأعد إضافته من صفحة المنتج بالكمية المطلوبة.');setResetSignal(n=>n+1);return;}

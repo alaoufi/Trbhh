@@ -1,3 +1,4 @@
+import {validCjSourceOptions,type CjSourceOptions} from './source-option-identity';
 import 'server-only';
 import {createHash} from 'node:crypto';
 import {checkedMoney,sumMoney} from '@/lib/commerce/money';
@@ -7,7 +8,7 @@ import type {ApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
 
 export type CustomerFiscalSnapshot={policyId:string;requestId:string;productPriceBasis:'inclusive'|'exclusive';shippingPriceBasis:'inclusive'|'exclusive';productVatBps:number;shippingVatBps:number;productNetMinor:number;productVatMinor:number;productGrossMinor:number;shippingNetMinor:number;shippingVatMinor:number;shippingGrossMinor:number};
 
-export type LiveCjQuote={version:1;checkedAt:string;expiresAt:string;destination:Record<string,string>;destinationHash:string;fulfillmentGroup:string;supplierReference:string;lines:{productId:string;storefrontProductId?:string;sku?:string;pid:string;vid:string;quantity:number;supplierUnitUsdMinor:number;customerUnitSarMinor:number}[];originAreaId:string;originCountry:string;logisticName:string;supplierFreightUsdMinor:number;supplierTaxUsdMinor:number;supplierUsdMinor:number;usdToSarX100:number;marginBps:3000;customerShippingSarMinor:number;customerTaxSarMinor:number;customerSarMinor:number;customerFiscal:CustomerFiscalSnapshot};
+export type LiveCjQuote={version:1;checkedAt:string;expiresAt:string;destination:Record<string,string>;destinationHash:string;fulfillmentGroup:string;supplierReference:string;lines:{productId:string;storefrontProductId?:string;sku?:string;sourceOptions?:CjSourceOptions;pid:string;vid:string;quantity:number;supplierUnitUsdMinor:number;customerUnitSarMinor:number}[];originAreaId:string;originCountry:string;logisticName:string;supplierFreightUsdMinor:number;supplierTaxUsdMinor:number;supplierUsdMinor:number;usdToSarX100:number;marginBps:3000;customerShippingSarMinor:number;customerTaxSarMinor:number;customerSarMinor:number;customerFiscal:CustomerFiscalSnapshot};
 export function destinationHash(destination:Record<string,string>):string{return createHash('sha256').update(JSON.stringify(Object.fromEntries(Object.entries(destination).sort(([a],[b])=>a.localeCompare(b))))).digest('hex');}
 /** Read original supplier decimal USD. Never derive USD commitments from converted SAR. */
 export function usdMinor(value:number):number{
@@ -40,6 +41,7 @@ export function validateLiveCjQuote(quote:LiveCjQuote,destination:Record<string,
  for(const line of quote.lines){
   if(!/^[1-9]\d*$/.test(line.productId)||![line.pid,line.vid].every(v=>/^[A-Za-z0-9_-]{1,64}$/.test(v))||!Number.isSafeInteger(line.quantity)||line.quantity<1||line.quantity>99||unique.has(line.productId))throw new Error('cj_quote_lines_invalid');
   if(line.storefrontProductId!==undefined&&(typeof line.storefrontProductId!=='string'||!/^[1-9]\d{0,19}$/.test(line.storefrontProductId))||line.sku!==undefined&&(typeof line.sku!=='string'||!line.sku.trim()||line.sku.length>100))throw new Error('cj_quote_reference_invalid');
+  if(line.sourceOptions!==undefined&&!validCjSourceOptions(line.sourceOptions))throw new Error('cj_quote_reference_invalid');
   unique.add(line.productId);checkedMoney(line.supplierUnitUsdMinor);checkedMoney(line.customerUnitSarMinor);
   if(!line.supplierUnitUsdMinor||!line.customerUnitSarMinor)throw new Error('cj_quote_price_invalid');
   supplier.push(checkedMoney(line.supplierUnitUsdMinor*line.quantity));

@@ -20,6 +20,21 @@ function setup(raw:Record<string,unknown>,previous='shipped'){
  });
 }
 describe('customer commerce fulfillment persistence',()=>{
+ it.each(['SHIPPED','DELIVERED'])('preserves established tracking identity when a conflicting %s read reaches the lock later',async orderStatus=>{
+  setup({orderStatus,trackNumber:'OLDER-T',logisticName:'Older carrier',trackingUrl:'https://older.example/OLDER-T'},'delivered');
+  f.tracking.mockResolvedValueOnce({ok:true,data:{trackNumber:'OLDER-T',lastMileCarrier:'Older local carrier',lastTrackNumber:'OLDER-LAST'}});
+  await reconcileCjFulfillment('1');const meta=JSON.parse(String((f.write.mock.calls[0] as unknown[])[1]));
+  expect(meta.fulfillment).toMatchObject({stage:'delivered',carrier:'Carrier',trackingNumber:'T',trackingUrl:'https://carrier.example/T'});
+  expect(meta.fulfillment.lastTrackNumber).not.toBe('OLDER-LAST');
+  expect(meta.exception).toMatchObject({actionRequired:true,orderStatus:'TRACKING_IDENTITY_CONFLICT'});
+  expect(meta.trackingConflict).toMatchObject({trackingNumber:'OLDER-T',lastTrackNumber:'OLDER-LAST'});
+  expect((f.write.mock.calls[1] as unknown[])[1]).toBe('action_required');
+  const notice=JSON.parse(String((f.write.mock.calls[2] as unknown[])[4]));expect(notice).toMatchObject({fulfillmentStatus:'action_required',trackingNumber:'T',carrier:'Carrier'});
+ });
+ it('allows independently matched last-mile enrichment for the established number after an older stage read',async()=>{
+  setup({orderStatus:'SHIPPED',trackNumber:'T'},'delivered');f.tracking.mockResolvedValueOnce({ok:true,data:{trackNumber:'T',lastMileCarrier:'Local carrier',lastTrackNumber:'LAST1'}});
+  await reconcileCjFulfillment('1');const meta=JSON.parse(String((f.write.mock.calls[0] as unknown[])[1]));expect(meta.fulfillment).toMatchObject({stage:'delivered',trackingNumber:'T',carrier:'Local carrier',lastTrackNumber:'LAST1'});expect(meta.exception).toBeUndefined();
+ });
  it('keeps the same shipment update in the administration audit and member notice',async()=>{setup({orderStatus:'SHIPPED',trackNumber:'T'});await reconcileCjFulfillment('1');const writes=f.write.mock.calls as unknown[][];const notice=writes.find(call=>String(call[0]).includes('INSERT INTO commerce_notifications'))!;const audit=writes.find(call=>String(call[0]).includes('INSERT INTO commerce_audit_events'))!;expect(audit).toBeDefined();expect(audit[2]).toBe(notice[2]);expect(audit[3]).toBe(notice[4]);expect(String(audit[0])).toContain('ON DUPLICATE KEY');});
  it('keeps verified carrier and last mile number with the official tracking portal',async()=>{setup({orderStatus:'SHIPPED',trackNumber:'T'});f.tracking.mockResolvedValueOnce({ok:true,data:{trackNumber:'T',lastMileCarrier:'Local carrier',lastTrackNumber:'LAST1'}});await reconcileCjFulfillment('1');const meta=JSON.parse(String((f.write.mock.calls[0] as unknown[])[1]));expect(meta.fulfillment).toMatchObject({carrier:'Local carrier',trackingNumber:'T',lastTrackNumber:'LAST1',trackingUrl:'https://www.cjpacket.com/'});const notice=JSON.parse(String((f.write.mock.calls[2] as unknown[])[4]));expect(notice).toMatchObject({trackingNumber:'T',lastTrackNumber:'LAST1'});});
  it('locks the paid commerce order before the outbox to match worker and receipt lock order',async()=>{setup({orderStatus:'UNSHIPPED',subStatus:'PROCESSING'});await reconcileCjFulfillment('1');const locks=f.query.mock.calls.map(call=>(call[0] as TemplateStringsArray).join('?')).filter(sql=>sql.includes('FOR UPDATE'));expect(locks[0]).toContain('FROM commerce_orders WHERE id=');expect(locks[0]).toContain("status='paid'");expect(locks[1]).toContain('FROM commerce_cj_fulfillment_outbox');});

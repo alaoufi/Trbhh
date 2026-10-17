@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
-import { canTransition, isStatus, mapCjStatus, type OrderStatus } from './state';
+import { canTransition, isStatus, isTerminal, mapCjStatus, type OrderStatus } from './state';
 
 /**
  * طبقة تخزين طلبات CJ داخل تربح — سجلّات داخلية فقط (لا اتصال بـ CJ ولا شراء حقيقي).
@@ -145,53 +145,51 @@ export async function listOrders(opts: { status?: string; limit?: number; offset
 export type TransitionResult = { ok: true; from: OrderStatus; to: OrderStatus } | { ok: false; error: string };
 
 /** ينقل حالة الطلب بعد التحقق من آلة الحالات، ويسجّل الحدث. idempotent عند تمرير eventKey. */
-export async function transitionOrder(
-  orderId: number | bigint,
-  to: string,
-  opts: { reason?: string; actorId?: number | bigint | null; source?: EventInput['source']; eventKey?: string } = {},
-): Promise<TransitionResult> {
-  if (!isStatus(to)) return { ok: false, error: 'unknown_status' };
-  const order = await getOrderById(orderId);
-  if (!order) return { ok: false, error: 'not_found' };
-  const from = order.status;
-  if (!isStatus(from)) return { ok: false, error: 'corrupt_status' };
-  if (from === to) return { ok: true, from, to }; // لا عملية، لكن ليست خطأ
-  if (!canTransition(from, to)) return { ok: false, error: 'invalid_transition' };
-
-  const now = new Date();
-  await prisma.cj_orders.update({
-    where: { id: bid(orderId) },
-    data: {
-      status: to, status_reason: (opts.reason ?? '').slice(0, 300),
-      ...(to === 'sent_to_cj' && !order.placed_at ? { placed_at: now } : {}),
-      ...(to === 'delivered' && !order.delivered_at ? { delivered_at: now } : {}),
-    },
-  });
-  await appendOrderEvent(orderId, {
-    eventKey: opts.eventKey ?? `${order.internal_ref}:${to}:${now.getTime()}`,
-    type: 'status_change', source: opts.source ?? 'internal', fromStatus: from, toStatus: to,
-    note: opts.reason ?? '', actorId: opts.actorId ?? null,
-  });
-  return { ok: true, from, to };
+type LockedLegacyOrder=Pick<NonNullable<Awaited<ReturnType<typeof getOrderById>>>,'id'|'internal_ref'|'status'|'placed_at'|'delivered_at'|'tracking_number'|'tracking_status'>;
+function mutationEvent(orderId:number|bigint,e:EventInput){return {order_id:bid(orderId),event_key:e.eventKey.slice(0,191),type:(e.type??'note').slice(0,48),source:e.source??'internal',from_status:(e.fromStatus??'').slice(0,32),to_status:(e.toStatus??'').slice(0,32),note:(e.note??'').slice(0,1000),actor_id:e.actorId==null?null:bid(e.actorId)};}
+export async function transitionOrder(orderId:number|bigint,to:string,opts:{reason?:string;actorId?:number|bigint|null;source?:EventInput['source'];eventKey?:string}={}):Promise<TransitionResult>{
+ if(!isStatus(to))return {ok:false,error:'unknown_status'};
+ return prisma.$transaction(async tx=>{
+  // Read current state under the same lock used by poll, webhook and manual updates.
+  const [order]=await tx.$queryRaw<LockedLegacyOrder[]>`SELECT id,internal_ref,status,placed_at,delivered_at,tracking_number,tracking_status FROM cj_orders WHERE id=${bid(orderId)} FOR UPDATE`;
+  if(!order)return {ok:false,error:'not_found'};
+  const from=order.status;if(!isStatus(from))return {ok:false,error:'corrupt_status'};
+  if(from===to)return {ok:true,from,to};
+  if(!canTransition(from,to))return {ok:false,error:'invalid_transition'};
+  const now=new Date();
+  // Claim the event in the mutation transaction. Failed event/update writes roll
+  // back together; an already consumed key never performs another state change.
+  const claimed=await tx.cj_order_events.createMany({data:[mutationEvent(orderId,{eventKey:opts.eventKey??`${order.internal_ref}:${to}:${now.getTime()}`,type:'status_change',source:opts.source??'internal',fromStatus:from,toStatus:to,note:opts.reason??'',actorId:opts.actorId??null})],skipDuplicates:true});
+  if(claimed.count!==1)return {ok:false,error:'duplicate_event'};
+  await tx.cj_orders.update({where:{id:bid(orderId)},data:{status:to,status_reason:(opts.reason??'').slice(0,300),...(to==='sent_to_cj'&&!order.placed_at?{placed_at:now}:{}),...(to==='delivered'&&!order.delivered_at?{delivered_at:now}:{})}});
+  return {ok:true,from,to};
+ });
 }
 
-/** يحدّث بيانات التتبّع ويسجّل حدثاً (idempotent عبر eventKey إن مُرّر). */
-export async function setOrderTracking(
-  orderId: number | bigint,
-  t: { carrier?: string; trackingNumber?: string; trackingUrl?: string; trackingStatus?: string; cjOrderId?: string },
-  opts: { eventKey?: string; source?: EventInput['source']; actorId?: number } = {},
-): Promise<void> {
-  await prisma.cj_orders.update({
-    where: { id: bid(orderId) },
-    data: {
-      ...(t.carrier !== undefined ? { carrier: t.carrier.slice(0, 120) } : {}),
-      ...(t.trackingNumber !== undefined ? { tracking_number: t.trackingNumber.slice(0, 160) } : {}),
-      ...(t.trackingUrl !== undefined ? { tracking_url: t.trackingUrl.slice(0, 1024) } : {}),
-      ...(t.trackingStatus !== undefined ? { tracking_status: t.trackingStatus.slice(0, 64) } : {}),
-      ...(t.cjOrderId !== undefined ? { cj_order_id: t.cjOrderId.slice(0, 64) } : {}),
-    },
-  });
-  await appendOrderEvent(orderId, { eventKey: opts.eventKey ?? `${String(orderId)}:track:${Date.now()}`, type: 'tracking', source: opts.source ?? 'carrier', note: t.trackingStatus ?? '', actorId: opts.actorId });
+/** Tracking shares the order lock and durable event claim with state transitions. */
+export async function setOrderTracking(orderId:number|bigint,t:{carrier?:string;trackingNumber?:string;trackingUrl?:string;trackingStatus?:string;cjOrderId?:string},opts:{eventKey?:string;source?:EventInput['source'];actorId?:number}={}):Promise<void>{
+ await prisma.$transaction(async tx=>{
+  const [order]=await tx.$queryRaw<LockedLegacyOrder[]>`SELECT id,internal_ref,status,placed_at,delivered_at,tracking_number,tracking_status FROM cj_orders WHERE id=${bid(orderId)} FOR UPDATE`;
+  if(!order)throw Error('not_found');
+  const automatic=(opts.source??'carrier')!=='internal';
+  if(automatic){
+   if(!isStatus(order.status)||isTerminal(order.status))return;
+   const observed=mapCjStatus(t.trackingStatus);
+   if(observed&&observed!==order.status&&!canTransition(order.status,observed))return;
+   // Without a source timestamp, a replacement number cannot prove it is newer.
+   // Preserve established identities; authorized manual corrections stay available.
+   if(order.tracking_number&&t.trackingNumber!==undefined&&t.trackingNumber.trim()!==order.tracking_number)return;
+  }
+  const claimed=await tx.cj_order_events.createMany({data:[mutationEvent(orderId,{eventKey:opts.eventKey??`${String(orderId)}:track:${Date.now()}`,type:'tracking',source:opts.source??'carrier',note:t.trackingStatus??'',actorId:opts.actorId})],skipDuplicates:true});
+  if(claimed.count!==1)return;
+  await tx.cj_orders.update({where:{id:bid(orderId)},data:{
+   ...(t.carrier!==undefined&&(!automatic||t.carrier.trim())?{carrier:t.carrier.slice(0,120)}:{}),
+   ...(t.trackingNumber!==undefined&&(!automatic||t.trackingNumber.trim())?{tracking_number:t.trackingNumber.slice(0,160)}:{}),
+   ...(t.trackingUrl!==undefined&&(!automatic||t.trackingUrl.trim())?{tracking_url:t.trackingUrl.slice(0,1024)}:{}),
+   ...(t.trackingStatus!==undefined&&(!automatic||t.trackingStatus.trim())?{tracking_status:t.trackingStatus.slice(0,64)}:{}),
+   ...(t.cjOrderId!==undefined?{cj_order_id:t.cjOrderId.slice(0,64)}:{}),
+  }});
+ });
 }
 
 /**

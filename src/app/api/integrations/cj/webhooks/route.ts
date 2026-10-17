@@ -4,6 +4,7 @@ import { cjConfig } from '@/lib/cj/config';
 import { verifySignature, constantSecret } from '@/lib/suppliers/crypto';
 import {verifyOfficialCjSignature,cjWebhookKey} from '@/lib/cj/webhook-envelope';
 import {readCjWebhookOpenId} from '@/lib/cj/webhook-key';
+import {readCjWebhookBody,WebhookBodyTooLarge} from '@/lib/cj/webhook-body';
 import {reconcileCjFulfillmentPayment} from '@/lib/cj/fulfillment';
 import {reconcileCjFulfillment} from '@/lib/cj/fulfillment/status';
 import {reconcileCjSettlementForFulfillment} from '@/lib/cj/settlements';
@@ -24,8 +25,9 @@ export async function POST(req: NextRequest) {
   const openId=readCjWebhookOpenId();
   if (!cfg.webhookSecret&&!openId) return NextResponse.json({ ok: false, error: 'not_configured' }, { status: 503 });
 
-  const raw = Buffer.from(await req.arrayBuffer());
-  if (raw.length > MAX_BODY) return NextResponse.json({ ok: false }, { status: 413 });
+  let raw:Buffer;
+  try { raw=await readCjWebhookBody(req,MAX_BODY); }
+  catch(error) { return NextResponse.json({ok:false},{status:error instanceof WebhookBodyTooLarge?413:400}); }
 
   const sig = req.headers.get('x-cj-signature') || '';
   const secretHeader = req.headers.get('x-cj-secret') || '';
@@ -43,9 +45,11 @@ export async function POST(req: NextRequest) {
   // الطلب. التطبيق لا يمسّ المال — تحديث حالة/تتبّع فقط. أي فشل تطبيق يُترك لمعالجة لاحقة.
   const ev = extractCjStatusEvent(payload);
   const rawJson = raw.toString('utf8').slice(0, 60000);
-  try{await prisma.$executeRaw`INSERT INTO cj_webhook_events (event_key, type, cj_order_id, order_number, raw_status, track_number, payload)
+  try{const inserted=await prisma.$executeRaw`INSERT INTO cj_webhook_events (event_key, type, cj_order_id, order_number, raw_status, track_number, payload)
     VALUES (${eventKey}, ${type}, ${ev.cjOrderId}, ${ev.orderNumber}, ${ev.rawStatus}, ${ev.trackNumber}, ${rawJson})
-    ON DUPLICATE KEY UPDATE id=id`;}catch{return NextResponse.json({ok:false},{status:503});}
+    ON DUPLICATE KEY UPDATE id=id`;
+    if(inserted===0)return NextResponse.json({ok:true});
+  }catch{return NextResponse.json({ok:false},{status:503});}
 
   after(async()=>{try {
     // Notifications only prompt authenticated reads. Never copy webhook payment

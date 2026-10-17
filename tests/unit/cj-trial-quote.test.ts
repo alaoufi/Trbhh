@@ -5,13 +5,19 @@ vi.mock('@/lib/cj/verified-pricing',()=>({readVerifiedCjPricing:async()=>({usdTo
 vi.mock('@/lib/cj/availability',()=>({verifyCjVariantForSaudi:mock.verify}));
 vi.mock('@/lib/cj/tax-quote',()=>({quoteCjVat:async(unit:number,quantity:number,shipping:number)=>({enabled:false,vatMinor:0,totalMinor:unit*quantity+shipping})}));
 vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:(row:{image:string})=>row.image?[row.image]:[]}));
+import {storedCjSourceOptions} from '@/lib/cj/source-option-identity';
 import {quoteCjTrialCart} from '@/lib/cj/trial-quote';
 const savedVariant={vid:'blue-s',name:'Black-XL',optionKey:'Color-Black-Size-XL',sku:'SKU-BS',priceUsd:9,weight:100,attributes:{plug:'EU'}};
 const product=(id=4)=>({id,hidden:0,name:'Source',name_ar:'سلعة',image:'https://example.test/item.jpg',currency:'SAR',sale_price_minor:1049,sale_price_override_minor:null,supplier_cost_minor:777,shipping_cost_minor:500,other_costs_minor:0,margin_bps:3000,agent_user_id:99n,cj_product_id:'private-pid',details_json:{variants:[savedVariant]}});
-const snapshot=(patch:Record<string,unknown>={})=>({pid:'private-pid',vid:'blue-s',sku:'SKU-BS',productName:'سلعة',rawVariantName:'Black-XL',optionKey:'Color-Black-Size-XL',displayLabel:'اللون: أسود · المقاس: XL',attributes:{plug:'EU'},verifiedQuantity:1,unitMinor:1500,stockQuantity:5,shippingName:'Saudi Standard',shippingMinor:700,shippingAdditionalMinor:0,vatEnabled:false,vatMinor:0,totalMinor:2200,deliveryDays:'7-12',originCountry:'CN',checkedAt:new Date().toISOString(),...patch});
-const live=(patch:Record<string,unknown>={})=>({status:'available',vid:'blue-s',sku:'SKU-BS',variantName:'Black-XL',optionKey:'Color-Black-Size-XL',stockQuantity:5,warehouses:[],supplierPriceMinor:900,salePriceMinor:1500,shippingOptions:[{name:'Saudi Standard',priceMinor:700,additionalMinor:0,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}],checkedAt:new Date().toISOString(),...patch});
+const snapshot=(patch:Record<string,unknown>={})=>({sourceOptions:storedCjSourceOptions(savedVariant),pid:'private-pid',vid:'blue-s',sku:'SKU-BS',productName:'سلعة',rawVariantName:'Black-XL',optionKey:'Color-Black-Size-XL',displayLabel:'اللون: أسود · المقاس: XL',attributes:{plug:'EU'},verifiedQuantity:1,unitMinor:1500,stockQuantity:5,shippingName:'Saudi Standard',shippingMinor:700,shippingAdditionalMinor:0,vatEnabled:false,vatMinor:0,totalMinor:2200,deliveryDays:'7-12',originCountry:'CN',checkedAt:new Date().toISOString(),...patch});
+const live=(patch:Record<string,unknown>={})=>({sourceOptions:storedCjSourceOptions(savedVariant),status:'available',vid:'blue-s',sku:'SKU-BS',variantName:'Black-XL',optionKey:'Color-Black-Size-XL',stockQuantity:5,warehouses:[],supplierPriceMinor:900,salePriceMinor:1500,shippingOptions:[{name:'Saudi Standard',priceMinor:700,additionalMinor:0,currency:'SAR',deliveryDays:'7-12',originCountry:'CN'}],checkedAt:new Date().toISOString(),...patch});
 beforeEach(()=>{vi.clearAllMocks();mock.row.mockImplementation(async(id:number)=>product(id));mock.verify.mockResolvedValue(live());});
 describe('CJ trial cart server revalidation',()=>{
+  it('rejects changed source options despite unchanged VID, SKU and amounts',async()=>{
+    mock.verify.mockResolvedValueOnce(live({optionKey:'White-S'}));
+    const result=await quoteCjTrialCart([{id:4,qty:1,variantId:'blue-s',snapshot:snapshot()}]);
+    expect(result.lines).toEqual([]);expect(result.rejected).toMatchObject([{reason:'variant_unavailable'}]);
+  });
   it('quotes only from a second exact-Vid live check and adds shipping to the line once',async()=>{
     const result=await quoteCjTrialCart([{id:4,qty:2,variantId:'blue-s',snapshot:snapshot({verifiedQuantity:2,totalMinor:3700})}]);
     expect(result).toMatchObject({currency:'SAR',totalMinor:3700,lines:[{id:4,qty:2,variantId:'blue-s',title:'سلعة',variantName:'Color-Black-Size-XL',variantSku:'SKU-BS',variantStock:5,unitMinor:1500,shippingMinor:700,shippingName:'Saudi Standard',totalMinor:3700}]});

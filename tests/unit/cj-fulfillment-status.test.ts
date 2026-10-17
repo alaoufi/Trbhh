@@ -1,6 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {supplierStageFromProof,safeTrackingUrl,cjShipmentException} from '@/lib/cj/fulfillment/status';
 describe('CJ fulfillment source events',()=>{
+ it.each(['REFUNDED','REFUNDING','REFUND_PENDING'])('holds authenticated %s signals instead of silently retaining delivery success',status=>expect(cjShipmentException({orderStatus:status})).toBe(status));
  it.each(['OUT_FOR_DELIVERY','AVAILABLE_FOR_PICKUP','UNSUCCESSFUL_DELIVERY_ATTEMPT','RETURNED_TO_SENDER'])('never treats %s as delivered',status=>expect(supplierStageFromProof({orderStatus:status})).toBeNull());
  it('holds disputes and failed deliveries for review, without interpreting an attempted delivery as success',()=>{expect(cjShipmentException({disputeId:'D1'})).toBe('CJ_DISPUTE_OPEN');expect(cjShipmentException({},'Unsuccessful delivery attempt')).toBe('DELIVERY_EXCEPTION');expect(cjShipmentException({},'Returned to sender')).toBe('DELIVERY_EXCEPTION');expect(cjShipmentException({},'Out for delivery')).toBeNull();});
  it('paid never means preparation',()=>expect(supplierStageFromProof({orderStatus:'PAID'})).toBeNull());

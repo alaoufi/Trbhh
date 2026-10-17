@@ -33,14 +33,29 @@ export function extractCjStatusEvent(payload: Record<string, unknown>): {
 /** يبحث عن طلب داخلي مطابق لحدث CJ (بمعرّف CJ أو برقمنا internal_ref). */
 async function findOrderForEvent(cjOrderId: string, orderNumber: string) {
   if (cjOrderId) {
-    const byCj = await prisma.cj_orders.findFirst({ where: { cj_order_id: cjOrderId }, select: { id: true, internal_ref: true, status: true } }).catch(() => null);
-    if (byCj) return byCj;
+    const byCj = await prisma.cj_orders.findFirst({ where: { cj_order_id: cjOrderId }, select: { id: true, internal_ref: true, cj_order_id: true, status: true } }).catch(() => null);
+    // A conflicting identity must never fall back to a coincidentally equal reference.
+    return byCj && (!orderNumber || byCj.internal_ref === orderNumber) ? byCj : null;
   }
   if (orderNumber) {
-    const byRef = await prisma.cj_orders.findUnique({ where: { internal_ref: orderNumber }, select: { id: true, internal_ref: true, status: true } }).catch(() => null);
+    const byRef = await prisma.cj_orders.findUnique({ where: { internal_ref: orderNumber }, select: { id: true, internal_ref: true, cj_order_id: true, status: true } }).catch(() => null);
     if (byRef) return byRef;
   }
   return null;
+}
+
+async function verifiedLegacyDetail(order: {cj_order_id: string; internal_ref: string}) {
+  if (!order.cj_order_id) return null;
+  const detail = await getCjOrderDetail(order.cj_order_id).catch(() => null);
+  if (!detail?.ok) return null;
+  const proof = detail.data.proof;
+  // Absence of sandbox classification is not affirmative evidence of a live order.
+  if (!proof || (proof.isSandbox !== 0 && proof.isSandbox !== '0' && proof.isSandbox !== false) ||
+      proof.orderId !== order.cj_order_id || proof.orderNum !== order.internal_ref) return null;
+  return {
+    orderStatus: typeof proof.orderStatus === 'string' ? proof.orderStatus : '',
+    trackNumber: typeof proof.trackNumber === 'string' ? proof.trackNumber : '',
+  };
 }
 
 /**
@@ -52,13 +67,15 @@ export async function applyCjWebhookEvent(ev: {
 }): Promise<{ applied: boolean; matched: boolean }> {
   const order = await findOrderForEvent(ev.cjOrderId, ev.orderNumber);
   if (!order) return { applied: false, matched: false };
+  const detail = await verifiedLegacyDetail(order);
+  if (!detail) return { applied: false, matched: false };
   let applied = false;
-  if (ev.rawStatus) {
-    const r = await applyCjStatus(order.id, ev.rawStatus, { eventKey: `${ev.eventKey}:status` });
+  if (detail.orderStatus) {
+    const r = await applyCjStatus(order.id, detail.orderStatus, { eventKey: `${ev.eventKey}:status` });
     applied = r.ok;
   }
-  if (ev.trackNumber) {
-    await setOrderTracking(order.id, { trackingNumber: ev.trackNumber, trackingStatus: ev.rawStatus || undefined }, { source: 'carrier', eventKey: `${ev.eventKey}:track` });
+  if (detail.trackNumber) {
+    await setOrderTracking(order.id, { trackingNumber: detail.trackNumber, trackingStatus: detail.orderStatus || undefined }, { source: 'cj', eventKey: `${ev.eventKey}:track` });
     applied = true;
   }
   return { applied, matched: true };
@@ -103,14 +120,14 @@ export async function pollOpenCjOrders(limit = 25): Promise<{ polled: number; up
   let polled = 0, updated = 0;
   for (const order of open) {
     polled++;
-    const detail = await getCjOrderDetail(order.cj_order_id).catch(() => null);
+    const detail = await verifiedLegacyDetail(order);
     const stamp = Date.now();
-    if (detail?.ok) {
-      if (detail.data.orderStatus) {
-        const r = await applyCjStatus(order.id, detail.data.orderStatus, { eventKey: `${order.internal_ref}:poll:${detail.data.orderStatus}:${new Date().toISOString().slice(0, 13)}` });
+    if (detail) {
+      if (detail.orderStatus) {
+        const r = await applyCjStatus(order.id, detail.orderStatus, { eventKey: `${order.internal_ref}:poll:${detail.orderStatus}:${new Date().toISOString().slice(0, 13)}` });
         if (r.ok) updated++;
       }
-      const track = detail.data.trackNumber;
+      const track = detail.trackNumber;
       if (track) {
         const t = await getTracking(track).catch(() => null);
         await setOrderTracking(order.id, {

@@ -18,12 +18,12 @@ export function safeTrackingUrl(value:unknown):string|null {
  if(typeof value!=='string'||value.length>1024)return null;
  try{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password||!u.hostname.includes('.')||u.hostname.endsWith('.local')||u.hostname.endsWith('.internal')||/^\d+(\.\d+){3}$/.test(u.hostname)||u.hostname.includes(':'))return null;return u.href;}catch{return null;}
 }
-type Meta={payment?:unknown;proof?:unknown;exception?:{actionRequired:boolean;source:'cj';orderStatus:string;observedAt:string};fulfillment?:{stage:SupplierStage;carrier:string;trackingNumber:string;lastTrackNumber?:string;trackingUrl:string|null;observedAt:string}};
+type Meta={payment?:unknown;proof?:unknown;exception?:{actionRequired:boolean;source:'cj';orderStatus:string;observedAt:string};trackingConflict?:{trackingNumber:string;carrier:string;lastTrackNumber:string;trackingUrl:string|null;observedAt:string};fulfillment?:{stage:SupplierStage;carrier:string;trackingNumber:string;lastTrackNumber?:string;trackingUrl:string|null;observedAt:string}};
 function parseMeta(raw:unknown):Meta {return (typeof raw==='string'?JSON.parse(raw):raw||{}) as Meta;}
 export function cjShipmentException(raw:Record<string,unknown>,trackingStatus?:string|null):string|null{
  if(raw.disputeId||raw.disputeOpenedId)return 'CJ_DISPUTE_OPEN';
  const status=String(raw.orderStatus||'').toUpperCase();
- if(['CANCELLED','FAILED_DELIVERY','DELIVERY_FAILED','RETURNED','RETURNED_TO_SENDER'].includes(status))return status;
+ if(['CANCELLED','REFUNDED','REFUNDING','REFUND_PENDING','FAILED_DELIVERY','DELIVERY_FAILED','RETURNED','RETURNED_TO_SENDER'].includes(status))return status;
  if(typeof trackingStatus==='string'&&/unsuccessful|undelivered|returned(?:\s+to\s+sender)?|delivery[_ ]failed|failed[_ ]delivery/i.test(trackingStatus))return 'DELIVERY_EXCEPTION';
  return null;
 }
@@ -56,11 +56,16 @@ export async function reconcileCjFulfillment(id:string,snapshot?:Record<string,u
   if(!lockedOrder)return;
   const [stored]=await tx.$queryRaw<{commerce_order_id:bigint;evidence_json:unknown;member_id:bigint}[]>`SELECT f.commerce_order_id,f.evidence_json,o.member_id FROM commerce_cj_fulfillment_outbox f JOIN commerce_orders o ON o.id=f.commerce_order_id JOIN commerce_receipts r ON r.order_id=o.id AND r.amount_minor=o.total_minor AND r.currency='SAR' WHERE f.id=${BigInt(id)} AND f.cj_order_id=${row.cjOrderId} AND f.status='supplier_paid' AND o.status='paid' FOR UPDATE`;
   if(!stored)return;const meta=parseMeta(stored.evidence_json),previous=meta.fulfillment?.stage||'supplier_paid';
-  const stage=observed&&ranks[observed]>=ranks[previous]?observed:previous;
-  const next={stage,carrier:carrier||meta.fulfillment?.carrier||'',trackingNumber:trackingNumber||meta.fulfillment?.trackingNumber||'',lastTrackNumber:lastTrackNumber||meta.fulfillment?.lastTrackNumber||'',trackingUrl:trackingUrl||meta.fulfillment?.trackingUrl||null,observedAt:new Date().toISOString()};
-  const exceptionCode=cjShipmentException(raw,tracking?.ok?tracking.data.trackStatus:null);
+  // Provider reads precede the lock. A slower read must not attach another
+  // shipment's carrier or delivery to the identity already persisted by a peer.
+  const trackingConflict=!!(meta.fulfillment?.trackingNumber&&trackingNumber&&meta.fulfillment.trackingNumber!==trackingNumber);
+  const stage=!trackingConflict&&observed&&ranks[observed]>=ranks[previous]?observed:previous;
+  const observedAt=new Date().toISOString();
+  const next=trackingConflict?{...meta.fulfillment!,observedAt}:{stage,carrier:carrier||meta.fulfillment?.carrier||'',trackingNumber:trackingNumber||meta.fulfillment?.trackingNumber||'',lastTrackNumber:lastTrackNumber||meta.fulfillment?.lastTrackNumber||'',trackingUrl:trackingUrl||meta.fulfillment?.trackingUrl||null,observedAt};
+  const exceptionCode=cjShipmentException(raw,tracking?.ok?tracking.data.trackStatus:null)||(trackingConflict?'TRACKING_IDENTITY_CONFLICT':null);
   const exception=exceptionCode?{actionRequired:true,source:'cj' as const,orderStatus:exceptionCode,observedAt:next.observedAt}:meta.exception;
-  await tx.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET evidence_json=${JSON.stringify({...meta,fulfillment:next,exception})},version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${BigInt(id)}`;
+  const conflict=trackingConflict?{trackingNumber,carrier,lastTrackNumber,trackingUrl,observedAt}:meta.trackingConflict;
+  await tx.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET evidence_json=${JSON.stringify({...meta,fulfillment:next,exception,trackingConflict:conflict})},version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${BigInt(id)}`;
   // Aggregate the least advanced fulfillment group; one delivered parcel cannot complete a multi-group order.
   // Read current group versions after the order lock, not the snapshot created
   // by the pointer lookup before a concurrent reconciliation completed.

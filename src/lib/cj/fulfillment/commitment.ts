@@ -15,5 +15,5 @@ export function validateAndTransformLiveCjQuoteToCommitment(value:unknown):Commi
  const quote=raw as unknown as LiveCjQuote;
  validateLiveCjQuote(quote,quote.destination,new Date(quote.checkedAt));
  const canonical=canonicalCjDestination(quote.destination,{alreadyCanonical:true});
- return {supplierReference:quote.supplierReference,supplierUsdMinor:quote.supplierUsdMinor,supplierFreightUsdMinor:quote.supplierFreightUsdMinor,supplierTaxUsdMinor:quote.supplierTaxUsdMinor,originAreaId:quote.originAreaId,originCountry:quote.originCountry,logisticName:quote.logisticName,lines:quote.lines.map(({storefrontProductId,sku,pid,vid,quantity,supplierUnitUsdMinor})=>({...(storefrontProductId?{storefrontProductId}:{}),...(sku?{sku}:{}),pid,vid,quantity,supplierUnitUsdMinor})),destination:canonical};
+ return {supplierReference:quote.supplierReference,supplierUsdMinor:quote.supplierUsdMinor,supplierFreightUsdMinor:quote.supplierFreightUsdMinor,supplierTaxUsdMinor:quote.supplierTaxUsdMinor,originAreaId:quote.originAreaId,originCountry:quote.originCountry,logisticName:quote.logisticName,lines:quote.lines.map(({storefrontProductId,sku,sourceOptions,pid,vid,quantity,supplierUnitUsdMinor})=>({...(storefrontProductId?{storefrontProductId}:{}),...(sku?{sku}:{}),...(sourceOptions?{sourceOptions}:{}),pid,vid,quantity,supplierUnitUsdMinor})),destination:canonical};
 }

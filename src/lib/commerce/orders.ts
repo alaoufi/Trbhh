@@ -10,7 +10,7 @@ import {buildOrderFiscalSnapshot,quoteFiscalProduct,quoteFiscalShipping,saveOrde
 import type {CalculatedFiscalLineV2} from '@/lib/finance/types';
 import {formatAddressLine,normalizeSaudiAddress} from './addresses';
 import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
-import {chosenVariantSnapshot} from './variant-snapshot';
+import {chosenVariantSnapshot,chosenCjVariantSnapshot} from './variant-snapshot';
 import {enqueuePaidCjFulfillment,saveLiveCjQuote,requireLiveCjQuotesAtPayment} from '@/lib/cj/bank-handoff';
 import {validateLiveCjQuote,assertCjQuoteFiscalPolicy} from '@/lib/cj/live-quote';
 import {canonicalCjDestination} from '@/lib/cj/live-destination';
@@ -151,8 +151,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
       const needsVariant=sourceVariants.length>0||cjVariantFound||Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0;
       if(needsVariant&&!rawVariant)throw new Error(Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0?'supplier_variant_checkout_required':'product_variant_required');
       if(!needsVariant&&selectedVariantKey)throw new Error('product_variant_required');
-      const chosen=rawVariant?chosenVariantSnapshot(selectedVariantKey,rawVariant):null;
-      if(chosen&&liveLine){if(liveLine.storefrontProductId)chosen.storefrontProductId=liveLine.storefrontProductId;chosen.pid=liveLine.pid;}
+      const chosen=liveLine?chosenCjVariantSnapshot(liveLine):rawVariant?chosenVariantSnapshot(selectedVariantKey,rawVariant):null;
       if(rawVariant&&!chosen)throw new Error('product_variant_invalid');
       const variantData=rawVariant as Record<string,unknown>|undefined;
       const variantStock=Number(variantData?.quantity??variantData?.stock);

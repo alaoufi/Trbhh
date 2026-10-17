@@ -1,5 +1,7 @@
 'use client';
 
+import {cjSizeOptionLabel,type CjSizeChart} from '@/lib/cj/size-chart';
+
 import {useEffect,useId,useMemo,useState} from 'react';
 import Link from 'next/link';
 import {formatSar} from '@/lib/commerce/money';
@@ -16,7 +18,7 @@ type Check={status:'available';vid:string;sku:string;variantName:string|null;opt
 const failureMessage:Record<string,string>={checking:'جاري التحقق من المخزون والشحن...',destination_required:'أكمل عنوان الشحن والرمز البريدي في ملفك؛ لا تُعرض أرقام غير مؤكدة.',out_of_stock:'غير متوفر حاليًا',quantity_exceeds_stock:'الكمية المطلوبة أكبر من المخزون المتاح',inventory_error:'تعذّر التحقق من المخزون، حاول مرة أخرى',variant_changed:'تغيّرت بيانات الخيار، حدّث الصفحة واختره مجدّداً',no_shipping:'لا يوجد شحن متاح للسعودية لهذا الخيار',freight_error:'تعذّر الحصول على سعر الشحن، حاول مرة أخرى',invalid_price:'تعذّر التحقق من السعر الحالي، لا يمكن الإضافة'};
 const money=(minor:number)=>`${formatSar(minor)} ر.س`;
 
-export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>}){
+export function CjPurchasePanel({productId,productPid,productName,variants,accountId,isStaff,labels,optionsByVid,sizeChart}:{productId:number;productPid:string;productName:string;variants:Variant[];accountId:number;isStaff:boolean;labels?:Record<string,string>;optionsByVid?:Record<string,DisplayOption[]>;sizeChart?:CjSizeChart|null}){
   const {items,ready,save,latest}=useTrialCart(accountId),id=useId();
   const [qty,setQty]=useState(1),[status,setStatus]=useState(''),[check,setCheck]=useState<Check|null>(null),[shipping,setShipping]=useState(0),[notice,setNotice]=useState(''),[added,setAdded]=useState(false);
   const [checkedSelection,setCheckedSelection]=useState<VerifiedSelection|null>(null);
@@ -66,14 +68,14 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
     const snapshot:TrialCartSnapshot={pid:productPid,vid:selected.vid,sku:quote.sku,productName,rawVariantName:selected.variantName||'',optionKey:selected.variantKey||'',displayLabel:labelFor(selected,selectedIndex).slice(0,500),attributes,verifiedQuantity:verificationQuantity,unitMinor:quote.salePriceMinor,stockQuantity:quote.stockQuantity,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:quote.checkedAt};
     try{save(addTrialCartItem(latest(),{id:productId,qty,variantId:selected.vid,snapshot}),'أُضيف الخيار بعد التحقق إلى سلة التجربة.');setNotice('');setAdded(true);}catch{setNotice('تعذر الإضافة. تأكد من الكمية وحدود السلة.');}
   }
-  return <section aria-label="خيارات الشراء التجريبي" className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5">
+  return <section aria-label="خيارات الشراء التجريبي" className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3">
     <h2 className="text-[15px] font-extrabold text-primary">خيارات الشراء</h2>
     {families.length>1&&<label className="block text-sm font-bold">نوع الخيار<select value={familyKey} onChange={e=>{setFamilyKey(e.target.value);setChosen({});}} className="mt-1 min-h-11 w-full rounded-lg border px-3"><option value="">اختر نوع الخيارات</option>{families.map(f=><option key={f.key} value={f.key}>{f.title}</option>)}</select></label>}
     {selected&&<p className="break-all rounded-lg bg-slate-50 p-2 text-xs">رمز الخيار المختار (SKU): <b dir="ltr">{selected.variantSku}</b></p>}
     {selector
-      ? <div className="space-y-2.5">{selector.groups.map(group=><div key={group.label}>
+      ? <div className="grid grid-cols-2 gap-2">{selector.groups.map(group=><div key={group.label} className="min-w-0">
           <label htmlFor={`${id}-${group.label}`} className="mb-1 block text-[13px] font-bold text-slate-700">{group.label}</label>
-          <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>Object.fromEntries(selector.groupLabels.slice(0,selector.groupLabels.indexOf(group.label)+1).map(l=>[l,l===group.label?e.target.value:c[l]||''])))} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{cjVariantValues(selector,group.label,chosen).map(val=><option key={val} value={val}>{group.label==='المجموعة'?`مجموعة المورد ${val} — راجع محتوياتها قبل الشراء`:group.label==='عدد القطع في العبوة'?`${val} قطع في العبوة`:val}</option>)}</select>
+          <select id={`${id}-${group.label}`} value={chosen[group.label]||''} onChange={e=>setChosen(c=>Object.fromEntries(selector.groupLabels.slice(0,selector.groupLabels.indexOf(group.label)+1).map(l=>[l,l===group.label?e.target.value:c[l]||''])))} className="min-h-11 md:min-h-9 min-w-0 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"><option value="">اختر {group.label}</option>{cjVariantValues(selector,group.label,chosen).map(val=><option key={val} value={val}>{group.label==='المقاس'?cjSizeOptionLabel(val,sizeChart):group.label==='المجموعة'?`مجموعة المورد ${val} — راجع محتوياتها قبل الشراء`:group.label==='عدد القطع في العبوة'?`${val} قطع في العبوة`:val}</option>)}</select>
         </div>)}
       </div>
       : family&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">بيانات خيارات المورد غير مكتملة أو ملتبسة؛ أُوقف اختيارها حتى تتضح مواصفاتها. لم يُحجز مخزون ولم يبدأ دفع.</p>}

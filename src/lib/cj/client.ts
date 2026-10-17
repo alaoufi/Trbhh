@@ -1,5 +1,6 @@
 import 'server-only';
 import {readCjOptionSchema} from './variant-schema';
+import {parseCjSizeChart,type CjSizeChart} from './size-chart';
 import {preserveCjVariantAttributes} from './variant-attributes';
 import {createHash} from 'node:crypto';
 import {parseCjCatalogFilters,type CatalogFilterValues} from './catalog-filters';
@@ -238,6 +239,14 @@ export async function getProduct(pid: string): Promise<CjResult<CjProductDetail>
   const variants = (rawVariants as Record<string, unknown>[]).map(v=>({...mapVariant(v),optionSchema}));
   const summary = mapSummary(d);
   return { ok: true, data: { ...summary, description: str(d.description) || str(d.descriptionEn) || str(d.productDescription), optionSchema, variants } };
+}
+
+export async function getCjSizeChart(pid:string):Promise<CjResult<CjSizeChart>>{
+ if(!/^[A-Za-z0-9_-]{1,200}$/.test(pid))return {ok:false,error:'invalid_product_id'};
+ const result=await call<unknown>('/product/sizeChart/query',{query:{pid}});
+ if(!result.ok)return result;
+ const chart=parseCjSizeChart(result.data,pid);
+ return chart?{ok:true,data:chart}:{ok:false,error:'cj_size_chart_invalid'};
 }
 
 export async function getVariants(pid: string): Promise<CjResult<CjVariant[]>> {

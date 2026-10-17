@@ -43,6 +43,17 @@ function inspectSettings(settings){
  try{registration(settings);registrationValid=true;}catch(e){registrationIssue=/^[a-z_]+$/.test(e.message)?e.message:'settings_invalid';}
  return {topics,registrationValid,registrationIssue};
 }
+function claimActivation(settings,storage,resume=false,io=fs){
+ if(resume){
+  // Resume only the exact inactive state inspected after the rejected write.
+  const callback=settings.callback||{};
+  if(Object.keys(callback).filter(name=>callback[name]!=null).sort().join(',')!=='order,product,stock'||!['product','stock','order'].every(name=>{const value=callback[name],urls=value?.urls??value?.callbackUrls;return value?.type==='CANCEL'&&Array.isArray(urls)&&urls.length===0;}))throw Error('reviewed_resume_state_changed');
+  const previous=io.lstatSync(path.join(storage,'cj-webhook-activation-once'));
+  if(!previous.isDirectory()||previous.isSymbolicLink())throw Error('previous_setup_claim_invalid');
+ }
+ io.mkdirSync(path.join(storage,resume?'cj-webhook-activation-reviewed-resume-once':'cj-webhook-activation-once'));
+ return resume?'cj-webhook-resume-before.sealed':'cj-webhook-callbacks-before.sealed';
+}
 async function verifyReceiver(openId,fetcher=fetch){
  const options={method:'POST',redirect:'error',signal:AbortSignal.timeout(10000)};
  const unsigned=await fetcher(CALLBACK,{...options,headers:{'Content-Type':'application/json'},body:'null'});
@@ -65,7 +76,7 @@ async function main(){
  const {PrismaClient}=require('@prisma/client'),{decryptToken}=require('./cj-catalog-audit.cjs'),db=new PrismaClient({log:[]});
  let stage='initial';const secrets=[];
  try{
-  const mode=process.argv[2];if(!['--prepare','--activate','--inspect'].includes(mode))throw Error('setup_mode_required');
+  const mode=process.argv[2];if(!['--prepare','--activate','--inspect','--reviewed-resume'].includes(mode))throw Error('setup_mode_required');
   const key=process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY||'',apiKey=process.env.CJ_API_KEY||'';
   secrets.push(key,apiKey);
   if(!/^[a-f0-9]{64}$/i.test(key)||!apiKey)throw Error('encryption_configuration_missing');
@@ -76,6 +87,7 @@ async function main(){
   secrets.push(openId);
   if(process.env.CJ_WEBHOOK_OPEN_ID&&process.env.CJ_WEBHOOK_OPEN_ID.trim()!==openId)throw Error('configured_account_mismatch');
   const storage=path.resolve(process.env.STORAGE_DIR||'/app/storage'),file=path.join(storage,'cj-webhook-auth.sealed');
+  if(mode==='--reviewed-resume'&&!fs.existsSync(file))throw Error('previous_private_key_required');
   if(mode==='--inspect'){
    const facts=inspectSettings(settings);stage='inspect_receiver';
    console.log(JSON.stringify({event:'CJ_WEBHOOK_SETTINGS_INSPECTED',...facts,activationPreviouslyAttempted:fs.existsSync(path.join(storage,'cj-webhook-activation-once')),privateKeyPresent:fs.existsSync(file),configurationWriteAttempted:false,realPaymentAttempted:false}));
@@ -96,8 +108,8 @@ async function main(){
   const config=registration(settings);
   const ready=['order','logistics'].every(name=>{const value=settings.callback[name];return value?.type==='ENABLE'&&(value.urls??value.callbackUrls)?.length===1&&(value.urls??value.callbackUrls)[0]===CALLBACK;});
   if(!ready){
-   fs.mkdirSync(path.join(storage,'cj-webhook-activation-once'));
-   fs.writeFileSync(path.join(storage,'cj-webhook-callbacks-before.sealed'),seal({accessToken:JSON.stringify(settings.callback),refreshToken:'cj-webhook-backup-v1'},'cj:webhook-backup',key),{mode:0o600,flag:'wx'});
+   const backup=claimActivation(settings,storage,mode==='--reviewed-resume');
+   fs.writeFileSync(path.join(storage,backup),seal({accessToken:JSON.stringify(settings.callback),refreshToken:'cj-webhook-backup-v1'},'cj:webhook-backup',key),{mode:0o600,flag:'wx'});
    stage='callback_write';if(await setupApi(token,'/webhook/set',config)!==true)throw Error('callback_write_unverified');
   }
   stage='callback_readback';const after=await setupApi(token,'/setting/get');
@@ -106,5 +118,5 @@ async function main(){
  }catch(e){let message=e.providerMessage??null;if(message)for(const secret of secrets.filter(Boolean))message=message.split(secret).join('[REDACTED]');console.log(JSON.stringify({event:'CJ_WEBHOOK_SETUP_STOPPED',stage,reason:e.code==='EEXIST'?'previous_setup_attempt_review_required':/^[a-z_]+$/.test(e.message)?e.message:'setup_failed',endpoint:e.endpoint??null,httpStatus:e.httpStatus??null,requestId:e.requestId??null,providerMessage:message,providerCode:e.providerCode??null,realPaymentAttempted:false}));process.exitCode=1;}
  finally{await db.$disconnect();}
 }
-module.exports={seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings};
+module.exports={seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings,claimActivation};
 if(require.main===module)main().catch(()=>{console.log('SETUP_START_FAILED');process.exitCode=1;});

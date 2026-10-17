@@ -1,11 +1,23 @@
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {join} from 'node:path';
 import {describe,it,expect,vi,afterEach} from 'vitest';
 import {readCjWebhookOpenId} from '@/lib/cj/webhook-key';
-const {seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-webhook-setup.cjs');
+const {seal,keyContext,registration,setupApi,verifyReceiver,verifyRegistration,inspectSettings,claimActivation}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-webhook-setup.cjs');
 afterEach(()=>{vi.unstubAllEnvs();vi.useRealTimers();});
 describe('CJ webhook provisioning safety',()=>{
+ it('permits one reviewed resume only for the observed unregistered state without removing old claims',()=>{
+  const settings={callback:{product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]}}};let claimed=false;
+  const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),mkdirSync:vi.fn(()=>{if(claimed)throw Object.assign(Error('exists'),{code:'EEXIST'});claimed=true;})};
+  expect(claimActivation(settings,'/storage',true,io)).toBe('cj-webhook-resume-before.sealed');expect(io.mkdirSync).toHaveBeenCalledExactlyOnceWith(join('/storage','cj-webhook-activation-reviewed-resume-once'));expect(()=>claimActivation(settings,'/storage',true,io)).toThrow();
+ });
+ it('refuses a reviewed resume when source state changed or the previous claim is missing',()=>{
+  const base={product:{type:'CANCEL',urls:[]},stock:{type:'CANCEL',urls:[]},order:{type:'CANCEL',urls:[]}};
+  const io={lstatSync:()=>({isDirectory:()=>true,isSymbolicLink:()=>false}),mkdirSync:vi.fn()};
+  for(const callback of [{...base,logistics:{type:'CANCEL',urls:[]}},{...base,order:{type:'ENABLE',urls:['https://other.example']}},{...base,stock:{type:'ENABLE',urls:['https://other.example']}}])expect(()=>claimActivation({callback},'/storage',true,io)).toThrow('reviewed_resume_state_changed');
+  expect(()=>claimActivation({callback:base},'/storage',true,{...io,lstatSync:()=>{throw Error('missing');}})).toThrow();expect(io.mkdirSync).not.toHaveBeenCalled();
+ });
  it('runs inspect without file writes, callback registration, financial calls or event payloads',async()=>{
   const realRequire=createRequire(import.meta.url),logs:string[]=[],requests:{url:string;options:Record<string,unknown>}[]=[];
   const fileWrite=vi.fn(()=>{throw Error('write_forbidden');}),disconnect=vi.fn();

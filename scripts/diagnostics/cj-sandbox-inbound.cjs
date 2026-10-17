@@ -8,14 +8,14 @@ const log=x=>console.log(JSON.stringify(x,(_,v)=>typeof v==='bigint'?String(v):v
 (async()=>{
  const db=new PrismaClient({log:[]});let identified=null,verified=false,prepared=null;
  try{
-  const mode=process.argv[2];if(mode!==undefined&&mode!=='--confirm-created')throw Error('sandbox_mode_invalid');
-  const confirmCreated=mode==='--confirm-created';
+  const mode=process.argv[2];if(mode!==undefined&&!['--confirm-created','--continue-unpaid'].includes(mode))throw Error('sandbox_mode_invalid');
+  const confirmCreated=mode==='--confirm-created',continueUnpaid=mode==='--continue-unpaid';
   const [auth]=await db.$queryRawUnsafe('SELECT sealed_tokens,access_expires_at FROM cj_auth WHERE id=1 LIMIT 1');
   const token=decryptToken(auth,process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY);
   const linked=await db.$queryRawUnsafe('SELECT id FROM commerce_cj_fulfillment_outbox WHERE supplier_reference=? LIMIT 1',ref);
   const legacy=await db.$queryRawUnsafe('SELECT id FROM cj_orders WHERE internal_ref=? LIMIT 1',ref);
   if(linked.length||legacy.length)throw Error('sandbox_linked_to_business_order_stop');
-  if(confirmCreated){
+  if(confirmCreated||continueUnpaid){
    const {setupApi,verifyRegistration,verifyReceiver}=require(dir+'/cj-webhook-setup.cjs');
    const settings=await setupApi(token,'/setting/get');
    const wanted={type:'ENABLE',callbackUrls:['https://trbhh.sa/api/integrations/cj/webhooks']};
@@ -27,6 +27,12 @@ const log=x=>console.log(JSON.stringify(x,(_,v)=>typeof v==='bigint'?String(v):v
   const [start]=await db.$queryRawUnsafe('SELECT COALESCE(MAX(id),0) AS id FROM cj_webhook_events');
   log({event:'TRBHH_WATCH_STARTED',businessOrderLinked:false,webhookKeyFilePresent:fs.existsSync(require('node:path').resolve(process.env.STORAGE_DIR||'/app/storage','cj-webhook-auth.sealed'))});
   try{
+   if(continueUnpaid){
+    const previous=fs.lstatSync('/app/storage/cj-sandbox-confirm-created-once-34b1f44e');
+    if(!previous.isDirectory()||previous.isSymbolicLink())throw Error('sandbox_previous_claim_invalid');
+    // Exact identities returned by CJ in the preceding externally observed run.
+    prepared={orderId:'261071053280661800',cjOrderCode:'SD261071053270664700'};
+   }
    if(confirmCreated){
     const {prepareSandboxPayment,confirmationTransport}=require(dir+'/cj-sandbox-confirm.cjs');
     prepared=await prepareSandboxPayment({api:confirmationTransport(token),claimOnce:()=>{
@@ -35,7 +41,7 @@ const log=x=>console.log(JSON.stringify(x,(_,v)=>typeof v==='bigint'?String(v):v
      fs.mkdirSync('/app/storage/cj-sandbox-confirm-created-once-34b1f44e');
     },report:log});
    }
-   const result=await sandboxFinancialProbe({api:financialTransport(token),claimOnce:()=>fs.mkdirSync(confirmCreated?'/app/storage/cj-sandbox-confirmed-financial-once-34b1f44e':'/app/storage/cj-sandbox-sd-financial-once-34b1f44e'),report:r=>{if(r.event==='CJ_SANDBOX_IDENTIFIED'){if(confirmCreated&&(!prepared||r.orderId!==prepared.orderId||r.cjOrderCode!==prepared.cjOrderCode))throw Error('sandbox_confirmation_identity_changed');identified=r;}log(r);}});
+   const result=await sandboxFinancialProbe({api:financialTransport(token),claimOnce:()=>fs.mkdirSync(confirmCreated||continueUnpaid?'/app/storage/cj-sandbox-confirmed-financial-once-34b1f44e':'/app/storage/cj-sandbox-sd-financial-once-34b1f44e'),report:r=>{if(r.event==='CJ_SANDBOX_IDENTIFIED'){if((confirmCreated||continueUnpaid)&&(!prepared||r.orderId!==prepared.orderId||r.cjOrderCode!==prepared.cjOrderCode))throw Error('sandbox_confirmation_identity_changed');if(continueUnpaid&&r.status!=='UNPAID')throw Error('sandbox_unpaid_state_required');identified=r;}log(r);}});
    log(result);verified=true;
   }catch(e){log({event:'CJ_SIMULATION_STOPPED',reason:e.code==='EEXIST'?'already_attempted_no_retry':/^sandbox_[a-z_]+$/.test(e.message)?e.message:'local_or_network_failure',endpoint:e.endpoint??null,code:e.providerCode??null,message:e.providerMessage??null,requestId:e.requestId??null,automaticRetry:false});}
   const orderId=identified?.orderId||ref,code=identified?.cjOrderCode||ref;

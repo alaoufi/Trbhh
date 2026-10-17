@@ -44,5 +44,6 @@ async function main(){const {PrismaClient}=require('@prisma/client'),{decryptTok
  const [auth]=await db.$queryRawUnsafe('SELECT sealed_tokens,access_expires_at FROM cj_auth WHERE id=1 LIMIT 1');const token=decryptToken(auth,process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY);
  stage='external_sandbox';console.log(JSON.stringify({event:'CJ_SANDBOX_BEGIN',reference,productId,vid,readOnly:process.argv[4]==='--read-only',isSandbox:1,payType:3,automaticRetry:false}));console.log(JSON.stringify(await (process.argv[4]==='--read-only'?readOnlyProbe:probe)({productId,pid:rows[0].cj_product_id,vid,reference,api:guardedApi(token)})));
  }catch(e){console.log(JSON.stringify({event:'CJ_SANDBOX_NOT_VERIFIED',reference,stage,reason:/^sandbox_[A-Za-z0-9_]+$/.test(e.message)?e.message:'sandbox_stopped',endpoint:e.endpoint??null,providerMessage:e.providerMessage??null,providerCode:e.providerCode??null,requestId:e.requestId??null,automaticRetry:false,realPaymentAttempted:false}));process.exitCode=1;}finally{await db.$disconnect();}}
-module.exports={sandboxPayload,probe,guardedApi,readOnlyProbe,safeProviderMessage};
+function isOrderAbsent(e){return e?.endpoint==='/shopping/order/getOrderDetail'&&e.httpStatus===400&&[1603000,1603100].includes(e.providerCode)&&/^order not found$/i.test(e.providerMessage?.trim()||'');}
+module.exports={sandboxPayload,probe,guardedApi,readOnlyProbe,safeProviderMessage,isOrderAbsent};
 if(require.main===module)main();

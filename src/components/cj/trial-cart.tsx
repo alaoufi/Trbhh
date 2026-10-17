@@ -42,7 +42,7 @@ export function TrialCart({accountId,ship,checkoutMessage,setupHref}:{accountId:
         const result=await response.json() as TrialCartQuote;
         if(controller.signal.aborted||generation.current!==current)return;
         setQuoteKey(JSON.stringify(items));setQuote(result);
-        setFeedback(result.rejected.length?'تم تحديث بيانات المنتج من المورد أو تعذّر التحقق؛ قد يتغيّر السعر أو المخزون أو الشحن. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'');
+        setFeedback(result.rejected.length?'تم التحديث من المورد أو تعذّر التحقق؛ قد يتغيّر السعر أو المخزون أو الشحن. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'');
       }catch(cause){if(!controller.signal.aborted&&generation.current===current)setError(cause instanceof Error&&cause.message==='permission'?'انتهت الجلسة أو لم تعد صلاحية عرض المنتجات متاحة. أعد تسجيل الدخول.':'تعذر تحديث السلة. لا يوجد إجمالي معتمد؛ أعد المحاولة.');}
       finally{window.clearTimeout(timeout);if(!controller.signal.aborted&&generation.current===current)setBusy(false);}
     })();return()=>{window.clearTimeout(timeout);controller.abort();};
@@ -75,7 +75,7 @@ export function TrialCart({accountId,ship,checkoutMessage,setupHref}:{accountId:
       const ship=data.shippingOptions.find(o=>o.name===prev.shippingName&&o.originCountry===prev.originCountry);
       if(!ship){setFeedback('مسار الشحن المعتمد غير متاح لهذه الكمية من المورد. أزل الخيار وأعد إضافته من صفحة المنتج بالكمية المطلوبة.');setResetSignal(n=>n+1);return;}
       const snapshot={...prev,verifiedQuantity:newQty,unitMinor:data.salePriceMinor,stockQuantity:data.stockQuantity??prev.stockQuantity,sku:data.sku||prev.sku,shippingName:ship.name,shippingMinor:ship.priceMinor,shippingAdditionalMinor:ship.additionalMinor,vatEnabled:ship.vatEnabled,vatMinor:ship.vatMinor,totalMinor:ship.totalMinor,deliveryDays:ship.deliveryDays,originCountry:ship.originCountry,checkedAt:data.checkedAt||prev.checkedAt};
-      setFeedback('تم تحديث بيانات المنتج من المورد للكمية المطلوبة.');
+      setFeedback('تم التحديث من المورد للكمية المطلوبة.');
       save(validateTrialCart(items.map(row=>row.id===item.id&&row.variantId===item.variantId?{id:item.id,qty:newQty,variantId:item.variantId,snapshot}:row)),'');
     }catch{setFeedback('تعذّر تحديث الكمية الآن — حاول مجدداً.');setResetSignal(n=>n+1);}
     finally{window.clearTimeout(timeout);if(quantityRequest.current===controller){quantityRequest.current=null;setBusy(false);}}

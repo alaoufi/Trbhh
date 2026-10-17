@@ -1,0 +1,11 @@
+import {describe,it,expect,vi} from 'vitest';
+import {createRequire} from 'node:module';
+const {sandboxPayload,probe,guardedApi}=createRequire(import.meta.url)('../../scripts/diagnostics/cj-sandbox-probe.cjs');
+const reference='trbhh-sbx-12345678-1234-1234-1234-123456789abc';
+const input={reference,productId:'281',pid:'pid',vid:'vid'};
+describe('CJ isolated sandbox response probe',()=>{
+ it('hard-codes simulated mode and unpaid-only type without accepting overrides',()=>{const p=sandboxPayload({...input,logisticName:'route',isSandbox:0,payType:2});expect(p.isSandbox).toBe(1);expect(p.payType).toBe(3);expect(p.products[0]).toMatchObject({vid:'vid',quantity:1,storeProductId:'281'});});
+ it('creates once and independently reads back the sandbox identity and exact variant',async()=>{const api=vi.fn().mockResolvedValueOnce({pid:'pid',variants:[{vid:'vid'}]}).mockResolvedValueOnce([{logisticName:'route',logisticPrice:1}]).mockResolvedValueOnce({orderId:'sandbox-order',orderNumber:reference}).mockResolvedValueOnce({orderId:'sandbox-order',orderNum:reference,isSandbox:1,orderStatus:'CREATED',productList:[{vid:'vid',quantity:1}]});expect(await probe({...input,api})).toMatchObject({event:'CJ_SANDBOX_VERIFIED',isSandbox:1,variantAndQuantityMatched:true,realPaymentAttempted:false});expect(api).toHaveBeenCalledTimes(4);});
+ it('never treats a normal order or mismatched variant as a successful sandbox',async()=>{const api=vi.fn().mockResolvedValueOnce({pid:'pid',variants:[{vid:'vid'}]}).mockResolvedValueOnce([{logisticName:'route',logisticPrice:1}]).mockResolvedValueOnce({orderId:'order',orderNumber:reference}).mockResolvedValueOnce({orderId:'order',orderNum:reference,isSandbox:0});await expect(probe({...input,api})).rejects.toThrow('sandbox_readback_unverified');expect(api).toHaveBeenCalledTimes(4);});
+ it('blocks real-payment paths and real order mode before network access',async()=>{const fetcher=vi.fn();const api=guardedApi('test-token',fetcher);await expect(api('/shopping/pay/payBalanceV2','POST',{})).rejects.toThrow('sandbox_endpoint_blocked');await expect(api('/shopping/order/createOrderV3','POST',{isSandbox:0,payType:3,products:[{}]})).rejects.toThrow('sandbox_create_blocked');expect(fetcher).not.toHaveBeenCalled();});
+});

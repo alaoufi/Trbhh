@@ -73,7 +73,7 @@ function LiveNumbersValue({pid,productId}:{pid:string;productId?:number}){
           <div><span className="text-emerald-800">الشحن: </span><b dir="ltr">{available.shipMinor === 0 ? 'مجاني' : sar(available.shipMinor)}</b></div>
           <div><span className="text-emerald-800">مدة الشحن: </span><b dir="ltr">{available.deliveryDays ? (/[A-Za-z؀-ۿ]/.test(available.deliveryDays) ? available.deliveryDays : `${available.deliveryDays} يوم`) : '—'}</b></div>
           <div className="col-span-2 border-t border-emerald-200 pt-1"><span className="text-emerald-800">السعر والشحن: </span><b className="text-emerald-900" dir="ltr">{sar(price + available.shipMinor)}</b></div>
-          <div className="col-span-2 flex justify-between gap-2 text-[10px]"><span>لكمية 1 · تم تحديث بيانات المنتج من المورد: {new Date(available.checkedAt).toLocaleString('ar-SA')}</span><button type="button" disabled={loading} onClick={()=>fetchLive(true)}>{loading?'جارٍ التحديث…':'تحديث'}</button></div>
+          <div className="col-span-2 flex justify-between gap-2 text-[10px]"><span>لكمية 1 · تم التحديث من المورد: {new Date(available.checkedAt).toLocaleString('ar-SA')}</span><button type="button" disabled={loading} onClick={()=>fetchLive(true)}>{loading?'جارٍ التحديث…':'تحديث'}</button></div>
           <div className="col-span-2 text-[10px]">إلى الرمز البريدي {available.destinationZip}</div>
         </div>
       ) : loading || !data ? (

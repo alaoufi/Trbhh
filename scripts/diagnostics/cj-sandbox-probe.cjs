@@ -4,7 +4,7 @@ const {randomUUID}=require('node:crypto');
 const ORIGIN='https://developers.cjdropshipping.com/api2.0/v1';
 function sandboxPayload({reference,productId,vid,logisticName}){
  if(!/^trbhh-sbx-[a-f0-9-]{36}$/.test(reference)||!/^[1-9]\d{0,19}$/.test(productId)||!/^[A-Za-z0-9_-]{1,64}$/.test(vid)||typeof logisticName!=='string'||!logisticName||logisticName.length>50)throw Error('sandbox_input_invalid');
- return {isSandbox:1,payType:3,orderFlow:1,shopLogisticsType:2,orderNumber:reference,shippingCountry:'Saudi Arabia',shippingCountryCode:'SA',shippingProvince:'Riyadh',shippingCity:'Al Majmaah',shippingCustomerName:'TRBHH SANDBOX TEST',shippingAddress:'Sandbox integration test only - no real delivery',shippingZip:'15365',fromCountryCode:'CN',logisticName,products:[{vid,quantity:1,storeProductId:productId,storeLineItemId:reference+'-'+productId}]};
+ return {isSandbox:1,payType:3,orderFlow:1,shopLogisticsType:2,orderNumber:reference,shippingCountry:'Saudi Arabia',shippingCountryCode:'SA',shippingProvince:'Riyadh',shippingCity:'Al Majmaah',shippingPhone:'000000000',shippingCustomerName:'TRBHH SANDBOX TEST',shippingAddress:'Sandbox integration test only - no real delivery',shippingZip:'15365',fromCountryCode:'CN',logisticName,products:[{vid,quantity:1,storeProductId:productId,storeLineItemId:reference+'-'+productId}]};
 }
 async function probe({productId,pid,vid,api,reference='trbhh-sbx-'+randomUUID()}){
  if(!/^[1-9]\d{0,19}$/.test(productId)||!/^[A-Za-z0-9_-]{1,64}$/.test(pid)||!/^[A-Za-z0-9_-]{1,64}$/.test(vid))throw Error('sandbox_input_invalid');

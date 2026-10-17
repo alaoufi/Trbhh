@@ -1,3 +1,5 @@
+import {automaticCjUnitPrice} from '@/lib/cj/automatic-pricing';
+import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
 import 'server-only';
 import {createHash, randomUUID} from 'node:crypto';
 import type {Prisma} from '@prisma/client';
@@ -136,7 +138,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
       let cjVariantFound=false;
       if(liveLine){rawVariant={vid:liveLine.vid,sku:liveLine.sku,quantity:item.quantity,available:true,publicPriceMinor:liveLine.customerUnitSarMinor};cjVariantFound=true;}
       if(selectedVariantKey&&!rawVariant){
-        const [cjSource]=await tx.$queryRaw<{details_json:unknown;availability_json:unknown;availability_checked_at:Date|null}[]>`SELECT details_json,availability_json,availability_checked_at FROM cj_products WHERE commerce_product_id=${item.productId} AND hidden=0 AND status='ready' ORDER BY availability_checked_at DESC,id LIMIT 1 FOR SHARE`;
+        const [cjSource]=await tx.$queryRaw<{details_json:unknown;availability_json:unknown;availability_checked_at:Date|null;other_costs_minor?:number}[]>`SELECT details_json,availability_json,availability_checked_at,other_costs_minor FROM cj_products cj WHERE cj.commerce_product_id=${item.productId} AND cj.hidden=0 AND cj.status='ready' AND (cj.sale_price_override_minor>0 OR cj.sale_price_minor>0) AND cj.last_sync_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND cj.last_sync_at<=UTC_TIMESTAMP(3) AND cj.availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND cj.availability_checked_at<=UTC_TIMESTAMP(3) AND JSON_VALID(cj.availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(cj.availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_TYPE(JSON_EXTRACT(cj.availability_json,'$.shippingOptions'))='ARRAY' AND JSON_LENGTH(JSON_EXTRACT(cj.availability_json,'$.shippingOptions'))>0 ORDER BY cj.availability_checked_at DESC,cj.id LIMIT 1 FOR SHARE`;
         const decode=(value:unknown)=>{if(typeof value!=='string')return value;try{return JSON.parse(value) as unknown;}catch{return null;}};
         const detail=decode(cjSource?.details_json),availability=decode(cjSource?.availability_json),detailVariants=detail&&typeof detail==='object'&&Array.isArray((detail as Record<string,unknown>).variants)?(detail as Record<string,unknown>).variants as unknown[]:[];
         const data=availability&&typeof availability==='object'?availability as Record<string,unknown>:null;
@@ -145,7 +147,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
         const raw=detailVariants.find(value=>value&&typeof value==='object'&&String((value as Record<string,unknown>).vid||'')===selectedVariantKey);
         const stockRows=Array.isArray(data?.variants)?data!.variants as Record<string,unknown>[]:[];
         const stock=Number(stockRows.find(value=>String(value.vid||'')===selectedVariantKey)?.stockQuantity||0);
-        if(isFresh&&raw&&Number.isSafeInteger(stock)&&stock>=item.quantity){rawVariant={...(raw as Record<string,unknown>),quantity:stock,available:true,publicPriceMinor:product.price_minor};cjVariantFound=true;}
+        if(isFresh&&raw&&Number.isSafeInteger(stock)&&stock>=item.quantity){rawVariant={...(raw as Record<string,unknown>),quantity:stock,available:true,publicPriceMinor:automaticCjUnitPrice(Number((raw as Record<string,unknown>).priceUsd),await readVerifiedCjPricing(),cjSource?.other_costs_minor??0)};cjVariantFound=true;}
         else if(raw)throw new Error('product_variant_unavailable');
       }
       const needsVariant=sourceVariants.length>0||cjVariantFound||Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0;

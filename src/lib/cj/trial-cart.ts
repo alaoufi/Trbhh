@@ -6,7 +6,7 @@ export const MAX_TRIAL_QTY=99;
 export type TrialCartSnapshot={sourceOptions?:CjSourceOptions;pid:string;vid:string;sku:string;productName:string;rawVariantName:string;optionKey:string;displayLabel:string;attributes:Record<string,string|number|boolean>;verifiedQuantity:number;unitMinor:number;stockQuantity:number;shippingName:string;shippingMinor:number;shippingAdditionalMinor:number;vatEnabled:boolean;vatMinor:number;totalMinor:number;deliveryDays:string|null;originCountry:string;checkedAt:string};
 export type TrialCartItem={id:number;qty:number;variantId?:string;snapshot?:TrialCartSnapshot};
 export type TrialCartLine=TrialCartItem&{title:string;variantName:string|null;variantSku:string|null;variantStock:number|null;image:string|null;unitMinor:number;shippingMinor:number;shippingAdditionalMinor:number;vatMinor:number;vatEnabled:boolean;shippingName:string|null;deliveryDays:string|null;currency:'SAR';totalMinor:number};
-export type TrialCartQuote={currency:'SAR';lines:TrialCartLine[];totalMinor:number;rejected:{id:number;variantId?:string;reason:'unavailable'|'invalid_price'|'variant_required'|'variant_unavailable'|'verification_required'|'price_changed'|'stock_changed'|'shipping_changed'|'tax_changed'}[]};
+export type TrialCartQuote={updates?:TrialCartLine[];currency:'SAR';lines:TrialCartLine[];totalMinor:number;rejected:{id:number;variantId?:string;reason:'unavailable'|'invalid_price'|'variant_required'|'variant_unavailable'|'verification_required'|'price_changed'|'stock_changed'|'shipping_changed'|'tax_changed'}[]};
 
 export function validateTrialCart(value:unknown):TrialCartItem[]{
   if(!Array.isArray(value)||value.length>MAX_TRIAL_LINES)throw Error('invalid_cart');

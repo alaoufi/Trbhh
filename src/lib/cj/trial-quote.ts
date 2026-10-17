@@ -36,15 +36,22 @@ export async function quoteCjTrialCart(value:unknown,deps:TrialQuoteDeps={}):Pro
     if(live.status!=='available'){result.rejected.push({id:item.id,variantId:item.variantId,reason:live.status==='quantity_exceeds_stock'||live.status==='out_of_stock'?'stock_changed':'variant_unavailable'});continue;}
     const sourceOptions=storedCjSourceOptions(saved);
     if((live.optionKey??'').trim()!==sourceOptions?.key||(live.variantName??'').trim()!==sourceOptions?.name||!sameCjSourceOptions(sourceOptions,live.sourceOptions)||!sameCjSourceOptions(sourceOptions,item.snapshot.sourceOptions)||item.snapshot.pid!==row.cj_product_id||item.snapshot.sku!==saved.sku||item.snapshot.optionKey!==saved.optionKey||item.snapshot.rawVariantName!==saved.name){result.rejected.push({id:item.id,variantId:item.variantId,reason:'variant_unavailable'});continue;}
-    if(live.salePriceMinor!==item.snapshot.unitMinor){result.rejected.push({id:item.id,variantId:item.variantId,reason:'price_changed'});continue;}
     if(live.stockQuantity!==item.snapshot.stockQuantity){result.rejected.push({id:item.id,variantId:item.variantId,reason:'stock_changed'});continue;}
     const shipping=live.shippingOptions.find(option=>option.name===item.snapshot!.shippingName&&option.originCountry===item.snapshot!.originCountry);
     if(!shipping||shipping.priceMinor!==item.snapshot.shippingMinor||shipping.additionalMinor!==item.snapshot.shippingAdditionalMinor||shipping.deliveryDays!==item.snapshot.deliveryDays){result.rejected.push({id:item.id,variantId:item.variantId,reason:'shipping_changed'});continue;}
     const tax=await (deps.quoteTax??quoteCjVat)(live.salePriceMinor,item.qty,shipping.priceMinor+shipping.additionalMinor);
-    if(tax.enabled!==item.snapshot.vatEnabled||tax.vatMinor!==item.snapshot.vatMinor||tax.totalMinor!==item.snapshot.totalMinor){result.rejected.push({id:item.id,variantId:item.variantId,reason:'tax_changed'});continue;}
     let totalMinor:number;
     try{checkedMoney(live.salePriceMinor);totalMinor=checkedMoney(tax.totalMinor);checkedMoney(tax.vatMinor);}catch{result.rejected.push({id:item.id,variantId:item.variantId,reason:'invalid_price'});continue;}
-    result.lines.push({...item,title:(item.snapshot.productName||row.name_ar||'بيانات المنتج قيد المراجعة').slice(0,400),variantName:saved.optionKey||saved.name||null,variantSku:saved.sku||null,variantStock:live.stockQuantity,image:safeImage(cjProductImages(row)[0]),unitMinor:live.salePriceMinor,shippingMinor:shipping.priceMinor,shippingAdditionalMinor:shipping.additionalMinor,vatMinor:tax.vatMinor,vatEnabled:tax.enabled,shippingName:shipping.name,deliveryDays:shipping.deliveryDays,currency:'SAR',totalMinor});
+    const freshLine={...item,title:(item.snapshot.productName||row.name_ar||'بيانات المنتج قيد المراجعة').slice(0,400),variantName:saved.optionKey||saved.name||null,variantSku:saved.sku||null,variantStock:live.stockQuantity,image:safeImage(cjProductImages(row)[0]),unitMinor:live.salePriceMinor,shippingMinor:shipping.priceMinor,shippingAdditionalMinor:shipping.additionalMinor,vatMinor:tax.vatMinor,vatEnabled:tax.enabled,shippingName:shipping.name,deliveryDays:shipping.deliveryDays,currency:'SAR' as const,totalMinor};
+    const priceChanged=live.salePriceMinor!==item.snapshot.unitMinor;
+    const taxChanged=tax.enabled!==item.snapshot.vatEnabled||tax.vatMinor!==item.snapshot.vatMinor||tax.totalMinor!==item.snapshot.totalMinor;
+    if(priceChanged||taxChanged){
+      const replacement={...freshLine,snapshot:{...item.snapshot,unitMinor:live.salePriceMinor,vatEnabled:tax.enabled,vatMinor:tax.vatMinor,totalMinor,checkedAt:live.checkedAt}};
+      validateTrialCart([{id:replacement.id,qty:replacement.qty,variantId:replacement.variantId,snapshot:replacement.snapshot}]);
+      (result.updates??=[]).push(replacement);
+      result.rejected.push({id:item.id,variantId:item.variantId,reason:priceChanged?'price_changed':'tax_changed'});continue;
+    }
+    result.lines.push(freshLine);
   }
   try{result.totalMinor=trialCartTotal(result.lines);}catch{throw Error('invalid_total');}
   return result;

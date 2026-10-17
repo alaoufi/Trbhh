@@ -1,3 +1,4 @@
+import {automaticCjPricing} from './automatic-pricing';
 import 'server-only';
 import {storedCjSourceOptions,sameCjSourceOptions} from './source-option-identity';
 import {createHash} from 'node:crypto';
@@ -21,8 +22,8 @@ export async function buildLiveCjQuote(input:{memberId:bigint;requestKey:string;
  const selected=row&&parseCjDetails(row)?.variants.find(v=>v.vid===item.variantId);
  if(!row||!selected||row.hidden!==0)throw new Error('cj_live_product_unavailable');
  const pricing=await (deps.pricing??readVerifiedCjPricing)();
- if(pricing.marginBps!==3000||row.margin_bps!==3000||row.sale_price_override_minor!=null)throw new Error('cj_live_margin_unapproved');
- const live=await (deps.verify??verifyCjVariantForSaudi)(row.cj_product_id,{vid:selected.vid,variantSku:selected.sku,variantName:selected.name,variantKey:selected.optionKey,variantSellPrice:selected.priceUsd,variantImage:null,variantWeight:selected.weight,attributes:selected.attributes,optionSchema:selected.optionSchema},item.qty,{},pricing.usdToSarX100,{otherCostsMinor:row.other_costs_minor,marginBps:3000},destination.postalCode);
+ if(pricing.marginBps!==3000)throw new Error('cj_live_margin_unapproved');
+ const live=await (deps.verify??verifyCjVariantForSaudi)(row.cj_product_id,{vid:selected.vid,variantSku:selected.sku,variantName:selected.name,variantKey:selected.optionKey,variantSellPrice:selected.priceUsd,variantImage:null,variantWeight:selected.weight,attributes:selected.attributes,optionSchema:selected.optionSchema},item.qty,{},pricing.usdToSarX100,automaticCjPricing(pricing,row),destination.postalCode);
  if(live.status!=='available')throw new Error('cj_live_variant_unavailable');
  const sourceOptions=storedCjSourceOptions(selected);
  if((live.optionKey??'').trim()!==sourceOptions?.key||(live.variantName??'').trim()!==sourceOptions?.name||!sameCjSourceOptions(sourceOptions,live.sourceOptions)||!sameCjSourceOptions(sourceOptions,item.snapshot.sourceOptions)||item.snapshot.pid!==row.cj_product_id||item.snapshot.sku!==selected.sku||item.snapshot.optionKey!==selected.optionKey||item.snapshot.rawVariantName!==selected.name)throw new Error('cj_live_variant_changed');

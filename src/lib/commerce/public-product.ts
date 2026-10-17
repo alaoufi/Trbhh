@@ -1,3 +1,5 @@
+import {automaticCjUnitPrice} from '@/lib/cj/automatic-pricing';
+import {readVerifiedCjPricing} from '@/lib/cj/verified-pricing';
 import 'server-only';
 import {Prisma} from '@prisma/client';
 import publicProductSelect from '../../../scripts/local-ai/public-product-select.cjs';
@@ -8,7 +10,7 @@ import {parseCjAvailability} from '@/lib/cj/mapping';
 
 export type PublicVariant={key:string;vid:string|null;sku:string|null;name:string;options:string[];attributes:Record<string,string>;image:string|null;priceMinor:number;stock:number;originalPriceMinor:number|null;shippingMinor:number|null;deliveryEstimate:string|null};
 export type PublicCommerceProduct={id:string;title:string;priceMinor:number;stock:number;images:string[];description:string;brand:string|null;options:string[];variants:PublicVariant[];requiresVariantSelection:boolean;featured:boolean;saudiShippingAvailable:boolean;deliveryEstimate:string|null;weightLabel:string|null;bundledShipping:boolean};
-type Row={id:bigint;title:string;price_minor:number;stock_available:number;stock_reserved:number;images:unknown;description:string;brand:string;options:unknown;variants:unknown;available:number;quantity:number|null;featured:number;seller_type:string;source_id:bigint|null;cj_source_id:bigint|null;cj_availability_json:string|null;cj_details_json:string|null};
+type Row={id:bigint;title:string;price_minor:number;stock_available:number;stock_reserved:number;images:unknown;description:string;brand:string;options:unknown;variants:unknown;available:number;quantity:number|null;featured:number;seller_type:string;source_id:bigint|null;cj_source_id:bigint|null;cj_other_costs_minor?:number;cj_availability_json:string|null;cj_details_json:string|null};
 function json(value:unknown):unknown{if(typeof value!=='string')return value;try{return JSON.parse(value);}catch{return null;}}
 function safeImages(value:unknown):string[]{
  const parsed=json(value);if(!Array.isArray(parsed))return[];
@@ -53,7 +55,8 @@ function variants(value:unknown,fallbackPrice:number):PublicVariant[]{
   return[{key:id,vid:plain(v.vid??v.vidId,191)||null,sku:plain(v.sku??v.variantSku,191)||null,name,options:optionValues,attributes:optionMap,image:image(v.image??optionMap.variantImage??optionMap.bigImg),priceMinor:price,stock,originalPriceMinor:Number.isSafeInteger(original)&&original>price?original:null,shippingMinor:Number.isSafeInteger(shipping)&&shipping>=0?shipping:null,deliveryEstimate:deliveryLabel(typeof v.deliveryEstimate==='string'?v.deliveryEstimate:null)}];
  });
 }
-function importedCjVariants(value:unknown,availability:unknown,fallbackPrice:number,parentStock:number):PublicVariant[]{
+function importedCjVariants(value:unknown,availability:unknown,fallbackPrice:number,parentStock:number,otherCostsMinor:number,pricing:Awaited<ReturnType<typeof readVerifiedCjPricing>>|null):PublicVariant[]{
+ if(!pricing)return [];
  const data=json(value);if(!data||typeof data!=='object')return[];const rows=(data as Record<string,unknown>).variants;if(!Array.isArray(rows))return[];
  const proof=parseCjAvailability({availability_json:typeof availability==='string'?availability:availability?JSON.stringify(availability):null});if(!proof)return[];
  if(!rows.length||proof.variants.length!==rows.length)return[];
@@ -61,7 +64,7 @@ function importedCjVariants(value:unknown,availability:unknown,fallbackPrice:num
  if(stockByVid.size!==rows.length)return[];
  const detailVids=rows.flatMap(raw=>raw&&typeof raw==='object'&&typeof(raw as Record<string,unknown>).vid==='string'?[(raw as Record<string,unknown>).vid as string]:[]);
  if(detailVids.length!==rows.length||new Set(detailVids).size!==rows.length)return[];
- const candidates=rows.flatMap(raw=>{if(!raw||typeof raw!=='object')return[];const v=raw as Record<string,unknown>,vid=plain(v.vid,64),quantity=stockByVid.get(vid)||0,sourcePrice=Number(v.priceUsd);if(!/^[A-Za-z0-9_-]{1,64}$/.test(vid)||!Number.isFinite(sourcePrice)||sourcePrice<=0||quantity<1)return[];const attrs={...attributes(v.attributes),...parseOptionMap(v.optionKey)},candidate={externalId:vid,vid,sku:v.sku,name:v.name,quantity:Math.min(quantity,parentStock),available:true,publicPriceMinor:fallbackPrice,options:attrs,image:typeof v.attributes==='object'&&v.attributes?((v.attributes as Record<string,unknown>).variantImage??(v.attributes as Record<string,unknown>).bigImg):null};return[candidate];});
+ const candidates=rows.flatMap(raw=>{if(!raw||typeof raw!=='object')return[];const v=raw as Record<string,unknown>,vid=plain(v.vid,64),quantity=stockByVid.get(vid)||0,sourcePrice=Number(v.priceUsd);if(!/^[A-Za-z0-9_-]{1,64}$/.test(vid)||!Number.isFinite(sourcePrice)||sourcePrice<=0||quantity<1)return[];const attrs={...attributes(v.attributes),...parseOptionMap(v.optionKey)},candidate={externalId:vid,vid,sku:v.sku,name:v.name,quantity:Math.min(quantity,parentStock),available:true,publicPriceMinor:automaticCjUnitPrice(sourcePrice,pricing,otherCostsMinor),options:attrs,image:typeof v.attributes==='object'&&v.attributes?((v.attributes as Record<string,unknown>).variantImage??(v.attributes as Record<string,unknown>).bigImg):null};return[candidate];});
  if(candidates.length!==rows.length)return[];
  return variants(candidates,fallbackPrice);
 }
@@ -76,11 +79,11 @@ function deliveryLabel(value:string|null|undefined):string|null{
  const first=Number(match[1]),last=match[2]?Number(match[2]):null;if(first<1||first>120||last!==null&&(last<first||last>180))return null;
  return last===null?`${first} يوم`:`من ${first} إلى ${last} يوم`;
 }
-function product(row:Row):PublicCommerceProduct|null{
+function product(row:Row,pricing:Awaited<ReturnType<typeof readVerifiedCjPricing>>|null=null):PublicCommerceProduct|null{
  // سلعة العضو الموثوق (بضاعته هو): لا مورّد ولا CJ — المخزون من commerce_products مباشرة،
  // والشحن مشمول في السعر الإجمالي (يرى العميل الإجمالي فقط، بلا سطر شحن منفصل).
  const ownGoods=row.seller_type==='verified_member';
- const parentStock=Math.max(0,row.stock_available-row.stock_reserved),supplierVariants=variants(row.variants,row.price_minor).map(variant=>({...variant,stock:Math.min(variant.stock,parentStock)})).filter(variant=>variant.stock>0),cjVariants=importedCjVariants(row.cj_details_json,row.cj_availability_json,row.price_minor,parentStock),availableVariants=row.cj_source_id!==null?cjVariants:supplierVariants,stock=ownGoods?parentStock:Math.max(0,Math.min(parentStock,row.available===1?(row.quantity??0):0));
+ const parentStock=Math.max(0,row.stock_available-row.stock_reserved),supplierVariants=variants(row.variants,row.price_minor).map(variant=>({...variant,stock:Math.min(variant.stock,parentStock)})).filter(variant=>variant.stock>0),cjVariants=importedCjVariants(row.cj_details_json,row.cj_availability_json,row.price_minor,parentStock,row.cj_other_costs_minor??0,pricing),availableVariants=row.cj_source_id!==null?cjVariants:supplierVariants,stock=ownGoods?parentStock:Math.max(0,Math.min(parentStock,row.available===1?(row.quantity??0):0));
  const optionNames=optionDescriptions(row.options),productVariants=json(row.variants),hasVariantRecords=Array.isArray(productVariants)&&productVariants.length>0,cjDetailParsed=json(row.cj_details_json),cjDetailVariants=cjDetailParsed&&typeof cjDetailParsed==='object'?(cjDetailParsed as Record<string,unknown>).variants:null,requiresVariantSelection=hasVariantRecords||optionNames.length>0||(row.cj_source_id!==null&&Array.isArray(cjDetailVariants)&&cjDetailVariants.length>0);
  if(row.cj_source_id!==null&&availableVariants.length===0)return null;
  if(requiresVariantSelection&&availableVariants.length===0)return null;
@@ -89,13 +92,14 @@ function product(row:Row):PublicCommerceProduct|null{
  const shipping=parseCjAvailability({availability_json:row.cj_availability_json});
  if(row.cj_source_id!==null&&(!shipping||row.price_minor<=0||row.stock_available-row.stock_reserved<1))return null;
  if(!Number.isSafeInteger(row.price_minor)||row.price_minor<=0||!plain(row.title,200))return null;
- return{id:row.id.toString(),title:plain(row.title,200),priceMinor:row.price_minor,stock:requiresVariantSelection?availableVariants.reduce((max,v)=>Math.max(max,v.stock),0):stock,images:safeImages(row.images),description:plain(row.description,12000),brand:plain(row.brand,100)||null,options:optionNames,variants:availableVariants,requiresVariantSelection,featured:Number(row.featured)>0,saudiShippingAvailable:row.cj_source_id===null||!!shipping,deliveryEstimate:deliveryLabel(shipping?.shippingOptions.map(item=>item.deliveryDays).find((item):item is string=>!!item)),weightLabel:details(row.cj_details_json).weightLabel,bundledShipping:ownGoods};
+ return{id:row.id.toString(),title:plain(row.title,200),priceMinor:row.cj_source_id!==null?Math.min(...availableVariants.map(v=>v.priceMinor)):row.price_minor,stock:requiresVariantSelection?availableVariants.reduce((max,v)=>Math.max(max,v.stock),0):stock,images:safeImages(row.images),description:plain(row.description,12000),brand:plain(row.brand,100)||null,options:optionNames,variants:availableVariants,requiresVariantSelection,featured:Number(row.featured)>0,saudiShippingAvailable:row.cj_source_id===null||!!shipping,deliveryEstimate:deliveryLabel(shipping?.shippingOptions.map(item=>item.deliveryDays).find((item):item is string=>!!item)),weightLabel:details(row.cj_details_json).weightLabel,bundledShipping:ownGoods};
 }
 const SELECT=Prisma.raw(publicProductSelect);
 export async function readPublicCommerceProducts(ids:readonly bigint[]):Promise<Map<string,PublicCommerceProduct>>{
  const unique=[...new Set(ids.filter(id=>id>0n))];if(!unique.length)return new Map();if(unique.length>100)throw new Error('commerce_product_limit');await assertCommerceSchemaReady(prisma);
  const rows=await prisma.$queryRaw<Row[]>(Prisma.sql`${SELECT} AND cp.id IN (${Prisma.join(unique)})`);
- return new Map(rows.flatMap(row=>{const value=product(row);return value?[[value.id,value] as const]:[]}));
+ const pricing=rows.some(row=>row.cj_source_id!==null)?await readVerifiedCjPricing().catch(()=>null):null;
+ return new Map(rows.flatMap(row=>{const value=product(row,pricing);return value?[[value.id,value] as const]:[]}));
 }
 export async function readPublicCommerceProduct(id:bigint):Promise<PublicCommerceProduct|null>{
  return (await readPublicCommerceProducts([id])).get(id.toString())||null;
@@ -110,12 +114,14 @@ export async function searchPublicCommerceProducts(query:string,interpretations:
  });
  await assertCommerceSchemaReady(prisma);
  const rows=await prisma.$queryRaw<Row[]>(Prisma.sql`${SELECT} AND (${Prisma.join(clauses,' OR ')}) ORDER BY cp.id DESC LIMIT ${100}`);
- return rows.flatMap(row=>{const value=product(row);return value?[value]:[];});
+ const pricing=rows.some(row=>row.cj_source_id!==null)?await readVerifiedCjPricing().catch(()=>null):null;
+ return rows.flatMap(row=>{const value=product(row,pricing);return value?[value]:[];});
 }
 export async function readSimilarPublicCommerceProducts(id:bigint,limit=4):Promise<PublicCommerceProduct[]>{
  const take=Math.min(Math.max(1,limit),8);await assertCommerceSchemaReady(prisma);
  const rows=await prisma.$queryRaw<Row[]>(Prisma.sql`${SELECT} AND cp.id<>${id} ORDER BY cp.id DESC LIMIT ${take}`);
- return rows.flatMap(row=>{const value=product(row);return value?[value]:[];});
+ const pricing=rows.some(row=>row.cj_source_id!==null)?await readVerifiedCjPricing().catch(()=>null):null;
+ return rows.flatMap(row=>{const value=product(row,pricing);return value?[value]:[];});
 }
 
 /** Hydrate candidates with fresh public eligibility and sanitization. */

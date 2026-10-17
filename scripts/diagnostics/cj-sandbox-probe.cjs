@@ -35,8 +35,8 @@ function guardedApi(token,fetcher=fetch){let last=0,createSent=false,calls=0;ret
  const delay=1600-(Date.now()-last);if(delay>0)await new Promise(r=>setTimeout(r,delay));last=Date.now();
  const url=new URL(ORIGIN+path);if(method==='GET')for(const[k,v]of Object.entries(body))url.searchParams.set(k,v);
  const response=await fetcher(url,{method,headers:{'Content-Type':'application/json','CJ-Access-Token':token},...(method==='POST'?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(20000)});
- if(!response.ok)throw Error('sandbox_http_'+response.status);const data=await response.json();
- if(data.code!==200||data.result!==true){const e=Error('sandbox_api_rejected');e.endpoint=path;e.providerMessage=safeProviderMessage(data.message,token);e.providerCode=typeof data.code==='number'?data.code:null;e.requestId=typeof data.requestId==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(data.requestId)?data.requestId:null;throw e;}return data.data;
+ let data;try{data=await response.json();}catch{const e=Error('sandbox_response_invalid');e.endpoint=path;e.httpStatus=response.status;throw e;}
+ if(!response.ok||data?.code!==200||data?.result!==true){const e=Error('sandbox_api_rejected');e.endpoint=path;e.httpStatus=response.status;e.providerMessage=safeProviderMessage(data.message,token);e.providerCode=typeof data.code==='number'?data.code:null;e.requestId=typeof data.requestId==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(data.requestId)?data.requestId:null;throw e;}return data.data;
  };}
 async function main(){const {PrismaClient}=require('@prisma/client'),{decryptToken}=require('./cj-catalog-audit.cjs'),db=new PrismaClient({log:[]});let stage='initial';const reference='trbhh-sbx-'+randomUUID();
  try{const productId=process.argv[2],vid=process.argv[3];if(!/^[1-9]\d{0,14}$/.test(productId||'')||!/^[A-Za-z0-9_-]{1,64}$/.test(vid||''))throw Error('sandbox_input_invalid');

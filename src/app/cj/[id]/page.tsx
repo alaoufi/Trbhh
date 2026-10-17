@@ -25,7 +25,6 @@ import { SubmitButton } from '@/components/cj/submit-button';
 import { cleanCjDisplayDescription } from '@/lib/cj/variant-display';
 import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
 
-import { CjLiveNumbers } from '@/components/cj/cj-live-numbers';
 import { translateVariantOptions } from '@/lib/cj/variant-display-server';
 import {enrichCjOptionMetadata} from '@/lib/cj/option-metadata-server';
 import { getCategories, getSubCategories } from '@/lib/data';
@@ -121,14 +120,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}<span className="block text-slate-500" dir="ltr">SKU: {r.sku}</span></td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
-        {/* الشحن إلى السعودية — قسم قابل للطيّ بسهم للأسفل؛ يتمدّد بالنقر ويجلب الأرقام الحيّة عندها. */}
-        <details className="group/s min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-3 text-base font-extrabold text-emerald-900 [&::-webkit-details-marker]:hidden">
-            الشحن إلى السعودية
-            <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open/s:rotate-180" />
-          </summary>
-          <div className="pb-4"><CjLiveNumbers pid={p.cj_product_id} productId={id} /></div>
-        </details>
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
       <div className="min-w-0 space-y-2 lg:col-start-1 lg:row-start-2">

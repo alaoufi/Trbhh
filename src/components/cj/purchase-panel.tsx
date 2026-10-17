@@ -1,6 +1,7 @@
 'use client';
 
 import {cjSourceOptions,sameCjSourceOptions,type CjSourceOptions} from '@/lib/cj/source-option-identity';
+import {CjLiveNumbers} from '@/components/cj/cj-live-numbers';
 import {SizeReferenceGuide} from '@/components/size-reference-guide';
 import {CjSizeChartTable} from '@/components/cj/size-chart';
 import {familiarSizeLabel} from '@/lib/sizing/display';
@@ -62,6 +63,7 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
   // ترتيب شركات الشحن حسب إجمالي الشحن (الأساسي + الإضافي) تصاعدياً — الأرخص أولاً وهو الافتراضي.
   const shipSorted=useMemo(()=>quote?[...quote.shippingOptions].sort((a,b)=>(a.priceMinor+a.additionalMinor)-(b.priceMinor+b.additionalMinor)):[],[quote]);
   const ship=shipSorted[shipping],total=ship?.totalMinor??null;
+  const cheapest=quote?.shippingOptions.reduce<(NonNullable<typeof quote>['shippingOptions'][number])|null>((best,next)=>!best||next.totalMinor<best.totalMinor?next:best,null)??null;
   // حدّ الكمية بالمخزون المتاح (ناقص ما في السلة) فلا يتجاوز الطلب المخزون الفعلي.
   const maxQty=quote?Math.max(1,quote.stockQuantity-alreadyInCart):99;
   useEffect(()=>{if(qty>maxQty)setQty(maxQty);},[maxQty,qty]);
@@ -86,6 +88,10 @@ export function CjPurchasePanel({productId,productPid,productName,variants,accou
       : family&&<p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">بيانات خيارات المورد غير مكتملة أو ملتبسة؛ أُوقف اختيارها حتى تتضح مواصفاتها. لم يُحجز مخزون ولم يبدأ دفع.</p>}
     {selected&&<div className="grid grid-cols-2 gap-1.5 text-[13px]">{options.map((option,index)=><div key={`${option.label}-${index}`} className="min-w-0 rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500" dir="auto">{option.label}</span><b className="break-words leading-tight" dir="auto">{option.value}</b></div>)}{selected.variantWeight!=null&&<div className="rounded-lg bg-slate-50 px-2 py-1.5"><span className="block text-[11px] leading-tight text-slate-500">الوزن</span><b className="leading-tight">{selected.variantWeight} غ</b></div>}</div>}
     {selected&&options.some(o=>o.label==='المجموعة')&&<p className="text-xs text-amber-800">رقم المجموعة تسمية لدى المورد، وليس عدد القطع. تفاصيل محتوياتها غير موضحة نصيًا؛ لا تعتمدها قبل التأكد من محتوياتها.</p>}
+    <div aria-label="السعر مع أقل شحن" className="rounded-xl border border-emerald-300 bg-emerald-50 p-3">
+      <h3 className="mb-2 text-sm font-extrabold text-emerald-900">السعر مع أقل شحن</h3>
+      {quote&&cheapest?<><p className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>الإجمالي لكمية {verificationQuantity}{cheapest.vatEnabled?' شامل الضريبة':''}</span><b className="text-xl text-emerald-900" dir="ltr">{money(cheapest.totalMinor)}</b></p><p className="mt-1 text-xs text-slate-600">سعر الوحدة {money(quote.salePriceMinor)} · أقل شحن {money(cheapest.priceMinor+cheapest.additionalMinor)}. يتغير الإجمالي إذا اخترت شحنًا آخر.</p></>:<><CjLiveNumbers pid={productPid} productId={productId}/><p className="mt-1 text-xs text-slate-600">مرجع لخيار متاح وكمية واحدة؛ يتأكد سعر خيارك وشحنه بعد إكمال المقاس واللون والعنوان.</p></>}
+    </div>
     <p role="status" aria-live="polite" className={`text-sm font-bold ${quote?'text-emerald-700':'text-amber-800'}`}>{!selected?'أكمل خيارات السلعة لبدء التحقق من السعر والمخزون والشحن.':quote?`${quote.priceChanged?'تم التحديث من المورد — تغيّر السعر · ':''}متوفر · الكمية المتاحة: ${quote.stockQuantity}`:!status||status==='checking'?'جارٍ التحقق من الخيار المختار…':failureMessage[status]||'تعذّر التحقق من الخيار؛ أعد اختياره للمحاولة مرة أخرى.'}</p>
     {quote&&<p className="text-xs leading-5 text-slate-600">تم التحديث من المورد (السعر والمخزون والشحن) · <time dateTime={quote.checkedAt}>{new Date(quote.checkedAt).toLocaleString('ar-SA')}</time></p>}
     {quote&&<div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm">

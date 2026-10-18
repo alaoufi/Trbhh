@@ -28,7 +28,17 @@
   "liveLinks": {
     "adminIndexDestinations": 77,
     "missingOrGlobalCrashObserved": 0,
-    "limit": "Navigation/render checks only; financial actions and every subroute/role were not exercised."
+    "limit": "Navigation/render checks only; financial actions and every subroute/role were not exercised.",
+    "publicSiteMapDestinations": 17,
+    "publicMissingOrGlobalCrashObserved": 0,
+    "mobilePagesWithoutHorizontalOverflow": [
+      "/admin",
+      "/admin/suppliers/cj/payables",
+      "/admin/finance?section=tax",
+      "/cj/281",
+      "/cj/cart",
+      "/search"
+    ]
   },
   "tests": {
     "focusedFinancePassed": 104,
@@ -36,9 +46,15 @@
     "typecheck": "passed",
     "eslintChangedFiles": "passed",
     "build": "passed; DATABASE_URL absent locally; no production DB proof",
-    "previousFullSuiteOpenFailures": [
-      "Prisma migrate diff CLI exceeded 20s in two unrelated schema fixture tests"
-    ]
+    "previousFullSuiteOpenFailures": [],
+    "fullSuite": {
+      "passed": 3392,
+      "skipped": 9,
+      "failed": 0,
+      "filesPassed": 415,
+      "filesSkipped": 1
+    },
+    "previousTimeouts": "Both Prisma CLI tests passed again individually and in the complete suite without changing assertions or timeout."
   },
   "purchaseTrial": {
     "productId": 281,
@@ -49,18 +65,77 @@
     "publicStoreActivation": false,
     "realPaymentAuthorized": false,
     "steps": [
-      "Obtain delegate confirmation on tracking callbacks, refund destination and eligibility; preserve provider request references.",
+      "Obtain delegate confirmation on sandbox tracking callback limitations and real tracking/delivery/error callback behavior, refund destination and eligibility; preserve provider request references.",
       "Deploy reviewed finance monitor correction separately after normal code-only release verification.",
       "Reverify chosen exact VID, quantity, inventory, destination freight, fiscal policy and total immediately before the private trial.",
       "Approve one exact maximum total; verify customer receipt and unique supplier reference before supplier payment.",
       "On uncertain payment result reconcile existing reference; do not repeat debit.",
       "Verify supplier proof, Trbhh order state, tracking callback and eventual receipt against the same references."
-    ]
+    ],
+    "blockedCatalogIds": [
+      123,
+      132
+    ],
+    "inventoryFreightQuoteStatus": "Must be freshly verified for the selected option, exact quantity and owned destination before the trial; no changes to cached availability were made."
   },
   "runtimeGuardsObserved": {
     "supplierAllowLiveOrders": false,
     "cjAllowLiveOrders": true,
+    "cjFulfillmentWorkerEnabled": true,
+    "cjLiveTrialEnabled": true,
+    "centralPurchasingEnabled": true,
+    "centralPaymentsEnabled": true,
+    "centralGatewayEnabled": true,
+    "publicCjSettingPresent": false,
     "changed": false
   },
-  "outcome": "Preparation and finite evidence collection only; not all findings closed and no live-purchase approval."
+  "outcome": "Finance monitor fix and code-only release runner prepared and pushed, not deployed. Current saved catalog audited in full; 288 products match live source prices, 2 draft products remain provider-rejected. All 77 admin index and 17 public map destinations navigated without missing-page/global crash evidence. Full unit suite passes. No real purchase approval; await delegate reply and exact capped trial selection.",
+  "delegateMessageEnglish": "Hello,\nWe are preparing one private CJ purchase test for Trbhh. No purchase or charge is authorized by this message.\nPlease confirm the following before we proceed:\n1. Whether sandbox tracking generates logistics callbacks, and how we can verify order, payment, shipment, tracking, delivery and exception updates against the same CJ and Trbhh references.\n2. The supported refund and cancellation process for our account, eligibility, required evidence, partial refund support, expected processing time, fees, and whether funds return to the original payment method or CJ Wallet.\n3. The reconciliation process after a payment timeout or uncertain result, so we do not create another order or repeat a debit.\n4. Which references and receipt evidence you require to investigate an issue.\nSandbox reference: trbhh-sbx-34b1f44e-cce8-4f12-9986-be0fd1576dde\nSandbox CJ order ID: 2610171053280661800\nSandbox CJ order code: SD2610171053270664700\nSandbox tracking reference: TRBHH-SANDBOX-TEST-001\nCandidate Trbhh product ID: 281\nPlease reply with the account-specific procedure and any limitations.",
+  "releasePreparation": {
+    "publisherCommit": "1f4f1494",
+    "baseline": "0abb9ad5c70e87b7a7bed650dfd5d8509fff68c3",
+    "codeFixCommit": "4352a5e00ee5d64b91e8444899b778e2852eade6",
+    "runtimePreservationTestsPassed": 16,
+    "dockerTestsSkipped": 3,
+    "executed": false
+  },
+  "liveCatalogPriceAudit": {
+    "productsAttempted": 290,
+    "productsRead": 287,
+    "variantsCompared": 2681,
+    "priceChanges": 0,
+    "unverifiedProductIds": [
+      123,
+      132
+    ],
+    "inventoryAndFreightRechecked": false,
+    "sourceReport": "/root/trbhh-release-tools/cj-all-prices-20261018.log",
+    "writes": 0,
+    "payments": 0,
+    "productsReadAfterExceptionDiagnosis": 288,
+    "variantsComparedAfterExceptionDiagnosis": 2683,
+    "exceptionDiagnosis": [
+      {
+        "productId": 106,
+        "status": "draft",
+        "resolved": true,
+        "variantsCompared": 2,
+        "priceDifferences": 0
+      },
+      {
+        "productId": 123,
+        "status": "draft",
+        "providerCode": 1602,
+        "verified": false
+      },
+      {
+        "productId": 132,
+        "status": "draft",
+        "providerCode": 1602002,
+        "verified": false
+      }
+    ],
+    "allEligibleForTrial": false,
+    "priceDifferencesAfterDiagnosis": 0
+  }
 }

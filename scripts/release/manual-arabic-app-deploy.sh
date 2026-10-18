@@ -4,7 +4,7 @@ set -Eeuo pipefail
 # Does not provision models or change any store, payment, or background-worker flags.
 umask 077
 candidate=${2:-}
-baseline=a979fc177d301bae75865dfe8d7417a2fe4f1e41
+baseline=8b08458e899436ffafb10b343b45d1db4e77bb86
 branch=codex/admin-navigation-complete-20261014
 [[ $(id -u) == 0 ]]
 [[ $candidate =~ ^[a-f0-9]{40}$ ]] || { echo CANDIDATE_REQUIRED >&2; exit 1; }

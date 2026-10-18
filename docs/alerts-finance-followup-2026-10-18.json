@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-18",
+  "risk": "P0: financial evidence presentation; no financial writes",
+  "liveCommit": "a979fc177d301bae75865dfe8d7417a2fe4f1e41",
+  "liveReadOnlyReview": {
+    "groups": 8,
+    "serviceRows": 44,
+    "serviceAmountSAR": 850,
+    "adminDebitReviewRows": 1,
+    "adminDebitReviewAmountSAR": 50,
+    "totalReviewRows": 45,
+    "totalReviewAmountSAR": 900,
+    "serviceCounts": {
+      "featured": 8,
+      "bump": 15,
+      "urgent": 6,
+      "classified": 6,
+      "store_show": 1,
+      "ad_show": 2,
+      "subscription": 6
+    },
+    "allEightSourceRoutesOpened": true,
+    "allSevenServiceTablesCountMatched": true
+  },
+  "rootCauses": [
+    "Service-payment source errors were caught and replaced with empty successful results",
+    "Service payment table lacked the immutable wallet operation ID",
+    "Grouping by service was labeled as classified although it is not tax approval",
+    "SSH auth probe required HTTP redirect and rejected the legitimate Next streamed redirect"
+  ],
+  "fixes": [
+    "Read-only source adapter returns explicit unavailable status on aggregation, count, row or member read failure",
+    "Display wallet operation ID for document matching",
+    "Clarify that service grouping does not approve tax classification",
+    "Use Riyadh timezone for service transaction dates",
+    "Regression-tested HTTP and streamed login redirect probe; no synthetic admin session"
+  ],
+  "validation": {
+    "unitFiles": 48,
+    "unitPassed": 590,
+    "authProbeTests": 5,
+    "liveAnonymousProbe": "version and all three login redirects passed",
+    "typecheck": "passed",
+    "eslint": "passed",
+    "build": "exit 0; DATABASE_URL absent locally, not production database verification"
+  },
+  "constraints": {
+    "realPayments": false,
+    "financialApprovals": false,
+    "financialDataWrites": false,
+    "publicStoreActivation": false,
+    "automaticWarningDismissal": false
+  },
+  "remaining": [
+    "Deploy the new source-reader presentation fixes separately; currently prepared only",
+    "Wallet movements cannot enter confirmed tax totals without approved classification and supporting document/refund linkage",
+    "The current monitor has no persisted wallet-tax-review resolution workflow; simply opening a source is not resolution",
+    "Historical notifications without a valid recorded destination cannot have their original source reconstructed automatically"
+  ]
+}

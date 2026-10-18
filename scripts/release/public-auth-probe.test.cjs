@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {isLoginRedirect}=require('./public-auth-probe.cjs');
+const origin='https://trbhh.sa';
+test('accepts explicit same-origin login redirects only',()=>{assert.equal(isLoginRedirect({status:307,location:'/login'},origin),true);assert.equal(isLoginRedirect({status:302,location:'https://trbhh.sa/login?next=%2Fnotifications'},origin),true);assert.equal(isLoginRedirect({status:302,location:'https://other.test/login'},origin),false);assert.equal(isLoginRedirect({status:302,location:'/notifications'},origin),false);});
+test('recognizes the observed Next streamed login redirect at HTTP 200',()=>{const body='<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=/login"/><template data-dgst="NEXT_REDIRECT;replace;/login;307;"></template>';assert.equal(isLoginRedirect({status:200,body},origin),true);});
+test('does not treat a normal login anchor or redirect text as protection',()=>{for(const body of ['<a href="/login">Login</a>','NEXT_REDIRECT;replace;/login;307;','<meta http-equiv="refresh" content="1;url=/login"/>','<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=https://other.test/login"/>'])assert.equal(isLoginRedirect({status:200,body},origin),false);});
+test('requires the actual login target in both streamed redirect markers',()=>{assert.equal(isLoginRedirect({status:200,body:'<meta id="__next-page-redirect" http-equiv="refresh" content="1;url=/login"/><template data-dgst="NEXT_REDIRECT;replace;/other;307;"></template>'},origin),false);});
+test('never accepts an error response or malformed origin',()=>{assert.equal(isLoginRedirect({status:500,location:'/login'},origin),false);assert.equal(isLoginRedirect({status:307,location:'/login'},'invalid'),false);});

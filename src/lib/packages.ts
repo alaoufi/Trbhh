@@ -1,4 +1,5 @@
 import 'server-only';
+import { walletSourceReference } from './wallet-source-reference';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 
@@ -240,7 +241,7 @@ export async function buyMemberPackage(userId: number, packageId: number): Promi
       const old = await tx.$queryRawUnsafe<{ expires_at: Date | null }[]>(`SELECT expires_at FROM user_packages WHERE user_id = ? LIMIT 1`, userId);
       const expiry = packagePurchaseExpiry(p.durationDays, old[0]?.expires_at || null);
       await tx.$executeRawUnsafe(`INSERT INTO user_packages (user_id, package_id, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE package_id = VALUES(package_id), expires_at = VALUES(expires_at), assigned_at = CURRENT_TIMESTAMP`, userId, packageId, expiry);
-      await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -price, balance_after: member?.balance ?? 0, reason: 'subscription', note: `اشتراك باقة ${p.name} لمدة ${p.durationDays} يوم` } });
+      await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -price, balance_after: member?.balance ?? 0, reason: 'subscription', money_ref: walletSourceReference({ kind: 'package', id: p.id, service: 'subscription' }), note: `اشتراك باقة ${p.name} لمدة ${p.durationDays} يوم` } });
       return { ok: true, balance: member?.balance ?? 0 };
     });
   } catch { return { ok: false, balance: 0, reason: 'invalid' }; }

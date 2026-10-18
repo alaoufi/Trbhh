@@ -1,8 +1,10 @@
+import {readWalletReviewEvidence} from './wallet-review';
+import {reconcileWalletReviews} from './wallet-review-model';
 import 'server-only';
 import {readAccess} from '@/lib/access-control/store';
 import type {CommerceDb} from '@/lib/commerce/types';
 import type {FinanceData,FinanceInvoice,FinanceTaxPolicy,FiscalSnapshotV2} from './types';
-import {readFinanceData,financeNumber} from './read-model';
+import {readFinanceData} from './read-model';
 import {calculateFiscalLinesV2,validateCalculationPolicy,validateFiscalTaxPolicy,effectiveFiscalVatBps} from './fiscal-v2';
 import {validateAdjustment} from './adjustments';
 import {fingerprint} from './service';
@@ -43,12 +45,13 @@ function confirmedInvoice(data:FinanceData,invoice:FinanceInvoice,now:Date):Fisc
  return s;
 }
 /** Returns only monetary aggregates and fixed review labels; customer/provider references never leave this adapter. */
-export function buildTaxRegistrationReport(data:FinanceData,wallet:WalletTaxReview[],now:Date):TaxRegistrationReport {
- const window=taxRegistrationWindow(now),start=Math.min(time(window.start),time(window.completedStart)),end=now.getTime(),events:TaxSupplyEvent[]=[],gaps=new Map<string,TaxRegistrationGap>();
+export function buildTaxRegistrationReport(data:FinanceData,wallet:WalletTaxReview[],now:Date,reviewedWalletEvents:TaxSupplyEvent[]=[],walletIntegrityGaps:TaxRegistrationGap[]=[]):TaxRegistrationReport {
+ const window=taxRegistrationWindow(now),start=Math.min(time(window.start),time(window.completedStart)),end=now.getTime(),events:TaxSupplyEvent[]=[...reviewedWalletEvents],gaps=new Map<string,TaxRegistrationGap>();
  const relevant=(at:string|null|undefined)=>Number.isFinite(time(at))&&time(at)>=start&&time(at)<=end;
  function gap(code:string,label:string,amountMinor:number|null,count=1){
   const previous=gaps.get(code);gaps.set(code,{code,label,count:(previous?.count||0)+count,amountMinor:amountMinor===null||previous?.amountMinor===null?null:sumFinanceMoney([previous?.amountMinor||0,amountMinor])});
  }
+ for(const item of walletIntegrityGaps)gap(item.code,item.label,item.amountMinor,item.count);
  if(!data.ready)gap('finance_unavailable','مصادر الفواتير المالية غير جاهزة؛ لا يمكن تأكيد اكتمال الإجمالي.',null);
  let thresholdMinor=DEFAULT_REGISTRATION_THRESHOLD_MINOR;
  const currentDate=new Date(now.getTime()+10800000).toISOString().slice(0,10);
@@ -102,19 +105,27 @@ export function buildTaxRegistrationReport(data:FinanceData,wallet:WalletTaxRevi
  const result=calculateTaxRegistration({now,events,thresholdMinor,gaps:[...gaps.values()]});
  return {...result,excludedTestCount:result.excludedTestCount+excludedTestCount};
 }
+/** A documented decision closes coverage only alongside its explicit supply/exclusion event. */
+export function buildTaxRegistrationWithWalletReviews(data:FinanceData,evidence:Awaited<ReturnType<typeof readWalletReviewEvidence>>,now:Date):TaxRegistrationReport {
+ const keys=new Set(evidence.invoiceSourceKeys);
+ for(const invoice of data.invoices){keys.add('order:'+invoice.orderId);if(invoice.status==='issued'&&invoice.number)keys.add(invoice.number);}
+ const audits=evidence.audits.filter(audit=>{const at=time(audit.at);if(!Number.isFinite(at))throw Error('wallet_review_audit_invalid');return at<=now.getTime();});
+ const reviewed=reconcileWalletReviews(evidence.sources,audits,[...keys]);
+ const window=taxRegistrationWindow(now),start=Math.min(time(window.start),time(window.completedStart)),groups=new Map<string,WalletTaxReview>();
+ for(const row of reviewed.rows){
+  const at=time(row.at);if(!Number.isFinite(at))throw Error('wallet_review_source_invalid');
+  if(at<start||at>now.getTime()||row.status==='approved')continue;
+  const prior=groups.get(row.reason)||{reason:row.reason,count:0,debitsMinor:0,creditsMinor:0};prior.count++;
+  if(row.amountMinor<0)prior.debitsMinor=sumFinanceMoney([prior.debitsMinor,-row.amountMinor]);else prior.creditsMinor=sumFinanceMoney([prior.creditsMinor,row.amountMinor]);groups.set(row.reason,prior);
+ }
+ return buildTaxRegistrationReport(data,[...groups.values()],now,reviewed.events,reviewed.integrityGaps);
+}
 /** No schema ensure, capture, issuance, wallet mutation or audit write occurs on this read path. */
 export async function readTaxRegistrationMonitor(db:CommerceDb,actorId:bigint,now=new Date()):Promise<TaxRegistrationReport>{
  if(actorId<=0n||actorId>BigInt(Number.MAX_SAFE_INTEGER))throw Error('access_forbidden');
- const window=taxRegistrationWindow(now),from=new Date(Math.min(time(window.start),time(window.completedStart)));
  return db.$transaction(async tx=>{
   const access=await readAccess(tx,Number(actorId));if(!access.ready||!access.keys.has('tax:view'))throw Error('access_forbidden');
-  const [data,rows]=await Promise.all([readFinanceData(tx),tx.$queryRaw<{reason:string;count:bigint;debits_minor:bigint;credits_minor:bigint}[]>`
-   SELECT reason,COUNT(*) AS count,
-    SUM(CASE WHEN COALESCE(amount_halala,amount*100)<0 THEN -COALESCE(amount_halala,amount*100) ELSE 0 END) AS debits_minor,
-    SUM(CASE WHEN COALESCE(amount_halala,amount*100)>0 THEN COALESCE(amount_halala,amount*100) ELSE 0 END) AS credits_minor
-   FROM wallet_txns WHERE created_at>=${from} AND created_at<=${now}
-    AND (COALESCE(amount_halala,amount*100)<0 OR reason='refund')
-    AND reason NOT IN ('topup','admin_credit','bonus','verify_gift','points_convert','referral','welcome') GROUP BY reason`]);
-  return buildTaxRegistrationReport(data,rows.map(row=>({reason:row.reason,count:financeNumber(row.count),debitsMinor:financeNumber(String(row.debits_minor)),creditsMinor:financeNumber(String(row.credits_minor))})),now);
+  const [data,evidence]=await Promise.all([readFinanceData(tx),readWalletReviewEvidence(tx)]);
+  return buildTaxRegistrationWithWalletReviews(data,evidence,now);
  },{isolationLevel:'RepeatableRead',maxWait:10000,timeout:30000});
 }

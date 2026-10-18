@@ -1,3 +1,4 @@
+import { walletSourceReference } from '@/lib/wallet-source-reference';
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
@@ -95,7 +96,7 @@ async function purchaseStoreSubscription(userId: number, storeId: number, plan: 
       const affected = amount === 0 ? 1 : await tx.$executeRaw`UPDATE users SET balance = balance - ${amount} WHERE id = ${BigInt(userId)} AND balance - ${amount} >= reserved`;
       if (!affected) return { ok: false, error: 'الرصيد غير كافٍ. اشحن رصيدك ثم أعد المحاولة.' };
       const after = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
-      if (amount > 0) await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -amount, balance_after: after!.balance, reason: options.plus ? 'store_plus' : 'subscription', note: `${options.plus ? 'باقة متجر Plus' : 'اشتراك متجر'} #${storeId} (${SUB_PLAN_LABELS[plan]})`.slice(0, 200), admin_id: null } });
+      if (amount > 0) await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -amount, balance_after: after!.balance, reason: options.plus ? 'store_plus' : 'subscription', note: `${options.plus ? 'باقة متجر Plus' : 'اشتراك متجر'} #${storeId} (${SUB_PLAN_LABELS[plan]})`.slice(0, 200), admin_id: null, money_ref: walletSourceReference({ kind: 'store', id: storeId, service: options.plus ? 'store_plus' : 'subscription' }) } });
       const now = new Date();
       const extend = (previous: Date | null) => {
         const date = new Date(previous && previous > now ? previous : now);

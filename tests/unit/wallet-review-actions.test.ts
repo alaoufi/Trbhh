@@ -1,0 +1,15 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+const m=vi.hoisted(()=>({save:vi.fn(),access:vi.fn(),actor:vi.fn()}));
+vi.mock('@/lib/finance/wallet-review',()=>({saveWalletReviewDecision:m.save}));
+vi.mock('@/lib/access-control/guards',()=>({requireAccess:m.access,accessActor:m.actor}));
+vi.mock('@/lib/prisma',()=>({prisma:{}}));
+vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw Error('REDIRECT:'+url);}}));
+vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
+import {saveFinanceWalletReview} from '@/app/admin/finance/actions';
+import {financeAuditContext} from '@/lib/finance/audit-context';
+const form=(extra:Record<string,string>={})=>{const f=new FormData();for(const [k,v]of Object.entries({month:'2026-10',sourceId:'1',sourceFingerprint:'a'.repeat(64),expectedLatestDecisionId:'',requestKey:'key',status:'approved',sourceReference:'ad:4',documentaryReference:'invoice:1',documentLineIdentity:'invoice:1:line:2',evidenceKind:'service_invoice',classification:'standard',net:'10.25',note:'راجعت المستند',confirm:'1',...extra}))f.set(k,v);return f;};
+beforeEach(()=>{vi.clearAllMocks();m.access.mockResolvedValue({uid:9});m.actor.mockResolvedValue({ip:'safe',sessionFingerprint:'hash'});});
+it('checks both read grants and approval then forwards exact source bound audit fields',async()=>{let context:unknown;m.save.mockImplementation(async()=>{context=financeAuditContext();});await expect(saveFinanceWalletReview(form())).rejects.toThrow('walletReviewSaved=1');expect(m.access.mock.calls).toEqual([['wallets','view'],['tax','view'],['tax','approve']]);expect(m.save).toHaveBeenCalledWith({},9n,expect.objectContaining({sourceId:'1',expectedLatestDecisionId:null,netMinor:1025,status:'approved',sourceFingerprint:'a'.repeat(64)}));expect(context).toEqual({ip:'safe',sessionFingerprint:'hash'});});
+it.each<Record<string,string>>([{confirm:''},{net:'10.255'},{classification:''},{evidenceKind:'topup_receipt'},{sourceFingerprint:'forged'},{expectedLatestDecisionId:'x'}])('rejects malformed or unconfirmed approval %j',async extra=>{await expect(saveFinanceWalletReview(form(extra))).rejects.toThrow('error=finance_');expect(m.save).not.toHaveBeenCalled();});
+it('cannot save after wallets permission denied',async()=>{m.access.mockRejectedValue(Error('DENIED'));await expect(saveFinanceWalletReview(form())).rejects.toThrow('DENIED');expect(m.save).not.toHaveBeenCalled();});
+it('missing-document records remain open without monetary/classification invention',async()=>{await expect(saveFinanceWalletReview(form({status:'needs_document',confirm:'',net:'',classification:'',evidenceKind:''}))).rejects.toThrow('walletReviewSaved=1');expect(m.save.mock.calls[0][2]).toMatchObject({status:'needs_document'});expect(m.save.mock.calls[0][2]).not.toHaveProperty('netMinor');});

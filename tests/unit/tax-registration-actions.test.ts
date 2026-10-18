@@ -1,12 +1,12 @@
 import {expect,it} from 'vitest';
-import {taxGapReview} from '@/lib/finance/tax-registration-actions';
+import {taxGapReview,allowedTaxGapReviewHrefs} from '@/lib/finance/tax-registration-actions';
 
 it('opens invoice settings for an unverified approval, without approving anything',()=>{
  expect(taxGapReview('threshold_unverified')).toMatchObject({href:'/admin/finance?section=tax#tax-policy-settings'});
 });
 it('opens the actual filtered wallet payment source for known service reasons',()=>{
- expect(taxGapReview('wallet_featured').href).toBe('/admin/revenue?tab=payments&cat=featured');
- expect(taxGapReview('wallet_admin_debit').href).toBe('/admin/revenue?tab=balances');
+ expect(taxGapReview('wallet_featured').href).toBe('/admin/finance?section=tax#wallet-review');
+ expect(taxGapReview('wallet_admin_debit').href).toBe('/admin/finance?section=tax#wallet-review');
  expect(taxGapReview('wallet_refund').instructions).toContain('المستند');
 });
 it('routes missing invoices and refund evidence to their existing review sections',()=>{
@@ -16,3 +16,5 @@ it('routes missing invoices and refund evidence to their existing review section
 it('never builds a destination from unknown or untrusted gap text',()=>{
  expect(taxGapReview('wallet_//evil.test').href).toBe('/admin/finance?section=reconciliation#admin-content');
 });
+
+it('requires wallet read permission before linking a tax warning to the review queue',()=>{const href='/admin/finance?section=tax#wallet-review';expect(allowedTaxGapReviewHrefs(['wallet_featured'],new Set(['tax:view']))).not.toContain(href);expect(allowedTaxGapReviewHrefs(['wallet_featured'],new Set(['tax:view','wallets:view']))).toContain(href);});

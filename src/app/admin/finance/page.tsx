@@ -1,3 +1,5 @@
+import {WalletReviewQueue} from '@/components/finance/wallet-review-queue';
+import {readWalletReviewQueue} from '@/lib/finance/wallet-review';
 import {readTaxDraft} from '@/lib/finance/tax-draft';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
@@ -9,8 +11,7 @@ import { buildFinanceReport, parseFinanceQuery } from '@/lib/finance/reports';
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
 import {TaxRegistrationMonitor} from '@/components/finance/tax-registration-monitor';
 import {readTaxRegistrationMonitor} from '@/lib/finance/tax-registration-read';
-import {taxGapReview} from '@/lib/finance/tax-registration-actions';
-import {canAccessPage} from '@/lib/access-control/catalog';
+import {allowedTaxGapReviewHrefs} from '@/lib/finance/tax-registration-actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'المتابعة المالية | تربح' };
@@ -47,6 +48,9 @@ const errorMessages: Record<string, string> = {
   finance_idempotency_conflict: 'استُخدم مرجع الحفظ لبيانات مختلفة. حدّث الصفحة وراجع المدخلات قبل المحاولة.',
   finance_issuance_not_approved: 'سياسة الإصدار لم تُعتمد بعد؛ سيبقى المستند سجلًا معلقًا.',
   finance_invoice_difference: 'لم يُحفظ المستند لوجود فرق في مبالغه. راجع المطابقة ومصدر الطلب.',
+  finance_wallet_review_failed: 'تعذر توثيق القرار. حدّث القائمة وراجع تغير المصدر أو القرار السابق وتكرار بند المستند وتداخل الفواتير؛ لم يُحفظ اعتماد جديد.',
+  finance_wallet_review_confirmation: 'يلزم تأكيد صريح بعد مراجعة مستند الخدمة والتصنيف والصافي.',
+  finance_wallet_review_invalid: 'راجع هوية المصدر والقرار والمراجع والملاحظات المطلوبة.',
   finance_invoice_immutable: 'المستند الصادر ثابت؛ التصحيح يحتاج مستندًا مستقلًا مرتبطًا بالأصل.',
 };
 
@@ -61,14 +65,22 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const report = buildFinanceReport(redactFinanceAudit(data, access.keys), query, now);
   const taxMonitor=access.keys.has('tax:view')&&['overview','tax'].includes(query.section)
     ? await readTaxRegistrationMonitor(prisma,BigInt(session.uid),now):null;
+  let walletQueue:Awaited<ReturnType<typeof readWalletReviewQueue>>|null=null;let walletQueueError=false;
+  const showWalletQueue=query.section==='tax'&&access.keys.has('tax:view')&&access.keys.has('wallets:view');
+  if(showWalletQueue){
+    const rawPage=typeof params.walletPage==='string'?params.walletPage:'1';
+    try{walletQueue=await readWalletReviewQueue(prisma,BigInt(session.uid),{page:/^\d{1,8}$/.test(rawPage)?Number(rawPage):1});}catch{walletQueueError=true;}
+  }
   const error = typeof params.error === 'string' ? params.error : null;
   return <div className="space-y-3">
+    {params.walletReviewSaved&&<p role="status">تم توثيق قرار المراجع. طلب المستند يبقى مفتوحًا؛ لا يُعتمد إلا الدليل الصريح المطابق للمصدر الحالي.</p>}
     {params.draft&&<p role="status" className="rounded-xl border p-3">تم حفظ المسودة. يمكنك إكمالها لاحقًا؛ لم تتغير إعدادات الفواتير المعتمدة.</p>}
     {params.settingsStored&&<p role="status" className="rounded-xl border p-3">تم حفظ البيانات. لإتاحة الشراء أكمل اسم الجهة وعنوانها ومسؤول إصدار مخول وتاريخ سريان صالح؛ لم تتغير سياسة الفواتير السابقة.</p>}
     {params.settingsApplied&&<p role="status" className="rounded-xl border p-3">تم حفظ الإعدادات وتطبيقها بدءًا من تاريخ السريان المحدد. تُستخدم تلقائيًا للفواتير الجديدة ولا تحتاج إدخالها لكل فاتورة.</p>}
-    {params.saved&&!params.draft&&!params.settingsStored&&!params.settingsApplied && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{params.submitted?'تم إرسال الطلب للمراجعة؛ لم يُعتمد بعد. راجع قسم طلبات المراجعة والاعتماد أدناه.':'تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.'}</p>}
+    {params.saved&&!params.walletReviewSaved&&!params.draft&&!params.settingsStored&&!params.settingsApplied && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{params.submitted?'تم إرسال الطلب للمراجعة؛ لم يُعتمد بعد. راجع قسم طلبات المراجعة والاعتماد أدناه.':'تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.'}</p>}
     {error && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{errorMessages[error] || 'تعذر تنفيذ الإجراء. راجع الحقول المطلوبة والفترة وصلاحيتك وجاهزية المصادر، ثم أعد المحاولة.'}</p>}
-    {taxMonitor&&<TaxRegistrationMonitor report={taxMonitor} allowedReviewHrefs={taxMonitor.coverage.gaps.map(gap=>taxGapReview(gap.code).href).filter(href=>canAccessPage(access.keys,href))}/>}
+    {taxMonitor&&<TaxRegistrationMonitor report={taxMonitor} allowedReviewHrefs={allowedTaxGapReviewHrefs(taxMonitor.coverage.gaps.map(gap=>gap.code),access.keys)}/>}
+    {showWalletQueue&&<WalletReviewQueue queue={walletQueue} error={walletQueueError} canApprove={access.keys.has('tax:approve')} month={query.month} actionKey={randomUUID()}/>}
     <FinanceWorkspace taxDraft={taxDraft} report={report} canEdit={permissions.edit} canApprove={permissions.approve} canClose={permissions.close} canExport={permissions.export} canRefund={permissions.refund} canCancel={permissions.cancel} canReconcile={permissions.reconcile} canManageTax={permissions.manageTax} canReopen={permissions.reopen} currentUserId={String(session.uid)} visibleSections={permissions.visibleSections} viewFinance={permissions.viewFinance} viewSettlements={permissions.viewSettlements} viewReconciliation={permissions.viewReconciliation} actionKey={randomUUID()} />
   </div>;
 }

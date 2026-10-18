@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
+import { walletSourceReference, type WalletSourceReference } from './wallet-source-reference';
 
 const ensure = ensureSchema;
 
@@ -107,7 +108,7 @@ export async function holdBalance(userId: number, amount: number): Promise<{ ok:
 
 /** تثبيت الحجز خصماً فعلياً (عند الموافقة): balance −= amount و reserved −= amount،
  *  مع تسجيل حركة المحفظة (الحسم يُسجَّل الآن). */
-export async function captureHold(userId: number, amount: number, reason: TxnReason, note?: string): Promise<{ ok: boolean; balance: number }> {
+export async function captureHold(userId: number, amount: number, reason: TxnReason, note?: string, sourceReference?: WalletSourceReference): Promise<{ ok: boolean; balance: number }> {
   await ensure();
   const amt = Math.max(0, Math.round(amount || 0));
   if (amt === 0) return { ok: true, balance: await getBalance(userId) };
@@ -120,7 +121,7 @@ export async function captureHold(userId: number, amount: number, reason: TxnRea
       }
       const after = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
       const next = after?.balance ?? 0;
-      await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -amt, balance_after: next, reason, note: note ? note.slice(0, 200) : null, admin_id: null } });
+      await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -amt, balance_after: next, reason, note: note ? note.slice(0, 200) : null, admin_id: null, money_ref: walletSourceReference(sourceReference) } });
       return { ok: true, balance: next };
     });
   } catch {
@@ -155,7 +156,7 @@ export async function adjustBalance(
   userId: number,
   amount: number,
   reason: TxnReason,
-  opts: { note?: string; adminId?: number } = {},
+  opts: { note?: string; adminId?: number; sourceReference?: WalletSourceReference } = {},
 ): Promise<{ ok: boolean; balance: number }> {
   await ensure();
   const amt = Math.round(amount);
@@ -186,6 +187,7 @@ export async function adjustBalance(
           reason,
           note: opts.note ? opts.note.slice(0, 200) : null,
           admin_id: opts.adminId ? BigInt(opts.adminId) : null,
+          money_ref: walletSourceReference(opts.sourceReference),
         },
       });
       return { ok: true, balance: next };
@@ -196,10 +198,10 @@ export async function adjustBalance(
 }
 
 /** Charge (debit) a fee if the member can afford it. No-op success when price ≤ 0. */
-export async function charge(userId: number, price: number, reason: TxnReason, note?: string): Promise<{ ok: boolean; balance: number; price: number }> {
+export async function charge(userId: number, price: number, reason: TxnReason, note?: string, sourceReference?: WalletSourceReference): Promise<{ ok: boolean; balance: number; price: number }> {
   const p = Math.max(0, Math.round(price || 0));
   if (p === 0) return { ok: true, balance: await getBalance(userId), price: 0 };
-  const r = await adjustBalance(userId, -p, reason, { note });
+  const r = await adjustBalance(userId, -p, reason, { note, sourceReference });
   return { ok: r.ok, balance: r.balance, price: p };
 }
 

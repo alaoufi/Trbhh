@@ -1,4 +1,5 @@
 'use server';
+import { newWalletOperationReference } from '@/lib/wallet-source-reference';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createHash } from 'crypto';
@@ -236,6 +237,7 @@ export async function createClassifiedAction(formData: FormData) {
   const startAt = publishAt ? publishAt.getTime() : Date.now();
 
   // رسوم نشر المبوّب حسب المدّة (إن سُعّرت) — تُخصم من الرصيد ويُضبط انتهاء المبوّب
+  const sourceReference = newWalletOperationReference('classified_publish');
   let cExpires: Date | null = null;
   let fee = 0;
   if (serviceHasPrice(pricing.classified)) {
@@ -246,7 +248,7 @@ export async function createClassifiedAction(formData: FormData) {
     }
     fee = pricing.classified[raw];
     if (fee > 0) {
-      const paid = await charge(session.uid, fee, 'classified', `نشر إعلان مبوّب (${DUR_DAYS[raw]} يوم)`);
+      const paid = await charge(session.uid, fee, 'classified', `نشر إعلان مبوّب (${DUR_DAYS[raw]} يوم)`, sourceReference);
       if (!paid.ok) {
         if (dupCreditConsumed) await addDupCredit(session.uid, 1); // استرجاع رصيد التكرار المستهلك — النشر لن يتم بلا سداد الرسوم
         redirect(`/classified/new?error=needcredit&price=${fee}&bal=${paid.balance}`);
@@ -274,7 +276,7 @@ export async function createClassifiedAction(formData: FormData) {
   } catch {
     // فشل الحفظ بعد خصم رصيد التكرار و/أو رسوم النشر — استرجاع كل ما خُصم بدل خسارته على نشر لم يتم
     if (dupCreditConsumed) await addDupCredit(session.uid, 1);
-    if (fee > 0) await adjustBalance(session.uid, fee, 'refund', { note: 'استرداد رسوم نشر مبوّب فشل حفظه' });
+    if (fee > 0) await adjustBalance(session.uid, fee, 'refund', { note: 'استرداد رسوم نشر مبوّب فشل حفظه', sourceReference });
     redirect('/classified/new?error=save');
   }
   if (flagTerms) {
@@ -404,7 +406,9 @@ export async function reactivateClassifiedAction(formData: FormData) {
     const fee = pricing.classified[raw];
     if (fee > 0) {
       const { charge } = await import('@/lib/wallet');
-      const paid = await charge(session.uid, fee, 'classified', `إعادة تفعيل مبوّب #${id} (${DUR_DAYS[raw]} يوم)`);
+      // Attach only a confirmed owned source; a failed lookup must not change purchase behavior.
+      const source = await getClassifiedOwnerState(id).catch(() => null);
+      const paid = await charge(session.uid, fee, 'classified', `إعادة تفعيل مبوّب #${id} (${DUR_DAYS[raw]} يوم)`, source?.userId === session.uid ? { kind: 'classified', id, service: 'classified' } : newWalletOperationReference('classified_reactivate'));
       if (!paid.ok) redirect(`/account/classified?error=needcredit&price=${fee}&bal=${paid.balance}`);
     }
     days = DUR_DAYS[raw];

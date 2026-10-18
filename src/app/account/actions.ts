@@ -1,4 +1,5 @@
 'use server';
+import { newWalletOperationReference } from '@/lib/wallet-source-reference';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
@@ -143,7 +144,7 @@ export async function restoreArchivedAdAction(formData: FormData) {
   const isStoreAd = Number(ad.store_only) === 1;
   const fee = isStoreAd ? 0 : await getAdRestoreFee().catch(() => 0);
   if (fee > 0) {
-    const paid = await charge(session.uid, fee, 'ad_show', `إعادة إظهار إعلان مؤرشف #${toInt(adId)}`);
+    const paid = await charge(session.uid, fee, 'ad_show', `إعادة إظهار إعلان مؤرشف #${toInt(adId)}`, { kind: 'ad', id: adId, service: 'ad_show' });
     if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
   }
   await prisma.ads.update({ where: { id: adId }, data: { status: 1, data_archive: null, bumped_at: new Date() } }).catch(() => {});
@@ -269,7 +270,7 @@ export async function featureAdAction(formData: FormData) {
   if (!isDur(raw)) redirect(back || '/account/ads?error=duration');
   const fee = (await getServicePricing()).featured[raw];
   if (fee <= 0) redirect(back || '/account/ads?featured=off'); // التمييز غير مُسعّر لهذه المدّة
-  const paid = await charge(session.uid, fee, 'featured', `تمييز الإعلان #${toInt(adId)} (${DUR_LABEL[raw]})`);
+  const paid = await charge(session.uid, fee, 'featured', `تمييز الإعلان #${toInt(adId)} (${DUR_LABEL[raw]})`, { kind: 'ad', id: adId, service: 'featured' });
   if (!paid.ok) redirect(back ? `${back}?featuredneed=1#paid-result` : `/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
   // مدّة التمييز تُضاف إلى ما تبقّى من تمييز سابق (expires_at = نهاية التمييز)
   const base = ad.expires_at && new Date(ad.expires_at).getTime() > Date.now() ? new Date(ad.expires_at) : new Date();
@@ -383,7 +384,7 @@ export async function buyUrgentAction(formData: FormData) {
   const hours = Number(formData.get('hours') || 0);
   const pack = x.urgentPacks.find((pk) => pk.hours === hours) ?? x.urgentPacks[0];
   if (!pack) redirect(back || '/account/ads');
-  const paid = await charge(session.uid, pack.price, 'urgent', `شارة عاجل (${pack.hours} ساعة) #${toInt(adId)}`);
+  const paid = await charge(session.uid, pack.price, 'urgent', `شارة عاجل (${pack.hours} ساعة) #${toInt(adId)}`, { kind: 'ad', id: adId, service: 'urgent' });
   if (!paid.ok) redirect(back ? `${back}?urgentneed=1#paid-result` : `/account/ads?error=needcredit&price=${pack.price}&bal=${paid.balance}`);
   const base = ad.urgent_until && ad.urgent_until > new Date() ? ad.urgent_until : new Date();
   await prisma.ads.update({ where: { id: adId }, data: { urgent_until: new Date(base.getTime() + pack.hours * 3600_000) } }).catch(() => {});
@@ -415,7 +416,7 @@ export async function bumpAdAction(formData: FormData) {
       const left = Math.max(1, Math.ceil(x.bumpFreeDays - daysSince));
       redirect(back ? `${back}?bumpwait=${left}#paid-result` : `/account/ads?bumpwait=${left}`);
     }
-    const paid = await charge(session.uid, x.bumpPrice, 'bump', `تحديث إعلان (رفع للأعلى) #${toInt(adId)}`);
+    const paid = await charge(session.uid, x.bumpPrice, 'bump', `تحديث إعلان (رفع للأعلى) #${toInt(adId)}`, { kind: 'ad', id: adId, service: 'bump' });
     if (!paid.ok) redirect(back ? `${back}?bumpneed=1#paid-result` : `/account/ads?error=needcredit&price=${x.bumpPrice}&bal=${paid.balance}`);
   }
   await prisma.ads.update({ where: { id: adId }, data: { bumped_at: new Date() } }).catch(() => {});
@@ -546,14 +547,15 @@ export async function fundSaleDepositAction(formData: FormData) {
   if (!(amountSar > 0) || amountSar > 1_000_000) redirect('/account/ads?depositerr=amount');
   const { canMemberSellDirectly } = await import('@/lib/commerce/seller-types');
   if (!(await canMemberSellDirectly(session.uid))) redirect('/account/ads?depositerr=notallowed');
-  const r = await charge(session.uid, amountSar, 'member_service', 'شحن تأمين رصيد البيع المباشر');
+  const sourceReference = newWalletOperationReference('sale_deposit');
+  const r = await charge(session.uid, amountSar, 'member_service', 'شحن تأمين رصيد البيع المباشر', sourceReference);
   if (!r.ok) redirect('/account/ads?depositerr=balance');
   try {
     await prisma.users.update({ where: { id: BigInt(session.uid) }, data: { sale_deposit_minor: { increment: BigInt(amountSar * 100) } } });
   } catch {
     // تعذّر إضافة التأمين بعد الخصم → نُعيد المبلغ للرصيد حفاظاً على المال.
     const { adjustBalance } = await import('@/lib/wallet');
-    await adjustBalance(session.uid, amountSar, 'refund', { note: 'تعذّر شحن تأمين البيع المباشر — استرداد' });
+    await adjustBalance(session.uid, amountSar, 'refund', { note: 'تعذّر شحن تأمين البيع المباشر — استرداد', sourceReference });
     redirect('/account/ads?depositerr=failed');
   }
   revalidatePath('/account/ads');

@@ -1,3 +1,4 @@
+import { walletSourceReference } from '@/lib/wallet-source-reference';
 import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { ensureSchema } from '@/data/schema-sync';
@@ -124,7 +125,7 @@ export async function acceptMemberServiceOrder(orderId: number, userId: number):
       const user = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
       const ledger = await tx.wallet_txns.create({ data: {
         user_id: BigInt(userId), amount: -order.amount, balance_after: user?.balance ?? 0, reason: 'member_service',
-        note: `خدمة خاصة #${toInt(order.id)}: ${order.title}`.slice(0, 200), admin_id: order.admin_id,
+        note: `خدمة خاصة #${toInt(order.id)}: ${order.title}`.slice(0, 200), admin_id: order.admin_id, money_ref: walletSourceReference({ kind: 'member_service_order', id: order.id, service: 'member_service' }),
       } });
       await tx.member_service_orders.update({ where: { id: order.id }, data: { debit_txn_id: ledger.id, updated_at: now } });
       return { ok: true, code: 'ok', balance: user?.balance ?? 0 };
@@ -167,7 +168,7 @@ export async function cancelMemberServiceOrder(orderId: number, userId: number, 
       const user = await tx.users.update({ where: { id: BigInt(userId) }, data: { balance: { increment: refund } }, select: { balance: true } });
       const ledger = await tx.wallet_txns.create({ data: {
         user_id: BigInt(userId), amount: refund, balance_after: user.balance, reason: 'refund',
-        note: `استرداد خدمة خاصة #${toInt(order.id)}: ${order.title}`.slice(0, 200), admin_id: order.admin_id,
+        note: `استرداد خدمة خاصة #${toInt(order.id)}: ${order.title}`.slice(0, 200), admin_id: order.admin_id, money_ref: walletSourceReference({ kind: 'member_service_order', id: order.id, service: 'member_service' }),
       } });
       await tx.member_service_orders.update({ where: { id: order.id }, data: { refund_txn_id: ledger.id, updated_at: now } });
       return { ok: true, code: 'ok', balance: user.balance, refund };

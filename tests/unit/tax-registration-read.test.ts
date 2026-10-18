@@ -1,3 +1,4 @@
+import {walletSourceFingerprint,type WalletReviewSource,type WalletReviewAudit} from '@/lib/finance/wallet-review-model';
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {calculateFiscalLinesV2} from '@/lib/finance/fiscal-v2';
 import {buildReturnSnapshot} from '@/lib/finance/workflows';
@@ -7,7 +8,7 @@ import type {CommerceDb} from '@/lib/commerce/types';
 const mock=vi.hoisted(()=>({access:vi.fn(),data:vi.fn()}));
 vi.mock('@/lib/access-control/store',()=>({readAccess:mock.access}));
 vi.mock('@/lib/finance/read-model',async original=>({...await original<typeof import('@/lib/finance/read-model')>(),readFinanceData:mock.data}));
-import {buildTaxRegistrationReport,readTaxRegistrationMonitor} from '@/lib/finance/tax-registration-read';
+import {buildTaxRegistrationReport,buildTaxRegistrationWithWalletReviews,readTaxRegistrationMonitor} from '@/lib/finance/tax-registration-read';
 
 const now=new Date('2026-09-24T12:00:00Z'),saleAt='2026-09-01T12:00:00.000Z';
 function fixture(rate=1500):FinanceData {
@@ -83,6 +84,21 @@ describe('tax monitor read permission and read-only boundary',()=>{
  });
  it('returns aggregate-only data from one consistent read transaction without writes',async()=>{
   const query=vi.fn().mockResolvedValue([]),tx={$queryRaw:query},transaction=vi.fn(fn=>fn(tx)),db={$transaction:transaction} as unknown as CommerceDb;
-  const result=await readTaxRegistrationMonitor(db,9n,now);expect(result.confirmedTotalMinor).toBe(20000);expect(transaction).toHaveBeenCalledWith(expect.any(Function),expect.objectContaining({isolationLevel:'RepeatableRead'}));expect(mock.access).toHaveBeenCalledWith(tx,9);expect(query).toHaveBeenCalledOnce();expect(JSON.stringify(result)).not.toContain('PRIVATE_');
+  const result=await readTaxRegistrationMonitor(db,9n,now);expect(result.confirmedTotalMinor).toBe(20000);expect(transaction).toHaveBeenCalledWith(expect.any(Function),expect.objectContaining({isolationLevel:'RepeatableRead'}));expect(mock.access).toHaveBeenCalledWith(tx,9);expect(query).toHaveBeenCalledTimes(3);expect(JSON.stringify(result)).not.toContain('PRIVATE_');
  });
 });
+
+describe('wallet decisions integrated with tax coverage',()=>{
+ const source:WalletReviewSource={id:'91',userId:'44',amountMinor:-1150,reason:'featured',sourceReference:'',moneyRef:null,note:'Historic service',at:saleAt};
+ function audit(status:'approved'|'needs_document'='approved'):WalletReviewAudit{return {id:'100',at:'2026-09-23T12:00:00.000Z',actorId:'9',entity:'wallet_txn_review',entityId:source.id,action:'wallet_review_decision',payload:{version:1,sourceId:source.id,sourceFingerprint:walletSourceFingerprint(source),expectedLatestDecisionId:null,requestKey:'review-key-100',status,sourceReference:'manual:service:91',evidenceKind:'service_invoice',documentaryReference:'SERVICE-INVOICE-91',documentLineIdentity:'1',classification:'standard',netMinor:1000,note:'Document explicitly verified'}};}
+ const evidence=(audits:WalletReviewAudit[]=[])=>({sources:[source],audits,invoiceSourceKeys:[] as string[]});
+ it('retains open and needs-document movements in quantified gaps',()=>{for(const audits of [[],[audit('needs_document')]]){const r=buildTaxRegistrationWithWalletReviews(fixture(),evidence(audits),now);expect(r.confirmedTotalMinor).toBe(20000);expect(r.coverage.gaps).toContainEqual(expect.objectContaining({code:'wallet_featured',count:1,amountMinor:1150}));}});
+ it('counts one explicit approval once and closes its gap without changing invoice totals',()=>{const a=audit();const r=buildTaxRegistrationWithWalletReviews(fixture(),evidence([a,structuredClone(a)]),now);expect(r.confirmedTotalMinor).toBe(21000);expect(r.coverage.gaps).toEqual([]);});
+ it('reopens coverage if the original wallet source changes',()=>{const e=evidence([audit()]);e.sources=[{...source,amountMinor:-1250}];const r=buildTaxRegistrationWithWalletReviews(fixture(),e,now);expect(r.confirmedTotalMinor).toBe(20000);expect(r.coverage.gaps[0].amountMinor).toBe(1250);});
+ it('never counts a wallet document already used as an issued invoice',()=>{const a=audit();(a.payload as Record<string,unknown>).documentaryReference='INV-1';const r=buildTaxRegistrationWithWalletReviews(fixture(),evidence([a]),now);expect(r.confirmedTotalMinor).toBe(20000);expect(r.coverage.gaps).toHaveLength(1);});
+ it('preserves an explicit approved exclusion without adding taxable supply',()=>{const a=audit();(a.payload as Record<string,unknown>).classification='out_of_scope';const r=buildTaxRegistrationWithWalletReviews(fixture(),evidence([a]),now);expect(r.confirmedTotalMinor).toBe(20000);expect(r.coverage.gaps).toEqual([]);});
+ it('does not carry old unresolved movement amounts into the rolling review window',()=>{const e=evidence();e.sources=[{...source,at:'2020-01-01T00:00:00Z'}];expect(buildTaxRegistrationWithWalletReviews(fixture(),e,now).coverage.gaps).toEqual([]);});
+});
+
+it('does not allow later wallet approvals to change the report as-of cutoff',()=>{const source:WalletReviewSource={id:'99',userId:'44',amountMinor:-1000,reason:'featured',sourceReference:'service:99',at:saleAt};const a:WalletReviewAudit={id:'101',at:'2026-09-25T12:00:00Z',actorId:'9',entity:'wallet_txn_review',entityId:source.id,action:'wallet_review_decision',payload:{version:1,sourceId:source.id,sourceFingerprint:walletSourceFingerprint(source),expectedLatestDecisionId:null,requestKey:'cutoff-review',status:'approved',sourceReference:source.sourceReference,evidenceKind:'service_invoice',documentaryReference:'SVC-99',documentLineIdentity:'1',classification:'standard',netMinor:1000,note:'Explicit document review'}};const e={sources:[source],audits:[a],invoiceSourceKeys:[]};expect(buildTaxRegistrationWithWalletReviews(fixture(),e,now).confirmedTotalMinor).toBe(20000);a.at='2026-09-23T12:00:00Z';const later={...a,id:'102',at:'2026-09-25T12:00:00Z',payload:{...a.payload as object,status:'needs_document',expectedLatestDecisionId:'101',requestKey:'cutoff-reopen'}};e.audits=[a,later];expect(buildTaxRegistrationWithWalletReviews(fixture(),e,now).confirmedTotalMinor).toBe(21000);});
+it('fails closed when wallet audit time is absent or invalid',()=>{const a:WalletReviewAudit={id:'100',entity:'wallet_txn_review',entityId:'9',action:'wallet_review_decision',payload:{}};expect(()=>buildTaxRegistrationWithWalletReviews(fixture(),{sources:[],audits:[a],invoiceSourceKeys:[]},now)).toThrow('wallet_review_audit_invalid');});

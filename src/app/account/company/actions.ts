@@ -485,7 +485,7 @@ export async function buyStoreShowAction(formData: FormData) {
   const price = pricing.store[dur];
   if (price <= 0) redirect('/store?show=err');
   const { charge } = await import('@/lib/wallet');
-  const paid = await charge(session.uid, price, 'store_show', `عرض المتجر في تربح — ${DUR_LABEL[dur]}`);
+  const paid = await charge(session.uid, price, 'store_show', `عرض المتجر في تربح — ${DUR_LABEL[dur]}`, { kind: 'store', id: storeId, service: 'store_show' });
   if (!paid.ok) redirect(`/store?show=needcredit&price=${price}`);
   const st = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { show_until: true } }).catch(() => null);
   const base = st?.show_until && st.show_until > new Date() ? st.show_until : new Date();
@@ -521,7 +521,7 @@ export async function buyAdShowAction(formData: FormData) {
   const dup = await crossUserDuplicateOf(session.uid, ad.title, ad.detail || '');
   if (dup) redirect(back ? `${back}?adshow=dup&dupid=${dup.id}` : `/store?adshow=dup&dupid=${dup.id}`);
   const { charge } = await import('@/lib/wallet');
-  const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) #${adId} — ${String(ad.title || '').slice(0, 40)}`);
+  const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) #${adId} — ${String(ad.title || '').slice(0, 40)}`, { kind: 'ad', id: adId, service: 'ad_show' });
   if (!paid.ok) redirect(back ? `${back}?adshow=needcredit&price=${pkg.price}` : `/store?adshow=needcredit&price=${pkg.price}`);
   const base = ad.trbhh_until && ad.trbhh_until > new Date() ? ad.trbhh_until : new Date();
   const until = new Date(base.getTime() + pkg.days * 24 * 60 * 60 * 1000);

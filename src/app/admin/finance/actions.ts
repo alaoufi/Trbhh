@@ -1,4 +1,5 @@
 'use server';
+import {saveWalletReviewDecision,type WalletReviewDecision} from '@/lib/finance/wallet-review';
 import {saveTaxDraft} from '@/lib/finance/tax-draft';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
@@ -27,7 +28,8 @@ async function run(form:FormData,module:AccessModule,permission:AccessAction,wor
   }catch(cause){error=publicFinanceError(cause);}
   if(error)params.set('error',error);
   else{params.set('saved','1');const key=typeof successKey==='function'?successKey(result):successKey;if(key!=='saved')params.set(key,'1');revalidatePath('/admin/finance');}
-  redirect('/admin/finance?'+params.toString());
+  if(successKey==='walletReviewSaved'){const page=String(form.get('walletPage')||'1');if(/^\d{1,8}$/.test(page))params.set('walletPage',page);params.set('section','tax');}
+  redirect('/admin/finance?'+params.toString()+(successKey==='walletReviewSaved'?'#wallet-review':''));
 }
 export async function saveFinanceBudget(form:FormData) {
   return run(form,'budget','edit',actor=>saveBudget(prisma,actor,{month:field(form,'month'),category:field(form,'category'),plannedMinor:parseFinanceSar(field(form,'planned')),reason:field(form,'reason')}));
@@ -170,4 +172,28 @@ export async function saveFinanceTaxSettings(form:FormData){
   await saveFinanceTaxPolicyDirect(prisma,actor,input);
   return true;
  },result=>result===true?'settingsApplied':'settingsStored');
+}
+
+export async function saveFinanceWalletReview(form:FormData){
+ await requireAccess('wallets','view');
+ return run(form,'tax','approve',async actor=>{
+  const sourceId=String(parseFinanceId(field(form,'sourceId'))),sourceFingerprint=field(form,'sourceFingerprint'),prior=field(form,'expectedLatestDecisionId');
+  if(!/^[a-f0-9]{64}$/.test(sourceFingerprint))throw Error('finance_wallet_review_invalid');
+  const expectedLatestDecisionId=prior?String(parseFinanceId(prior)):null;
+  const status=policySelection(form,'status',['approved','needs_document'] as const);
+  const input:WalletReviewDecision={version:1,sourceId,sourceFingerprint,expectedLatestDecisionId,requestKey:field(form,'requestKey'),status,sourceReference:field(form,'sourceReference'),note:field(form,'note')};
+  if(!input.note||input.note.length>1000||!input.requestKey||input.requestKey.length>80)throw Error('finance_wallet_review_invalid');
+  if(status==='approved'){
+   if(field(form,'confirm')!=='1')throw Error('finance_wallet_review_confirmation');
+   input.classification=policySelection(form,'classification',['standard','zero','exempt','out_of_scope','capital_asset'] as const);
+   input.netMinor=parseFinanceSar(field(form,'net'));
+   input.evidenceKind=policySelection(form,'evidenceKind',['service_invoice','service_contract'] as const);
+   input.documentaryReference=field(form,'documentaryReference');input.documentLineIdentity=field(form,'documentLineIdentity');
+   if(!input.netMinor||![input.sourceReference,input.documentaryReference,input.documentLineIdentity].every(v=>v.length>0&&v.length<=191))throw Error('finance_wallet_review_invalid');
+  }
+  try{return await saveWalletReviewDecision(prisma,actor,input);}catch(cause){
+   const code=cause instanceof Error?cause.message:'';
+   if(/^wallet_review_[a-z_]{1,60}$/.test(code))throw Error('finance_wallet_review_failed');throw cause;
+  }
+ },'walletReviewSaved');
 }

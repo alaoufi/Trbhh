@@ -463,7 +463,7 @@ export async function createAdAction(formData: FormData) {
       const fprice = (await getServicePricing()).featured[fdur];
       if (fprice > 0) {
         const { charge } = await import('@/lib/wallet');
-        const paid = await charge(session.uid, fprice, 'featured', `تمييز الإعلان (${DUR_LABEL[fdur]}) #${toInt(ad.id)}`);
+        const paid = await charge(session.uid, fprice, 'featured', `تمييز الإعلان (${DUR_LABEL[fdur]}) #${toInt(ad.id)}`, { kind: 'ad', id: ad.id, service: 'featured' });
         if (paid.ok) {
           const base = scheduledAt ?? new Date();
           await prisma.ads.update({ where: { id: ad.id }, data: { adsSpecial: 'checked', expires_at: new Date(base.getTime() + DUR_DAYS[fdur] * 86400000) } }).catch(() => {});
@@ -483,7 +483,7 @@ export async function createAdAction(formData: FormData) {
     const upack = x.urgentPacks.find((pk) => pk.hours === urgentHoursReq);
     if (upack) {
       const { charge } = await import('@/lib/wallet');
-      const paid = await charge(session.uid, upack.price, 'urgent', `شارة عاجل (${upack.hours} ساعة) #${toInt(ad.id)}`);
+      const paid = await charge(session.uid, upack.price, 'urgent', `شارة عاجل (${upack.hours} ساعة) #${toInt(ad.id)}`, { kind: 'ad', id: ad.id, service: 'urgent' });
       if (paid.ok) {
         const base = scheduledAt ?? new Date();
         await prisma.ads.update({ where: { id: ad.id }, data: { urgent_until: new Date(base.getTime() + upack.hours * 3600_000) } }).catch(() => {});

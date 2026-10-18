@@ -1,4 +1,5 @@
 import 'server-only';
+import { newWalletOperationReference } from '@/lib/wallet-source-reference';
 import { prisma } from './prisma';
 import { getSetting, getSettingNum } from './settings';
 import { ensureSchema } from '@/data/schema-sync';
@@ -88,7 +89,8 @@ export async function subscribeIdentityPlan(userId: number, idx: number, dur: Id
   const price = planPrice(plan, dur);
   if (price <= 0) return { ok: false, error: 'noprice' };
   const { charge } = await import('./wallet');
-  const paid = await charge(userId, price, 'subscription', `اشتراك باقة الهويات «${plan.name}» (${DURATION_LABEL[dur]})`);
+  const sourceReference = newWalletOperationReference('identity_subscription');
+  const paid = await charge(userId, price, 'subscription', `اشتراك باقة الهويات «${plan.name}» (${DURATION_LABEL[dur]})`, sourceReference);
   if (!paid.ok) return { ok: false, error: 'nocredit', balance: paid.balance, price };
   const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { identity_paid_until: true } }).catch(() => null);
   const now = Date.now();

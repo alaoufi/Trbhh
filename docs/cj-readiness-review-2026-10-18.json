@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-18",
+  "risk": "P0",
+  "productionCommit": "0abb9ad5c70e87b7a7bed650dfd5d8509fff68c3",
+  "financialAlert": {
+    "confirmedCause": "Tax monitor rejected the existing authorized direct_settings save because maker and checker are the same actor.",
+    "fix": "Accept that mode only when approved request result is bound to the exact policy; retain payload/time/state validation and rejection of unbound self approvals.",
+    "deployed": false,
+    "remainingWalletReview": {
+      "records": 45,
+      "amountSar": 900,
+      "reason": "Unclassified wallet service supplies and refund links require source review; never hide or automatically classify."
+    }
+  },
+  "productionSavedCatalog": {
+    "products": 290,
+    "validVariants": 2685,
+    "invalidVariants": 0,
+    "productsWithoutVariants": 0,
+    "oldOrMissingAvailabilityProducts": 290,
+    "fx": 3.75,
+    "markupPercent": 30,
+    "sourceUsd281": 8.89,
+    "sourceSar281": 33.34,
+    "customerSar281": 43.35,
+    "allLiveSourcePricesVerified": false
+  },
+  "liveLinks": {
+    "adminIndexDestinations": 77,
+    "missingOrGlobalCrashObserved": 0,
+    "limit": "Navigation/render checks only; financial actions and every subroute/role were not exercised."
+  },
+  "tests": {
+    "focusedFinancePassed": 104,
+    "financeCjNavigationPassed": 1837,
+    "typecheck": "passed",
+    "eslintChangedFiles": "passed",
+    "build": "passed; DATABASE_URL absent locally; no production DB proof",
+    "previousFullSuiteOpenFailures": [
+      "Prisma migrate diff CLI exceeded 20s in two unrelated schema fixture tests"
+    ]
+  },
+  "purchaseTrial": {
+    "productId": 281,
+    "optionApproval": null,
+    "quantityApproval": null,
+    "maxTotalApproval": null,
+    "destinationApproval": null,
+    "publicStoreActivation": false,
+    "realPaymentAuthorized": false,
+    "steps": [
+      "Obtain delegate confirmation on tracking callbacks, refund destination and eligibility; preserve provider request references.",
+      "Deploy reviewed finance monitor correction separately after normal code-only release verification.",
+      "Reverify chosen exact VID, quantity, inventory, destination freight, fiscal policy and total immediately before the private trial.",
+      "Approve one exact maximum total; verify customer receipt and unique supplier reference before supplier payment.",
+      "On uncertain payment result reconcile existing reference; do not repeat debit.",
+      "Verify supplier proof, Trbhh order state, tracking callback and eventual receipt against the same references."
+    ]
+  },
+  "runtimeGuardsObserved": {
+    "supplierAllowLiveOrders": false,
+    "cjAllowLiveOrders": true,
+    "changed": false
+  },
+  "outcome": "Preparation and finite evidence collection only; not all findings closed and no live-purchase approval."
+}

@@ -17,7 +17,11 @@ function policyFields(policy:FinanceTaxPolicy){return {effectiveFrom:policy.effe
 function approvedPolicy(data:FinanceData,policy:FinanceTaxPolicy,at:string):boolean {
  if(!Number.isFinite(time(at)))return false;
  const request=data.requests?.find(row=>row.id===policy.requestId),date=new Date(time(at)+10800000).toISOString().slice(0,10);
- return !!request&&!!request.payload&&typeof request.payload==='object'&&!Array.isArray(request.payload)&&request.kind==='tax_settings'&&request.targetId==='tax'&&request.status==='approved'&&!!request.checkerId&&request.checkerId!==request.makerId&&!!request.decidedAt&&time(request.decidedAt)<=time(at)&&time(policy.at)<=time(at)&&policy.effectiveFrom<=date&&fingerprint(policyFields(policy))===fingerprint(policyFields(request.payload as FinanceTaxPolicy));
+ const result=request?.result;
+ // Direct settings writes already require both settings and approval grants.
+ // Only their immutable result bound to this policy permits the same actor.
+ const direct=result?.mode==='direct_settings'&&result.policyId===policy.id;
+ return !!request&&!!request.payload&&typeof request.payload==='object'&&!Array.isArray(request.payload)&&request.kind==='tax_settings'&&request.targetId==='tax'&&request.status==='approved'&&!!request.makerId&&!!request.checkerId&&(request.checkerId!==request.makerId||direct)&&!!request.decidedAt&&time(request.decidedAt)<=time(at)&&time(policy.at)<=time(at)&&policy.effectiveFrom<=date&&fingerprint(policyFields(policy))===fingerprint(policyFields(request.payload as FinanceTaxPolicy));
 }
 /** The existing approved commerce contract is a sale by the platform; raw GMV is never a fallback. */
 function confirmedInvoice(data:FinanceData,invoice:FinanceInvoice,now:Date):FiscalSnapshotV2 {

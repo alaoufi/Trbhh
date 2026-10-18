@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-18",
+  "liveCommitObserved": "0abb9ad5c70e87b7a7bed650dfd5d8509fff68c3",
+  "productionDeploymentExecuted": false,
+  "liveReproduction": {
+    "path": "/notifications?tab=archive",
+    "action": "Open already-read historical comment notification",
+    "actual": "Redirected to /notifications with no explanation; source did not open"
+  },
+  "changes": [
+    "Explain unavailable notification destinations and retain archive context",
+    "Distinguish read archive from resolved issue",
+    "Expandable tax coverage gaps with source links filtered by read permission",
+    "Explain financial next steps without automatic classification or closure",
+    "Stable tax settings destination and explicit missing approval permission",
+    "Disable tax save without approval rights and label saved policy history clearly"
+  ],
+  "validation": {
+    "scopedTests": {
+      "files": 47,
+      "passed": 583
+    },
+    "typecheck": "passed",
+    "eslint": "passed",
+    "build": "exit 0; compilation passed; DATABASE_URL absent locally so database-backed generation is not production verification"
+  },
+  "remaining": [
+    "Deploy only after explicit authorization; verify both live surfaces after deployment",
+    "Historical notification source cannot be reconstructed when no valid link was stored",
+    "Financial classification and refund evidence require authorized document review; warnings are not automatically closed"
+  ],
+  "realPaymentAttempted": false,
+  "financialApprovalExecuted": false,
+  "storeOpened": false
+}

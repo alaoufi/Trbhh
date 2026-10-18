@@ -133,6 +133,8 @@ describe('finance workspace review flows', () => {
 });
 
 describe('finance request controls and preserved records',()=>{
+it('explains missing tax approval rights and provides a stable review anchor',()=>{const html=workflow('tax',{canManageTax:true,canApprove:false});expect(html).toContain('id="tax-policy-settings"');expect(html).toContain('تحتاج صلاحية اعتماد إعدادات الضريبة لتطبيق الحفظ');expect(html).toMatch(/<button[^>]*disabled=""[^>]*>حفظ<\/button>/);});
+
  function workflow(section:FinanceSection,extra:Record<string,unknown>={},source=data()) {
   return renderToStaticMarkup(createElement(FinanceWorkflowPanel,{report:buildFinanceReport(source,{month:'2026-09',section,mode:'accountant'}),actionKey:'preview-actions',...extra}));
  }
@@ -164,7 +166,7 @@ describe('finance request controls and preserved records',()=>{
  });
  it('tax settings are not assumed and cannot be changed with approve-only permission',()=>{
   const reader=workflow('tax',{canApprove:true});expect(reader).not.toContain('name="vatPercent"');
-  const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).toContain('name="vatPercent" value="0"');expect(manager).toContain('لا يعاد حساب الفواتير السابقة');
+  const manager=workflow('tax',{canManageTax:true,canApprove:true});expect(manager).toContain('name="vatPercent"');expect(manager).toContain('name="vatPercent" value="0"');expect(manager).toContain('لا يعاد حساب الفواتير السابقة');
  });
  it('provides an explicit zero VAT preset without inventing an issuer from an old incomplete policy',()=>{
   const source=data();source.taxPolicies=[{id:'1',requestId:'2',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Previous issuer',taxNumber:'300000000000003',address:'Previous address'},vatBps:1500,policyReference:'previous-policy'}];
@@ -174,7 +176,7 @@ describe('finance request controls and preserved records',()=>{
   expect(html).toContain('لم تُحدد سياسة حساب للإصدار المستقبلي');expect(workflow('tax',{canApprove:true},source)).not.toContain('name="automationDelegateId"');
  });
  it('starts VAT OFF, allows a blank registration number and exposes explicit registration evidence with one central rate',()=>{
-  const html=workflow('tax',{canManageTax:true});
+  const html=workflow('tax',{canManageTax:true,canApprove:true});
   const select=html.match(/<select(?=[^>]*name="vatEnabled")[^>]*>[\s\S]*?<\/select>/)?.[0];
   expect(select).toMatch(/<option(?=[^>]*value="off")(?=[^>]*selected="")[^>]*>/);
   expect(html).not.toMatch(/<input(?=[^>]*name="issuerTaxNumber")(?=[^>]*required)[^>]*>/);
@@ -183,7 +185,7 @@ describe('finance request controls and preserved records',()=>{
  });
  it('prefills the explicit current approved policy so a threshold-only proposal preserves all other decisions',()=>{
   const source=data();source.taxPolicies=[{id:'7',requestId:'8',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Approved issuer',taxNumber:'300000000000003',address:'Approved address'},vatBps:1525,policyReference:'existing-approved-reference',calculationPolicy:{version:2,priceBasis:'exclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:1525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatControl:{enabled:true,registrationConfirmed:true,registrationEffectiveFrom:'2026-09-01',registrationThresholdMinor:41000000}}}];
-  const html=workflow('tax',{canManageTax:true},source),formHtml=html.slice(html.indexOf('<form'));
+  const html=workflow('tax',{canManageTax:true,canApprove:true},source),formHtml=html.slice(html.indexOf('<form'));
   for(const value of ['Approved issuer','Approved address','300000000000003','15.25','410000','existing-approved-reference'])expect(formHtml).toContain(`value="${value}"`);
   expect(formHtml.match(/<select(?=[^>]*name="vatEnabled")[^>]*>[\s\S]*?<\/select>/)?.[0]).toMatch(/<option(?=[^>]*value="on")(?=[^>]*selected="")[^>]*>/);
   expect(formHtml).toMatch(/<input(?=[^>]*name="registrationConfirmed")(?=[^>]*checked="")[^>]*>/);

@@ -17,3 +17,5 @@ describe('notifications page wiring',()=>{
  it('archive keeps read sender history reachable',async()=>{const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({tab:'archive'})}));expect(mocks.groups.mock.calls[0][0].where).toEqual({reciver_id:7,is_read:1});expect(html).toContain('/notifications/messages/7');expect(html).not.toContain('تعليم رسائل هذا التنبيه');});
  it('valid peer opens ordinary chat',async()=>{mocks.users.mockResolvedValue([{id:8n,name:'Peer',userName:null}]);const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({})}));expect(html).toContain('href="/messages/8"');});
 });
+
+it('explains unavailable notification source without claiming resolution',async()=>{const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({tab:'archive',notice:'source-unavailable'})}));expect(html).toContain('لا يحتوي هذا التنبيه على رابط مصدر صالح');expect(html).toContain('قراءة التنبيه لا تعني معالجة سببه');});

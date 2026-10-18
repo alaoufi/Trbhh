@@ -14,3 +14,5 @@ describe('notification ownership and access',()=>{
  it('denied inbox never changes message state',async()=>{mocks.view.mockResolvedValue(false);const form=new FormData();form.set('sender','8');await expect(readMessageNotificationAction(form)).rejects.toThrow('redirect:/notifications');expect(mocks.chats).not.toHaveBeenCalled();});
  it('acknowledges only this received sender and preserves message history',async()=>{const form=new FormData();form.set('sender','7');await expect(readMessageNotificationAction(form)).rejects.toThrow('redirect:/notifications');expect(mocks.chats).toHaveBeenCalledWith({where:{reciver_id:7,sender_id:7,is_read:0},data:{is_read:1}});});
 });
+
+it.each([null,'','/notifications','//external.test'])('explains unavailable stored destination %s',async route=>{mocks.find.mockResolvedValue({route,read_at:null});const form=new FormData();form.set('id','9');await expect(openNotifAction(form)).rejects.toThrow('redirect:/notifications?tab=archive&notice=source-unavailable');});

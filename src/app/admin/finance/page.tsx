@@ -9,6 +9,8 @@ import { buildFinanceReport, parseFinanceQuery } from '@/lib/finance/reports';
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
 import {TaxRegistrationMonitor} from '@/components/finance/tax-registration-monitor';
 import {readTaxRegistrationMonitor} from '@/lib/finance/tax-registration-read';
+import {taxGapReview} from '@/lib/finance/tax-registration-actions';
+import {canAccessPage} from '@/lib/access-control/catalog';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'المتابعة المالية | تربح' };
@@ -66,7 +68,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     {params.settingsApplied&&<p role="status" className="rounded-xl border p-3">تم حفظ الإعدادات وتطبيقها بدءًا من تاريخ السريان المحدد. تُستخدم تلقائيًا للفواتير الجديدة ولا تحتاج إدخالها لكل فاتورة.</p>}
     {params.saved&&!params.draft&&!params.settingsStored&&!params.settingsApplied && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{params.submitted?'تم إرسال الطلب للمراجعة؛ لم يُعتمد بعد. راجع قسم طلبات المراجعة والاعتماد أدناه.':'تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.'}</p>}
     {error && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{errorMessages[error] || 'تعذر تنفيذ الإجراء. راجع الحقول المطلوبة والفترة وصلاحيتك وجاهزية المصادر، ثم أعد المحاولة.'}</p>}
-    {taxMonitor&&<TaxRegistrationMonitor report={taxMonitor}/>}
+    {taxMonitor&&<TaxRegistrationMonitor report={taxMonitor} allowedReviewHrefs={taxMonitor.coverage.gaps.map(gap=>taxGapReview(gap.code).href).filter(href=>canAccessPage(access.keys,href))}/>}
     <FinanceWorkspace taxDraft={taxDraft} report={report} canEdit={permissions.edit} canApprove={permissions.approve} canClose={permissions.close} canExport={permissions.export} canRefund={permissions.refund} canCancel={permissions.cancel} canReconcile={permissions.reconcile} canManageTax={permissions.manageTax} canReopen={permissions.reopen} currentUserId={String(session.uid)} visibleSections={permissions.visibleSections} viewFinance={permissions.viewFinance} viewSettlements={permissions.viewSettlements} viewReconciliation={permissions.viewReconciliation} actionKey={randomUUID()} />
   </div>;
 }

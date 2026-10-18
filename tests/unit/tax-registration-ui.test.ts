@@ -5,6 +5,11 @@ import {calculateTaxRegistration} from '@/lib/finance/tax-registration';
 import {TaxRegistrationMonitor} from '@/components/finance/tax-registration-monitor';
 const now=new Date('2026-09-24T12:00:00Z');
 describe('tax registration monitor coverage and accessible warnings',()=>{
+ it('expands an old warning and exposes a permitted source and concrete next step',()=>{
+  const report=calculateTaxRegistration({now,events:[],gaps:[{code:'wallet_featured',label:'خدمات تحتاج مراجعة',count:8,amountMinor:17000},{code:'threshold_unverified',label:'حد غير متحقق',count:1,amountMinor:null}]});
+  const html=renderToStaticMarkup(createElement(TaxRegistrationMonitor,{report,allowedReviewHrefs:['/admin/revenue?tab=payments&cat=featured']}));
+  expect(html).toContain('<summary');expect(html).toContain('href="/admin/revenue?tab=payments&amp;cat=featured"');expect(html).toContain('الإجراء المطلوب');expect(html).toContain('الموظف المخوّل');expect(html).not.toContain('href="/admin/finance?section=tax#tax-policy-settings"');expect(html).not.toContain('<form');
+ });
  it('shows source-qualified totals, threshold, rolling dates and updated time without a VAT activation action',()=>{
   const report=calculateTaxRegistration({now,events:[{sourceKey:'one',origin:'invoice',kind:'supply',classification:'zero',netMinor:37500000,at:now.toISOString()}],gaps:[]});
   const html=renderToStaticMarkup(createElement(TaxRegistrationMonitor,{report}));

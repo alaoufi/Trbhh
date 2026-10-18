@@ -12,7 +12,7 @@ vi.mock('@/lib/finance/tax-registration-read',()=>({readTaxRegistrationMonitor:m
 vi.mock('@/components/finance/finance-workspace',()=>({FinanceWorkspace:()=>React.createElement('div',null,'financial workspace')}));
 vi.mock('@/components/finance/tax-registration-monitor',()=>({TaxRegistrationMonitor:()=>React.createElement('div',null,'rolling tax monitor')}));
 import Page from '@/app/admin/finance/page';
-beforeEach(()=>{vi.clearAllMocks();m.require.mockResolvedValue({uid:7});m.access.mockResolvedValue({keys:new Set(['tax:view'])});m.data.mockResolvedValue({});m.build.mockReturnValue({});m.monitor.mockResolvedValue({});});
+beforeEach(()=>{vi.clearAllMocks();m.require.mockResolvedValue({uid:7});m.access.mockResolvedValue({keys:new Set(['tax:view'])});m.data.mockResolvedValue({});m.build.mockReturnValue({});m.monitor.mockResolvedValue({coverage:{gaps:[]}});});
 describe('finance tax monitor server page authorization',()=>{
  it('loads rolling totals for an authorized tax viewer independently of the selected report month',async()=>{
   const html=renderToStaticMarkup(await Page({searchParams:Promise.resolve({section:'tax',month:'2020-01'})}));

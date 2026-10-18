@@ -27,10 +27,10 @@ const kindOf = (t: string | null): Kind => KINDS.find((k) => k.key === t) || KIN
 
 
 
-export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; mp?: string }> }) {
+export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; mp?: string; notice?:string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const {tab:tabRaw,page:pageRaw,mp:mpRaw}=await searchParams;
+  const {tab:tabRaw,page:pageRaw,mp:mpRaw,notice}=await searchParams;
   const tab=['all','archive',...KINDS.map(k=>k.key)].includes(tabRaw||'')?tabRaw!:'all';
   const canViewMessages=await canUseMemberChat(session.uid,'view');
   const data=await notificationPageData(session.uid,tab,Math.max(1,parseInt(pageRaw||'1')||1),Math.max(1,parseInt(mpRaw||'1')||1),canViewMessages);
@@ -52,6 +52,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         )}
       </div>
 
+      {notice==='source-unavailable'&&<p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">لا يحتوي هذا التنبيه على رابط مصدر صالح. احتُفظ بسجله في الأرشيف؛ قراءة التنبيه لا تعني معالجة سببه. راجع نص التنبيه ومرجع العملية مع الموظف المختص.</p>}
+      {tab==='archive'&&<p className="text-sm text-muted-foreground">الأرشيف يحتفظ بالتنبيهات المقروءة. ظهور السجل هنا لا يعني وجود إجراء جديد، ولا يثبت إغلاق المشكلة الأصلية.</p>}
       {/* التصنيفات + الأرشيف */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
         {TABS.map((t) => {

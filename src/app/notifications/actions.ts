@@ -11,7 +11,8 @@ export async function openNotifAction(formData:FormData){
  const row=await prisma.notfications.findFirst({where:{id,user_id:String(session.uid)}});
  if(!row)redirect('/notifications');
  await prisma.notfications.updateMany({where:{id,user_id:String(session.uid),read_at:null},data:{read_at:new Date()}});
- revalidatePath('/','layout');redirect(safeNotificationRoute(row.route));
+ const destination=safeNotificationRoute(row.route);
+ revalidatePath('/','layout');redirect(destination==='/notifications'?'/notifications?tab=archive&notice=source-unavailable':destination);
 }
 export async function readMessageNotificationAction(formData:FormData){
  const session=await requireUser();const raw=formData.get('sender');if(typeof raw!=='string'||!/^\d+$/.test(raw))redirect('/notifications');const sender=Number(raw);

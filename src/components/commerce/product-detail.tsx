@@ -2,15 +2,16 @@
 import {SizeReferenceGuide} from '@/components/size-reference-guide';
 /* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; use native lazy-loaded images without a configured remote loader. */
 import Link from 'next/link';
-import {useRef,useState} from 'react';
-import {ChevronLeft,ChevronRight,Expand,X} from 'lucide-react';
+import {useState} from 'react';
+import {ProductImageZoom} from '@/components/product-image-zoom';
+import {ChevronLeft,ChevronRight} from 'lucide-react';
 import {AddCommerceCartItem} from './purchase-cart-client';
 import type {PublicCommerceProduct} from '@/lib/commerce/public-product';
 import {formatSar} from '@/lib/commerce/money';
 import {remindRestockAction} from '@/app/shop/actions';
 
 export function CommerceProductDetail({product,similar,shippingFeeMinor,priceBasis,purchasingEnabled,shippingTerms,reminded}:{product:PublicCommerceProduct;similar:PublicCommerceProduct[];shippingFeeMinor:number|null;priceBasis:'inclusive'|'exclusive'|null;purchasingEnabled:boolean;shippingTerms:string;reminded?:boolean}){
- const[selected,setSelected]=useState(0),dialog=useRef<HTMLDialogElement>(null);
+ const[selected,setSelected]=useState(0);
  const[selectedVariant,setSelectedVariant]=useState(''),variant=product.variants.find(item=>item.key===selectedVariant);
  const images=variant?.image?[variant.image,...product.images.filter(image=>image!==variant.image)]:product.images;
  const visiblePrice=variant?.priceMinor??(product.variants.length?Math.min(...product.variants.map(item=>item.priceMinor)):product.priceMinor);
@@ -20,12 +21,10 @@ export function CommerceProductDetail({product,similar,shippingFeeMinor,priceBas
   <div className="mb-4"><nav aria-label="مسار التنقل" className="text-xs font-bold text-slate-500"><Link href="/shop" className="hover:text-[#16294a]">متجر تربح</Link><span className="mx-2">/</span><span className="text-[#16294a]">تفاصيل المنتج</span></nav></div>
   <main className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(340px,.9fr)] lg:gap-8">
    <section aria-label="صور المنتج" className="min-w-0 space-y-3">
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="aspect-square max-h-[580px] bg-slate-50">{images.length?<img src={images[selected]} alt={product.title} fetchPriority="high" className="h-full w-full object-contain p-2 sm:p-5"/>:<div className="grid h-full place-items-center text-sm font-bold text-slate-400">صورة المنتج غير متوفرة</div>}</div>
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="aspect-square max-h-[580px] bg-slate-50">{images.length?<ProductImageZoom src={images[selected]} onPrevious={images.length>1?()=>move(-1):undefined} onNext={images.length>1?()=>move(1):undefined} positionLabel={`${selected+1} / ${images.length}`} alt={product.title} className="h-full w-full"><img src={images[selected]} alt={product.title} fetchPriority="high" className="h-full w-full object-contain"/></ProductImageZoom>:<div className="grid h-full place-items-center text-sm font-bold text-slate-400">صورة المنتج غير متوفرة</div>}</div>
      {images.length>1&&<><button type="button" onClick={()=>move(-1)} aria-label="الصورة السابقة" className="absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/95 shadow"><ChevronRight/></button><button type="button" onClick={()=>move(1)} aria-label="الصورة التالية" className="absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/95 shadow"><ChevronLeft/></button></>}
-     {images.length>0&&<button type="button" onClick={()=>dialog.current?.showModal()} aria-label="تكبير صورة المنتج" className="absolute bottom-3 left-3 grid h-11 w-11 place-items-center rounded-full bg-white/95 shadow"><Expand className="h-5 w-5"/></button>}
     </div>
     {images.length>1&&<div className="flex max-w-full gap-2 overflow-x-auto pb-2">{images.map((image,index)=><button key={`${image}-${index}`} type="button" onClick={()=>setSelected(index)} aria-label={`عرض الصورة ${index+1}`} aria-pressed={selected===index} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white ${selected===index?'border-[#ff6a1a]':'border-slate-200'}`}><img src={image} alt="" loading="lazy" className="h-full w-full object-contain p-1"/></button>)}</div>}
-    <dialog ref={dialog} className="m-auto w-[calc(100%_-_2rem)] max-w-4xl rounded-2xl bg-white p-3 backdrop:bg-slate-950/70" aria-label="صورة المنتج المكبرة"><form method="dialog" className="mb-2 flex justify-end"><button aria-label="إغلاق" className="grid h-11 w-11 place-items-center rounded-full border"><X/></button></form>{images[selected]&&<img src={images[selected]} alt={product.title} className="max-h-[75vh] w-full object-contain"/>}</dialog>
    </section>
    <section className="min-w-0 space-y-4">
     {product.featured&&<span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-extrabold text-amber-800">منتج مميّز</span>}

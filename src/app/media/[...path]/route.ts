@@ -4,7 +4,7 @@ import { open, readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { statLocal, statInDir } from '@/lib/storage';
 import { isHeicBytes, heicBytesToJpeg } from '@/lib/upload-normalize';
-import { isCanonicalMediaPath, isPotentiallyProtectedUploadPath, isProtectedUploadType } from '@/lib/media-access';
+import { isCanonicalMediaPath, isPotentiallyProtectedUploadPath, isProtectedUploadType, isTopupReceiptPath } from '@/lib/media-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,6 +72,22 @@ function serveFile(file: { abs: string; size: number }, req: NextRequest, conten
 async function protectedMediaCacheControl(rel: string): Promise<string | null> {
   if (!isPotentiallyProtectedUploadPath(rel)) return 'public, max-age=31536000, immutable';
   const { prisma } = await import('@/lib/prisma');
+  if (isTopupReceiptPath(rel)) {
+    const { getSession } = await import('@/lib/auth');
+    const session = await getSession();
+    if (!session) return null;
+    const match = /^uploads\/topup_([1-9]\d{0,19})_\d+\.[a-z0-9]{1,10}$/i.exec(rel);
+    if (!match) return null;
+    const ownerId = BigInt(match[1]);
+    if (ownerId > 18446744073709551615n) return null;
+    // Filename alone cannot grant access. A copied path on another member's
+    // top-up request must not transfer ownership of a private receipt.
+    const receipt = await prisma.wallet_topups.findFirst({where:{receipt:rel,user_id:ownerId},select:{user_id:true}}).catch(()=>null);
+    if (!receipt) return null;
+    if (receipt.user_id === BigInt(session.uid)) return 'private, no-store';
+    const { hasAccess } = await import('@/lib/access-control/guards');
+    return (await hasAccess(session.uid,'topups','view').catch(()=>false)) ? 'private, no-store' : null;
+  }
   const upload = await prisma.uploads.findFirst({ where: { file_name: rel }, select: { type: true, user_id: true } }).catch(() => null);
   if (!upload || !isProtectedUploadType(upload.type)) return null;
 

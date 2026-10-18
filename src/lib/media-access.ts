@@ -13,5 +13,8 @@ export function isProtectedUploadType(type: string | null | undefined): boolean 
 
 /** Avoid a database lookup for ordinary public ad media on the hot path. */
 export function isPotentiallyProtectedUploadPath(fileName: string): boolean {
-  return /^uploads\/verify_[^/]+$/i.test(fileName);
+  return /^uploads\/(?:verify_|topup_)[^/]+$/i.test(fileName);
 }
+
+/** Top-up receipts contain private banking evidence. The exact path is bound to a stored request. */
+export function isTopupReceiptPath(fileName:string):boolean{return /^uploads\/topup_[^/]+$/i.test(fileName);}

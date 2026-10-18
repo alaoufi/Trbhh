@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-18",
+  "scope": "Read-only examination of stored financial documents; no approval or monetary mutation",
+  "liveBaseline": "a979fc177d301bae75865dfe8d7417a2fe4f1e41",
+  "findings": {
+    "walletMovements": 45,
+    "reviewAmountMinor": 90000,
+    "storedMoneyReferenceCount": 0,
+    "financeInvoiceRows": 0,
+    "commerceReceiptRows": 0,
+    "memberServiceOrderRows": 0,
+    "walletTopupRows": 45,
+    "topupReceiptAttachments": 25,
+    "receiptFilesVerifiedLocally": 25,
+    "receiptFilenameOwnerBindingsVerified": 25,
+    "adReferenceMovements": 25,
+    "adRowsFound": 25,
+    "adOwnerMatches": 25,
+    "adOwnerMismatches": 0,
+    "movementsWithoutExplicitAdReference": 20
+  },
+  "interpretation": [
+    "Bank funding receipts and an advertising transaction history were found inside Trbhh",
+    "A funding receipt is not automatically a service invoice or a tax-classification approval",
+    "The 25 matched ad references establish an operational link only; they do not close financial coverage gaps",
+    "No stored invoice or money reference was found for the 45 movements in the examined invoice and wallet sources"
+  ],
+  "security": {
+    "severity": "P0",
+    "observedAnonymousOriginReceiptStatus": 206,
+    "observedPublicReceiptStatus": 200,
+    "observedPublicEdgeCacheStatus": "MISS",
+    "documentBytesOrUrlsPrinted": false,
+    "fix": "Bind topup receipt access to the registered owner or topups:view; private no-store; deny unregistered and unauthenticated requests before reading storage",
+    "productionFixDeployed": false,
+    "followup": "After deployment invalidate any previously cached receipt responses and verify original URLs are denied anonymously, plus authorized access remains available"
+  },
+  "financialWrites": false,
+  "realPaymentAttempted": false,
+  "storeOpened": false,
+  "validation": {
+    "relatedTests": {
+      "files": 50,
+      "passed": 612
+    },
+    "diagnosticTests": 12,
+    "typecheck": "passed",
+    "eslint": "passed",
+    "build": "exit 0; no local production database; live deployment and owner/denial verification pending",
+    "independentSecurityReview": "no blocking findings; cached-response invalidation and live verification still required"
+  }
+}

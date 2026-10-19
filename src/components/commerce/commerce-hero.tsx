@@ -75,17 +75,17 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const separated = s.presentation === 'separated';
   const separatedVisual = <figure data-slide-presentation="separated" className="w-full bg-[#f8fafc] text-[#16294a]">
-    <div data-banner-image="true" className="relative aspect-[16/9] w-full overflow-hidden bg-[#071a22] sm:aspect-[16/7]">
+    <div data-banner-image="true" className={`relative w-full overflow-hidden bg-[#071a22] ${compact ? 'h-[120px] sm:h-[160px]' : 'aspect-[16/9] sm:aspect-[16/7]'}`}>
       {s.image
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={s.image} alt={s.title} loading={active === 0 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className={`h-full w-full ${s.imageFit === 'cover' ? 'object-cover' : 'object-contain'}`} />
         : <div className="h-full w-full bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
     </div>
-    <figcaption className={`flex flex-col bg-[#f8fafc] ${compact ? 'gap-1.5 p-4 sm:p-5' : 'gap-2 p-5 sm:p-7'} ${s.contentAlign === 'center' ? 'items-center text-center' : ''}`}>
+    <figcaption className={`flex flex-col bg-[#f8fafc] ${compact ? 'gap-1 p-3' : 'gap-2 p-5 sm:p-7'} ${s.contentAlign === 'center' ? 'items-center text-center' : ''}`}>
       {eyebrow && <span className="inline-flex w-fit max-w-full items-center gap-1.5 rounded-full bg-[#006c35]/10 px-3 py-1 text-[12px] font-extrabold text-[#006c35]">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#f0b429]" /> {eyebrow}
       </span>}
-      <Heading className={`break-words font-extrabold leading-snug ${compact ? 'text-xl sm:text-3xl' : 'text-2xl sm:text-4xl'}`}>{s.title}</Heading>
+      <Heading className={`break-words font-extrabold leading-snug ${compact ? 'text-base sm:text-xl' : 'text-2xl sm:text-4xl'}`}>{s.title}</Heading>
       {s.subtitle && <p className="max-w-3xl break-words text-sm font-semibold leading-6 text-slate-600 sm:text-base">{s.subtitle}</p>}
       {s.cta !== '' && <span className="mt-2 inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] px-5 py-2.5 text-sm font-extrabold text-[#16294a] shadow-sm">
         {s.cta || 'تصفّح الآن'}
@@ -93,7 +93,7 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
       </span>}
     </figcaption>
   </figure>;
-  const overlayVisual = <div className={`relative flex w-full items-center ${compact ? 'min-h-[230px] sm:min-h-[320px]' : 'min-h-[340px] sm:min-h-[360px]'}`}>
+  const overlayVisual = <div className={`relative flex w-full items-center ${compact ? 'min-h-[140px] sm:min-h-[180px]' : 'min-h-[340px] sm:min-h-[360px]'}`}>
     {s.image
       ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -104,15 +104,15 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
     <div className="absolute inset-0 bg-[#0b162e]/45" />
     <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/90 via-[#0b162e]/55 to-transparent" />
     <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/70 via-transparent to-transparent" />
-    <div className={`relative flex w-full max-w-xl flex-col justify-center ${compact ? 'p-4 sm:p-8' : 'p-6 sm:p-10'} ${s.contentAlign === 'center' ? 'mx-auto items-center text-center' : ''}`}>
+    <div className={`relative flex w-full max-w-xl flex-col justify-center ${compact ? 'p-3 sm:p-4' : 'p-6 sm:p-10'} ${s.contentAlign === 'center' ? 'mx-auto items-center text-center' : ''}`}>
       {eyebrow && <span className="mb-3 inline-flex w-fit max-w-full items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff6a1a]" /> {eyebrow}
       </span>}
-      <Heading className={`break-words font-extrabold leading-snug drop-shadow-lg ${compact ? 'line-clamp-2 text-xl sm:text-4xl' : 'line-clamp-3 text-2xl sm:text-4xl'}`}>
+      <Heading className={`break-words font-extrabold leading-snug drop-shadow-lg ${compact ? 'line-clamp-2 text-base sm:text-2xl' : 'line-clamp-3 text-2xl sm:text-4xl'}`}>
         {s.title}
       </Heading>
       {s.subtitle && <p className="mt-2 line-clamp-3 max-w-lg break-words text-sm font-semibold leading-6 text-white/85 sm:text-lg">{s.subtitle}</p>}
-      {s.cta !== '' && <span className={`inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] font-extrabold text-[#16294a] shadow-lg transition group-hover:bg-[#ff8a3d] ${compact ? 'mt-3 px-4 py-2.5 text-sm sm:mt-5 sm:px-6 sm:py-3 sm:text-base' : 'mt-5 px-6 py-3 text-base'}`}>
+      {s.cta !== '' && <span className={`inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] font-extrabold text-[#16294a] shadow-lg transition group-hover:bg-[#ff8a3d] ${compact ? 'mt-2 px-3 py-1.5 text-xs sm:text-sm' : 'mt-5 px-6 py-3 text-base'}`}>
         {s.cta || 'تصفّح الآن'}
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
       </span>}

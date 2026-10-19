@@ -126,14 +126,15 @@ it('shows search before the hero and keeps category navigation outside collapsib
  try {
   const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
   const shell=tree.find(e=>e.props['data-home-search-shell']!==undefined)!;
-  const search=tree.find(e=>e.type==='details'&&e.props['data-home-search']!==undefined)!;
+  const search=tree.find(e=>e.type==='div'&&e.props['data-home-search']!==undefined)!;
   const categories=tree.filter(e=>e.type===HomeCategoryNavigation);
-  expect(search.props.open).toBe(true);
+  expect(tree.find(e=>e.type===PublicSearchForm)?.props.inline).toBe(true);
+  expect(tree.find(e=>e.type===PublicSearchForm)?.props.placeholder).toBe('وش تبحث عنه اليوم؟');
   expect(categories).toHaveLength(1);
   expect(elements(search.props.children).some(e=>e.type===HomeCategoryNavigation)).toBe(false);
   expect(elements(shell.props.children)).toContain(categories[0]);
   expect(tree.indexOf(shell)).toBeLessThan(tree.findIndex(e=>e.type===CommerceHero));
-  const add=tree.filter(e=>e.props['data-home-search-add']!==undefined);
+  const add=elements(tree.find(e=>e.type===PublicSearchForm)?.props.inlineAction).filter(e=>e.props['data-home-search-add']!==undefined);
   expect(add).toHaveLength(1);
   expect(add[0].props.href).toBe('/ads/new');
   expect(add[0].props.className).not.toMatch(/absolute|hidden/);

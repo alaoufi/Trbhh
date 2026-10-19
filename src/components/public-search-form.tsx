@@ -1,13 +1,15 @@
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { SearchSuggestInput } from '@/components/search-suggest';
-import { Search } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
+import type { ReactNode } from 'react';
+import styles from './home-dense-feed.module.css';
 
 type Region = { id: number; name: string; countryId?: number };
 type Area = { id: number; name: string; cityId: number };
 
-export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false }: {
+export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false, inline = false, inlineAction }: {
   regions: Region[]; areas: Area[]; params?: Record<string, string | undefined>;
-  priceOn?: boolean; placeholder?: string; compact?: boolean;
+  priceOn?: boolean; placeholder?: string; compact?: boolean; inline?: boolean; inlineAction?: ReactNode;
 }) {
   const field = 'h-11 min-w-0 w-full rounded-lg border bg-background px-3 text-sm text-foreground';
   const filters = <>
@@ -31,6 +33,14 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
       </select>
     </label>}
   </>;
+  if (inline) return <form action="/search" method="get" role="search" className={styles.searchRow}>
+    {params.category && <input name="category" type="hidden" value={params.category} />}
+    {params.special === '1' && <input name="special" type="hidden" value="1" />}
+    <label className={styles.searchInput}><span className="sr-only">البحث في الإعلانات</span><SearchSuggestInput key={params.q || ''} name="q" defaultValue={params.q || ''} placeholder={placeholder} /></label>
+    <button type="submit" aria-label="بحث" className={styles.searchSubmit}><Search className="h-4 w-4" /><span className="hidden sm:inline">بحث</span></button>
+    <details className={styles.searchFilters}><summary aria-label="تصفية البحث" className={styles.filterToggle}><SlidersHorizontal className="h-4 w-4" /><span className="hidden sm:inline">تصفية</span></summary><div className={styles.filterPanel}>{filters}</div></details>
+    {inlineAction}
+  </form>;
   return <form action="/search" method="get" role="search" className="space-y-3">
     {params.category && <input name="category" type="hidden" value={params.category} />}
     <div className="flex items-end gap-2">

@@ -543,12 +543,16 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </a>
       )}
 
+      <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,440px)_minmax(0,1fr)] md:items-start" data-ad-detail-overview>
+      <div className="min-w-0 space-y-3">
       {/* Gallery with tap-to-zoom lightbox */}
       <AdGallery images={ad.images} title={ad.title} special={ad.special} adsType={ad.adsType} />
 
       {/* Video / audio — shown prominently right below the images */}
       <AdMedia videoPath={ad.videoPath} audioPath={await getAdAudio(ad.id).catch(() => null)} />
 
+      </div>
+      <div className="min-w-0 space-y-4">
       <h1 className="text-xl font-bold text-primary">{ad.title}</h1>
 
       {/* Info grid card */}
@@ -608,6 +612,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <AdCategorySummary fields={ad.categoryFields}/>
         <SizeReferenceGuide/>
         <ExpandableDetail text={ad.detail || ""} />
+      </div>
+
+      </div>
       </div>
 
       {/* شراء مباشر — سلعة العضو الموثوق المعتمدة: الإجمالي شامل الشحن (يرى العميل الإجمالي فقط) */}

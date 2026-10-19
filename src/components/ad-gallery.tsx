@@ -28,15 +28,15 @@ export function AdGallery({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="mx-auto w-full min-w-0 max-w-[440px] space-y-2 md:grid md:grid-cols-[52px_minmax(0,1fr)] md:items-start md:gap-2 md:space-y-0">
       {/* main image — swipe to browse, tap to enlarge */}
-      <div className="relative">
+      <div className="relative min-w-0 md:col-start-2 md:row-start-1">
         <div
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
-          className="relative block aspect-[4/3] w-full overflow-hidden rounded-2xl border-2 border-primary/20 bg-secondary shadow-sm"
+          className="relative block h-[240px] w-full md:h-[320px] overflow-hidden rounded-2xl border-2 border-primary/20 bg-secondary shadow-sm"
         >
-          <ProductImageZoom src={images[active]} onPrevious={n>1?()=>go(-1):undefined} onNext={n>1?()=>go(1):undefined} positionLabel={`${active+1} / ${n}`} alt={title} className="h-full w-full"><Image src={images[active]} alt={title} fill sizes="(max-width:1024px) 100vw, 66vw" className="object-contain" priority /></ProductImageZoom>
+          <ProductImageZoom src={images[active]} onPrevious={n>1?()=>go(-1):undefined} onNext={n>1?()=>go(1):undefined} positionLabel={`${active+1} / ${n}`} alt={title} className="h-full w-full"><Image src={images[active]} alt={title} fill sizes="(max-width:767px) min(100vw, 440px), 380px" className="object-contain" priority /></ProductImageZoom>
           <div className="absolute right-3 top-3 flex gap-1">
             {special && <span className="rounded bg-[hsl(var(--new))] px-2 py-0.5 text-xs font-bold text-white">مميّز</span>}
             {adsType && <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">{adsType === 'offer' ? 'عرض' : 'طلب'}</span>}
@@ -57,15 +57,19 @@ export function AdGallery({
 
       {/* thumbnails */}
       {n > 1 && (
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+        <div aria-label="صور الإعلان" className="flex gap-2 overflow-x-auto pb-1 md:col-start-1 md:row-start-1 md:max-h-[320px] md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0">
           {images.slice(0, 12).map((img, i) => (
             <button
               type="button"
               key={i}
               onClick={() => setActive(i)}
-              className={`relative aspect-square overflow-hidden rounded-lg border-2 bg-secondary transition hover:-translate-y-0.5 ${i === active ? 'border-primary ring-2 ring-primary/40' : 'border-primary/20 hover:border-primary/50'}`}
+              onMouseEnter={() => setActive(i)}
+              onFocus={() => setActive(i)}
+              aria-label={`عرض الصورة ${i + 1} من ${n}`}
+              aria-pressed={i === active}
+              className={`relative h-[52px] w-[52px] shrink-0 overflow-hidden rounded-lg border-2 bg-secondary transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${i === active ? 'border-primary ring-2 ring-primary/40' : 'border-primary/20 hover:border-primary/50'}`}
             >
-              <Image src={img} alt={`${title} ${i + 1}`} fill sizes="20vw" className="object-cover" />
+              <Image src={img} alt={`${title} ${i + 1}`} fill sizes="52px" className="object-cover" />
             </button>
           ))}
         </div>

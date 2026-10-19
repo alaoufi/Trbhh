@@ -81,3 +81,13 @@ describe('homepage category discovery', () => {
     expect(html).not.toContain('/shop');
   });
 });
+
+it('keeps every active category reachable in one visual navigation without a duplicate selector', async () => {
+ const many = { ...config, categories: Array.from({length:36},(_,i)=>({id:i+1,name:'Category '+i,active:true,order:i})) };
+ const html = renderToStaticMarkup(await HomeCategoryNavigation({config:many,selectedCategory:'36',visual:true}));
+ expect((html.match(/href="\/\?category=/g)||[])).toHaveLength(36);
+ expect(html).toMatch(/<a[^>]*aria-current="page"[^>]*href="\/\?category=36"/);
+ expect(html).toContain('href="/"');
+ expect(html).not.toContain('<select');
+ expect(html).not.toContain('<form');
+});

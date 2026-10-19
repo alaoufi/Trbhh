@@ -146,7 +146,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const heroSlides = nationalDayActive ? nationalDayHeroSlides() : marketplaceHeroSlides;
 
   return (
-    <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
+    <div className={`commerce-scope public-marketplace-home space-y-7 sm:space-y-10 ${feedStyles.catalog} ${denseFeed ? feedStyles.dense : ''}`} data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
       {nationalDayActive && <NationalDayEntry active />}
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
@@ -158,6 +158,16 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       {nationalDayActive && <NationalDayBanner />}
 
+      <div data-home-search-shell className="space-y-3">
+        {discoveryOn && <details open data-home-search className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm sm:px-4">
+          <summary className="cursor-pointer list-none py-3 text-lg font-extrabold text-[#16294a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">وش تبحث عنه اليوم؟</summary>
+          <div className="space-y-3 pb-3">
+            <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
+            <Link data-home-search-add href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
+          </div>
+        </details>}
+        <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
+      </div>
       {discoveryOn && (
         <section className="space-y-3" aria-label="اكتشف سوق تربح">
           <NationalDayHeroFrame active={nationalDayActive}>
@@ -171,26 +181,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           </NationalDayHeroFrame>
         </section>
       )}
-      {/* أدوات البحث والأقسام مطويّة افتراضياً وتُفتح بالضغط على «وش تبحث عنه اليوم؟» */}
-      <div data-home-search-shell className="relative">
-        <details data-home-search className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm sm:px-4">
-          <summary className="cursor-pointer list-none py-3 text-lg font-extrabold text-[#16294a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary lg:min-h-16 lg:pl-44 lg:py-4 [&::-webkit-details-marker]:hidden">وش تبحث عنه اليوم؟</summary>
-          <div className="space-y-3 pb-3">
-            {discoveryOn && <>
-              <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
-              <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
-            </>}
-            <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
-          </div>
-        </details>
-        {discoveryOn && <Link data-home-search-add href="/ads/new" className="absolute left-4 top-2.5 hidden lg:inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>}
-      </div>
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
       <section aria-label={selectedCategory?.name || 'السوق'} className="space-y-4">
         {feedAds.length > 0 && <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-xl font-extrabold text-[#16294a]"><span className="h-6 w-1.5 rounded-full bg-[#ff6a1a]" />{selectedCategory?.name || 'اكتشف السوق'}</h2><Link href={feedSearchHref} className="py-2 text-sm font-bold text-[#16294a]">عرض الكل ←</Link></div>}
-        <div className={`space-y-4 ${denseFeed ? feedStyles.dense : ''}`}>
+        <div className="space-y-4">
           {selectedCategory && !feedAds.length
             ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
             : compactStripOn && stripAds.length >= 4 ? (

@@ -1,11 +1,13 @@
-/* auto-fill (not auto-fit): empty trailing tracks are KEPT so a short last row's
-   cards stay small instead of stretching into big "old-style" cards. */
-.dense [data-home-feed-grid] {grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr));gap:8px;align-items:start;}
-.dense :global(.marketplace-card) {border-radius:12px;}
-.dense :global(.marketplace-card)>div:first-child {aspect-ratio:16/10;}
-.dense :global(.marketplace-card)>div:nth-child(2) {padding:8px;gap:5px;flex:0 0 auto;}
-.dense :global(.marketplace-card)>div:nth-child(2)>div:last-child {margin-top:0;}
-.dense :global(.marketplace-card) h3 {font-size:12px;line-height:18px;min-height:0;}
-.dense :global(.marketplace-card) strong {font-size:14px;}
-.dense :global(.marketplace-card) dl {font-size:10px;}
-.dense :global(.marketplace-card) dl>div:nth-child(n+3) {display:none;}
+/* Explicit tracks keep short rows the same size as full rows. Only marketplace
+   feed grids opt in; the list and shop designs retain their own layouts. */
+.catalog [data-home-feed-grid] {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}
+.catalog [data-home-feed-grid] :global(.marketplace-card) {border-radius:12px;}
+.catalog [data-home-feed-grid] :global(.marketplace-card)>div:first-child {aspect-ratio:1;}
+.catalog [data-home-feed-grid] :global(.marketplace-card)>div:nth-child(2) {padding:12px;gap:6px;flex:0 0 auto;}
+.catalog [data-home-feed-grid] :global(.marketplace-card)>div:nth-child(2)>div:last-child {margin-top:0;}
+.catalog [data-home-feed-grid] :global(.marketplace-card) h3 {font-size:14px;line-height:20px;min-height:0;}
+.catalog [data-home-feed-grid] :global(.marketplace-card) strong {font-size:16px;}
+.catalog.dense [data-home-feed-grid] :global(.marketplace-card)>div:nth-child(2) {padding:8px;gap:5px;}
+@media (min-width:640px) {.catalog [data-home-feed-grid] {grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media (min-width:1024px) {.catalog [data-home-feed-grid] {grid-template-columns:repeat(4,minmax(0,1fr));}}
+@media (min-width:1280px) {.catalog [data-home-feed-grid] {grid-template-columns:repeat(6,minmax(0,1fr));}}

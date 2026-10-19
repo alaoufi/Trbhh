@@ -20,6 +20,7 @@ vi.mock('@/components/platform-rating-widget',()=>({PlatformRatingWidget:()=>nul
 import HomePage from '@/app/page';
 import {AdGrid} from '@/components/ad-card';
 import {PublicSearchForm} from '@/components/public-search-form';
+import {HomeCategoryNavigation} from '@/components/home-category-navigation';
 import {CommerceHero} from '@/components/commerce/commerce-hero';
 import {NationalDayBanner,NationalDayHeroFrame} from '@/components/national-day-banner';
 function elements(value:unknown):ReactElement<Record<string,unknown>>[]{
@@ -117,4 +118,30 @@ it('keeps category results and their browse target during the seasonal treatment
   ]);
   expect(state.search).toHaveBeenCalledWith({categoryId:90,take:24,skip:0});
  } finally {flag.mockRestore();clock.mockRestore();}
+});
+
+it('shows search before the hero and keeps category navigation outside collapsible search',async()=>{
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ try {
+  const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
+  const shell=tree.find(e=>e.props['data-home-search-shell']!==undefined)!;
+  const search=tree.find(e=>e.type==='details'&&e.props['data-home-search']!==undefined)!;
+  const categories=tree.filter(e=>e.type===HomeCategoryNavigation);
+  expect(search.props.open).toBe(true);
+  expect(categories).toHaveLength(1);
+  expect(elements(search.props.children).some(e=>e.type===HomeCategoryNavigation)).toBe(false);
+  expect(elements(shell.props.children)).toContain(categories[0]);
+  expect(tree.indexOf(shell)).toBeLessThan(tree.findIndex(e=>e.type===CommerceHero));
+  const add=tree.filter(e=>e.props['data-home-search-add']!==undefined);
+  expect(add).toHaveLength(1);
+  expect(add[0].props.href).toBe('/ads/new');
+  expect(add[0].props.className).not.toMatch(/absolute|hidden/);
+ } finally {flag.mockRestore();}
+});
+
+it('keeps categories visible without an empty search control when discovery is disabled',async()=>{
+ const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
+ expect(tree.some(e=>e.props['data-home-search']!==undefined)).toBe(false);
+ expect(tree.filter(e=>e.type===HomeCategoryNavigation)).toHaveLength(1);
 });

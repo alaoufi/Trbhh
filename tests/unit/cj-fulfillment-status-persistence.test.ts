@@ -3,7 +3,7 @@ const f=vi.hoisted(()=>({read:vi.fn(),detail:vi.fn(),getDetail:vi.fn(),tracking:
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:f.query,$transaction:async(fn:(tx:unknown)=>Promise<void>)=>fn({$queryRaw:f.query,$executeRaw:f.write})}}));
 vi.mock('@/lib/cj/client',()=>({getCjOrderDetail:f.getDetail,getTracking:f.tracking}));
 vi.mock('@/lib/cj/fulfillment/store',()=>({fulfillmentStore:{read:f.read}}));
-vi.mock('@/lib/cj/fulfillment/provider',()=>({makeFulfillmentProvider:()=>({detail:f.detail})}));
+vi.mock('@/lib/cj/fulfillment/provider',async importOriginal=>({...await importOriginal<typeof import('@/lib/cj/fulfillment/provider')>(),makeFulfillmentProvider:()=>({detail:f.detail})}));
 import {memberCjOrderTracking,reconcileCjFulfillment} from '@/lib/cj/fulfillment/status';
 const c={supplierReference:'ref',supplierUsdMinor:100,originAreaId:'w',originCountry:'CN',logisticName:'route',destination:{country:'SA'},lines:[{pid:'p',vid:'v',quantity:1}]};
 function setup(raw:Record<string,unknown>,previous='shipped'){
@@ -20,6 +20,21 @@ function setup(raw:Record<string,unknown>,previous='shipped'){
  });
 }
 describe('customer commerce fulfillment persistence',()=>{
+ it('persists the 48 hour paid progress alert through the existing member notice and audit',async()=>{
+  setup({orderStatus:'PROCESSING',paymentDate:'2026-01-01 00:00:00'},'preparing');
+  await reconcileCjFulfillment('1');const writes=f.write.mock.calls as unknown[][];
+  const meta=JSON.parse(String(writes[0][1]));expect(meta.exception).toMatchObject({actionRequired:true,orderStatus:'CJ_PAID_PROGRESS_STALLED'});
+  expect(writes[1][1]).toBe('action_required');expect(JSON.parse(String(writes[2][4]))).toMatchObject({fulfillmentStatus:'action_required',sourceException:'CJ_PAID_PROGRESS_STALLED'});
+  expect(String(writes[3][0])).toContain('commerce_audit_events');
+ });
+ it('does not replace an existing exception with a later progress stall',async()=>{
+  setup({orderStatus:'UNSHIPPED',paymentDate:'2026-01-01 00:00:00'},'preparing');
+  const original=f.query.getMockImplementation()!;f.query.mockImplementation(async(parts:TemplateStringsArray)=>{const rows=await original(parts);if(parts.join('?').startsWith('SELECT f.commerce_order_id'))rows[0].evidence_json.exception={actionRequired:true,source:'cj',orderStatus:'CJ_DISPUTE_OPEN',observedAt:'2026-01-01T00:00:00Z'};return rows;});
+  await reconcileCjFulfillment('1');expect(JSON.parse(String((f.write.mock.calls[0] as unknown[])[1])).exception.orderStatus).toBe('CJ_DISPUTE_OPEN');
+ });
+ it('does not turn an older pending read into a stall after established shipment progress',async()=>{
+  setup({orderStatus:'UNSHIPPED',paymentDate:'2026-01-01 00:00:00'},'shipped');await reconcileCjFulfillment('1');expect(JSON.parse(String((f.write.mock.calls[0] as unknown[])[1])).exception).toBeUndefined();
+ });
  it.each(['SHIPPED','DELIVERED'])('preserves established tracking identity when a conflicting %s read reaches the lock later',async orderStatus=>{
   setup({orderStatus,trackNumber:'OLDER-T',logisticName:'Older carrier',trackingUrl:'https://older.example/OLDER-T'},'delivered');
   f.tracking.mockResolvedValueOnce({ok:true,data:{trackNumber:'OLDER-T',lastMileCarrier:'Older local carrier',lastTrackNumber:'OLDER-LAST'}});

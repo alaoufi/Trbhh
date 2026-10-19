@@ -9,6 +9,41 @@ function fixture() {
   return {provider,store,proof,row:()=>row,set:(patch:Partial<FulfillmentRecord>)=>{row={...row,...patch};}};
 }
 describe('durable supplier fulfillment',()=>{
+ it('preserves an unrelated action-required hold through ledger failure and recovery',async()=>{
+  const f=fixture();f.set({status:'debit_uncertain',cjOrderId:'cj1',actionRequired:true,lastError:'customer_objection'});
+  f.provider.billing=vi.fn(async()=>{throw Error('unavailable');});
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  Object.assign(f.proof,{paymentDate:'2026-10-13 10:00:00',orderStatus:'UNSHIPPED'});
+  f.provider.billing=vi.fn(async()=>[{id:'bill',cjOrderCode:'code',amountUsdMinor:1000,status:'1',type:'Order Payment'}]);
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  expect(f.row()).toMatchObject({status:'supplier_paid',actionRequired:true});
+  expect(f.provider.debit).not.toHaveBeenCalled();
+ });
+ it('persists unavailable wallet ledger for manual review and reconciles later without another debit',async()=>{
+  const f=fixture(), options={paymentMode:'wallet' as const,walletAuthorization:{payId:'pay',shipmentOrderId:'ship',expectedUsdMinor:1000}};
+  f.provider.debit=vi.fn(async()=>{throw Error('timeout');});
+  await Promise.all([runFulfillment('1',f.store,f.provider,options),runFulfillment('1',f.store,f.provider,options)]);
+  f.provider.billing=vi.fn(async()=>{throw Error('unsupported Lumi billing');});
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  expect(f.row()).toMatchObject({status:'debit_uncertain',lastError:'wallet_billing_unavailable_manual_review',payment:{payId:'pay',method:'wallet'}});
+  await runFulfillment('1',f.store,f.provider,options);
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  expect(f.provider.debit).toHaveBeenCalledTimes(1);
+  Object.assign(f.proof,{paymentDate:'2026-10-13 10:00:00',orderStatus:'UNSHIPPED'});
+  f.provider.billing=vi.fn(async()=>[]);
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  expect(f.row().lastError).toBe('wallet_billing_unavailable_manual_review');
+  f.provider.billing=vi.fn(async()=>[{id:'bill',cjOrderCode:'code',amountUsdMinor:1000,status:'1',type:'Order Payment'}]);
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  expect(f.row()).toMatchObject({status:'supplier_paid',evidence:{method:'wallet'}});
+  expect(f.provider.debit).toHaveBeenCalledTimes(1);
+ });
+ it('requires ledger evidence for a known wallet payment even outside uncertain status',async()=>{
+  const f=fixture();f.set({status:'payment_ready',cjOrderId:'cj1',payment:{payId:'pay',shipmentOrderId:'ship',expiresAt:Date.now()+60000,payableUsdMinor:1000,method:'wallet'}});
+  Object.assign(f.proof,{paymentDate:'2026-10-13 10:00:00',orderStatus:'UNSHIPPED'});
+  await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});
+  expect(f.row().status).toBe('debit_uncertain');expect(f.row().lastError).toBe('payment_proof_incomplete');expect(f.provider.billing).toHaveBeenCalledTimes(1);expect(f.provider.debit).not.toHaveBeenCalled();
+ });
  it.each([{id:'failed',cjOrderCode:'code',amountUsdMinor:500,status:'0',type:'Order Payment'},{id:'other-order',cjOrderCode:'other-code',amountUsdMinor:500,status:'1',type:'Order Payment'}])('ignores unrelated or unsuccessful wallet bill $id',async other=>{const f=fixture();f.set({status:'debit_uncertain',cjOrderId:'cj1'});Object.assign(f.proof,{currency:'USD',orderStatus:'UNSHIPPED',paymentDate:'2026-10-13 10:00:00'});f.provider.billing=vi.fn(async()=>[{id:'B',cjOrderCode:'code',amountUsdMinor:1000,status:'1',type:'Order Payment'},other]);await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});expect(f.row().status).toBe('supplier_paid');expect(f.provider.debit).not.toHaveBeenCalled();});
  it.each(['CANCELLED','REFUNDED','UNPAID','CREATED'])('does not settle wallet evidence for supplier status %s',async orderStatus=>{const f=fixture();f.set({status:'debit_uncertain',cjOrderId:'cj1'});Object.assign(f.proof,{currency:'USD',orderStatus,paymentDate:'2026-10-13 10:00:00'});f.provider.billing=vi.fn(async()=>[{id:'B',cjOrderCode:'code',amountUsdMinor:1000,status:'1',type:'Order Payment'}]);await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});expect(f.row().status).toBe('debit_uncertain');expect(f.row().lastError).toBe('payment_proof_incomplete');expect(f.provider.debit).not.toHaveBeenCalled();});
  it.each(['EUR',undefined])('does not settle wallet evidence with currency %s',async currency=>{const f=fixture();f.set({status:'debit_uncertain',cjOrderId:'cj1'});Object.assign(f.proof,{currency,orderStatus:'UNSHIPPED',paymentDate:'2026-10-13 10:00:00'});f.provider.billing=vi.fn(async()=>[{id:'B',cjOrderCode:'code',amountUsdMinor:1000,status:'1',type:'Order Payment'}]);await runFulfillment('1',f.store,f.provider,{reconcileOnly:true});expect(f.row().status).toBe('debit_uncertain');expect(f.provider.debit).not.toHaveBeenCalled();});

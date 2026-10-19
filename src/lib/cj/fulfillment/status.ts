@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {prisma} from '@/lib/prisma';
 import {getCjOrderDetail,getTracking} from '../client';
 import {fulfillmentStore} from './store';
-import {makeFulfillmentProvider} from './provider';
+import {makeFulfillmentProvider,cjUtcTimestamp} from './provider';
 import {matchesCommitment} from './worker';
 export type SupplierStage='supplier_paid'|'preparing'|'shipped'|'delivered';
 const ranks:Record<SupplierStage,number>={supplier_paid:0,preparing:1,shipped:2,delivered:3};
@@ -23,9 +23,15 @@ function parseMeta(raw:unknown):Meta {return (typeof raw==='string'?JSON.parse(r
 export function cjShipmentException(raw:Record<string,unknown>,trackingStatus?:string|null):string|null{
  if(raw.disputeId||raw.disputeOpenedId)return 'CJ_DISPUTE_OPEN';
  const status=String(raw.orderStatus||'').toUpperCase();
- if(['CANCELLED','REFUNDED','REFUNDING','REFUND_PENDING','FAILED_DELIVERY','DELIVERY_FAILED','RETURNED','RETURNED_TO_SENDER'].includes(status))return status;
+ if(['CLOSED','CANCELED','CANCELLED','REFUNDED','REFUNDING','REFUND_PENDING','FAILED_DELIVERY','DELIVERY_FAILED','RETURNED','RETURNED_TO_SENDER'].includes(status))return status;
  if(typeof trackingStatus==='string'&&/unsuccessful|undelivered|returned(?:\s+to\s+sender)?|delivery[_ ]failed|failed[_ ]delivery/i.test(trackingStatus))return 'DELIVERY_EXCEPTION';
  return null;
+}
+/** Operational review threshold, not a promised CJ dispatch SLA or refund proof. */
+export function cjPaidProgressException(raw:Record<string,unknown>,now=Date.now()):string|null {
+ if(!['UNSHIPPED','PENDING','PROCESSING'].includes(String(raw.orderStatus||'').toUpperCase()))return null;
+ const paidAt=cjUtcTimestamp(raw.paymentDate);
+ return Number.isFinite(now)&&Number.isFinite(paidAt)&&paidAt<=now&&now-paidAt>=48*60*60*1000?'CJ_PAID_PROGRESS_STALLED':null;
 }
 /** Read-only CJ reconciliation, with transactional customer-order status/notice persistence. */
 export async function reconcileCjFulfillment(id:string,snapshot?:Record<string,unknown>):Promise<void> {
@@ -63,7 +69,11 @@ export async function reconcileCjFulfillment(id:string,snapshot?:Record<string,u
   const observedAt=new Date().toISOString();
   const next=trackingConflict?{...meta.fulfillment!,observedAt}:{stage,carrier:carrier||meta.fulfillment?.carrier||'',trackingNumber:trackingNumber||meta.fulfillment?.trackingNumber||'',lastTrackNumber:lastTrackNumber||meta.fulfillment?.lastTrackNumber||'',trackingUrl:trackingUrl||meta.fulfillment?.trackingUrl||null,observedAt};
   const exceptionCode=cjShipmentException(raw,tracking?.ok?tracking.data.trackStatus:null)||(trackingConflict?'TRACKING_IDENTITY_CONFLICT':null);
-  const exception=exceptionCode?{actionRequired:true,source:'cj' as const,orderStatus:exceptionCode,observedAt:next.observedAt}:meta.exception;
+  // A stall is an operational alert only. It must not overwrite a known
+  // exception/conflicting shipment or regress already proven shipment progress.
+  const stalled=!exceptionCode&&!meta.exception?.actionRequired&&!meta.trackingConflict&&ranks[previous]<ranks.shipped?cjPaidProgressException(raw):null;
+  const reviewCode=exceptionCode||stalled;
+  const exception=reviewCode?{actionRequired:true,source:'cj' as const,orderStatus:reviewCode,observedAt:next.observedAt}:meta.exception;
   const conflict=trackingConflict?{trackingNumber,carrier,lastTrackNumber,trackingUrl,observedAt}:meta.trackingConflict;
   await tx.$executeRaw`UPDATE commerce_cj_fulfillment_outbox SET evidence_json=${JSON.stringify({...meta,fulfillment:next,exception,trackingConflict:conflict})},version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${BigInt(id)}`;
   // Aggregate the least advanced fulfillment group; one delivered parcel cannot complete a multi-group order.

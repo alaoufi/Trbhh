@@ -23,6 +23,8 @@ export function cjPayableSelectable(row:{status:string;cjOrderId:string|null;las
 }
 export function cjPayableHoldReason(status:string,lastError:string|null):string {
   if(lastError){
+    if(lastError==='wallet_billing_unavailable_manual_review')return 'تعذر جلب سجل محفظة CJ؛ نتيجة الخصم غير محسومة. طابق مرجع الحركة والمبلغ والطلب في Billing History، ثم حدّث المطابقة. لا تكرر الدفع.';
+    if(['payment_proof_incomplete','awaiting_payment_proof'].includes(lastError))return 'أدلة الخصم لم تكتمل؛ راجع حالة الطلب وتاريخ الدفع وسجل المحفظة. لا تكرر الدفع ولا تعتبر انتهاء المهلة فشلاً.';
     if(/price|amount|cost|payable|quote.*mismatch/.test(lastError))return 'تغيّرت التكلفة أو لا تطابق المبلغ المعتمد؛ راجع الفرق قبل السداد.';
     if(/stock|inventory/.test(lastError))return 'المخزون الحالي غير كافٍ أو لم يمكن تأكيده؛ السداد محجوب.';
     if(/freight|shipping|logistic/.test(lastError))return 'تغيّرت تكلفة الشحن أو لم تتأكد صلاحية المسار للسعودية؛ راجع الشحن قبل السداد.';

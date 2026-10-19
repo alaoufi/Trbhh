@@ -23,3 +23,5 @@ describe('CJ payable hold and separate payment path presentation',()=>{
   const batch=await getCjSettlementBatch('8');expect(batch?.lines.every(item=>item.paymentUrl===null)).toBe(true);expect(batch?.lines[0].walletAuthorized).toBe(true);expect(batch?.lines[2].actualUsdMinor).toBe(1300);
  });
 });
+it('explains unavailable wallet evidence without treating it as failed debit',()=>{const text=cjPayableHoldReason('debit_uncertain','wallet_billing_unavailable_manual_review');expect(text).toContain('سجل محفظة CJ');expect(text).toContain('لا تكرر الدفع');expect(text).toContain('مرجع الحركة');});
+it.each(['payment_proof_incomplete','awaiting_payment_proof'])('explains incomplete debit proof %s',error=>{expect(cjPayableHoldReason('debit_uncertain',error)).toContain('لا تكرر الدفع');});

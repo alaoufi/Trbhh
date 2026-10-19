@@ -36,15 +36,21 @@ export async function runFulfillment(id:string,store:FulfillmentStore,provider:F
  if(!row.cjOrderId)return;
  const order=await provider.detail(row.cjOrderId);
  if(order.orderId!==row.cjOrderId||!matchesCommitment(c,order))return block('order_commitment_mismatch');
- if(['debit_claimed','debit_uncertain'].includes(row.status)){
+ if(['debit_claimed','debit_uncertain'].includes(row.status)||row.payment?.method==='wallet'){
   // Cart/parent uses SD cjOrderCode; wallet billing identifies the separate CJ cjOrderId.
   const billingId=order.billingOrderId===undefined?order.cjOrderCode:order.billingOrderId;
-  const bills=billingId?await provider.billing(billingId):[];
+  let bills:BillingProof[];
+  try {bills=billingId?await provider.billing(billingId):[];}
+  catch {
+   // An unavailable wallet ledger is not proof of no debit. Keep the claim
+   // durable and allow only read-only reconciliation until proof returns.
+   await patch({status:'debit_uncertain',evidence:{method:'wallet',order},lastError:'wallet_billing_unavailable_manual_review'});return;
+  }
   // Count every successful payment for this order before comparing its amount:
   // an additional debit with a different amount is still conflicting evidence.
   const successful=bills.filter(b=>b.cjOrderCode===billingId&&b.type==='Order Payment'&&b.status==='1');
-  if(isCjCardPaymentConfirmed({paymentDate:order.paymentDate,orderStatus:order.orderStatus,currency:order.currency})&&order.payableUsdMinor===c.supplierUsdMinor&&successful.length===1&&successful[0].id&&successful[0].amountUsdMinor===c.supplierUsdMinor)await patch({status:'supplier_paid',evidence:{order,bill:successful[0]},lastError:undefined});
-  else await patch({status:'debit_uncertain',evidence:{order,bills},lastError:'payment_proof_incomplete'});
+  if(isCjCardPaymentConfirmed({paymentDate:order.paymentDate,orderStatus:order.orderStatus,currency:order.currency})&&order.payableUsdMinor===c.supplierUsdMinor&&successful.length===1&&successful[0].id&&successful[0].amountUsdMinor===c.supplierUsdMinor)await patch({status:'supplier_paid',evidence:{method:'wallet',order,bill:successful[0]},lastError:undefined});
+  else await patch({status:'debit_uncertain',evidence:{order,bills},lastError:row.lastError==='wallet_billing_unavailable_manual_review'?row.lastError:'payment_proof_incomplete'});
   return;
  }
  // External card receipts are proved by authenticated CJ order reads, not by

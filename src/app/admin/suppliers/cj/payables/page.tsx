@@ -1,3 +1,4 @@
+import {CjOperationalGuide} from '@/components/cj/operational-guide';
 import {DelegateMessage} from '@/components/cj/delegate-message';
 import {SupplierProductReferences} from '@/components/cj/supplier-product-references';
 import Link from 'next/link';
@@ -26,7 +27,7 @@ export default async function CjPayablesPage({searchParams}:{searchParams:Promis
   const batchId = typeof sp.batch==='string'&&/^[1-9]\d{0,19}$/.test(sp.batch)&&BigInt(sp.batch)<=18446744073709551615n?sp.batch:null;
   const [rows,hours,batch,batches] = await Promise.all([listCjPayables(),getCjSettlementWaitHours(),batchId?getCjSettlementBatch(batchId):null,listCjSettlementBatches()]);
   return <div className="space-y-4">
-    <CjAdminNav current="payables"/>
+    <CjAdminNav current="payables"/><CjOperationalGuide/>
     <h1 className="text-xl font-extrabold text-primary">سداد المستحقات</h1>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3">هذه طلبات تحصّل مبلغها في تربح وثبت إيصالها، ولم يثبت سدادها خارجيًا. اختر الطلبات ثم «دفع جميع الطلبات» لتجهيز روابط السداد دون خصم. السداد بالبطاقة يتم على صفحة الدفع الخارجية؛ المحفظة تحتاج تفويضًا ماليًا صريحًا.</p>
     {typeof sp.error==='string'&&errors[sp.error]&&<p role="alert" className="rounded border border-red-200 bg-red-50 p-3">{errors[sp.error]}</p>}

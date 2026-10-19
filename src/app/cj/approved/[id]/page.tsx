@@ -1,3 +1,4 @@
+import {ProductSectionNav} from '@/components/product-section-nav';
 import Link from 'next/link';
 import { ShareButtons } from '@/components/share-buttons';
 import { primaryOrigin } from '@/lib/public-origin';
@@ -17,12 +18,12 @@ export default async function ApprovedPreviewPage({ params }: { params: Promise<
   const product = await getApprovedPreview((await params).id);
   if (!product) notFound();
   if(product.cjSourceId)redirect(`/cj/${product.cjSourceId}`);
-  return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 py-5 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="approved-product">
+  return <div className="mx-auto max-w-7xl min-w-0 space-y-6 px-3 py-5 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="approved-product">
     <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-7 text-amber-950"><b>معاينة خاصة</b> — عرض معلومات السلعة فقط. لا شراء أو دفع أو حجز مخزون من هذه الصفحة.</p>
     <Link href="/cj?tab=trbhh" className="inline-flex min-h-11 items-center text-sm font-bold text-primary hover:underline">العودة إلى اعلانات تربح</Link>
     <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2 lg:gap-8">
       <CjProductGallery images={product.images} title={product.title} />
-      <section className="min-w-0 space-y-4" aria-label="معلومات السلعة المعتمدة">
+      <section className="min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6" aria-label="معلومات السلعة المعتمدة">
         <p className="text-xs font-semibold text-slate-500">سلعة معتمدة للبيع باسم تربح</p>
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{product.title}</h1>
         <ShareButtons compact url={`${primaryOrigin}${product.href}`} title={product.title}/>
@@ -31,6 +32,7 @@ export default async function ApprovedPreviewPage({ params }: { params: Promise<
         <p className="text-sm text-slate-600">{product.stock > 0 ? 'توجد كمية مسجلة في الكتالوج؛ لا يتم حجزها في المعاينة.' : 'لا توجد كمية متاحة مسجلة حاليًا.'}</p>
       </section>
     </div>
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"><h2 className="mb-3 text-lg font-extrabold text-primary">تفاصيل السلعة</h2>{product.description ? <CjProductDescription text={product.description} /> : <p className="text-sm text-slate-500">لا يوجد وصف إضافي محفوظ لهذه السلعة.</p>}</section>
+    <ProductSectionNav items={[{id:'cj-approved-description',label:'تفاصيل السلعة'}]}/>
+    <section id="cj-approved-description" aria-labelledby="cj-approved-description-heading" className="scroll-mt-24 min-w-0 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6"><h2 id="cj-approved-description-heading" className="mb-3 text-lg font-extrabold text-primary">تفاصيل السلعة</h2>{product.description ? <CjProductDescription text={product.description} /> : <p className="text-sm text-slate-500">لا يوجد وصف إضافي محفوظ لهذه السلعة.</p>}</section>
   </div>;
 }

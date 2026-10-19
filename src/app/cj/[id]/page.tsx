@@ -1,3 +1,4 @@
+import {ProductSectionNav} from '@/components/product-section-nav';
 import {SizeReferenceGuide} from '@/components/size-reference-guide';
 import {ProductReference} from '@/components/cj/product-reference';
 import {readCjSizeChart} from '@/lib/cj/size-chart-server';
@@ -5,7 +6,7 @@ import Link from 'next/link';
 import { ShareButtons } from '@/components/share-buttons';
 import { primaryOrigin } from '@/lib/public-origin';
 import { notFound } from 'next/navigation';
-import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Phone, MessageCircle, Truck, RotateCcw, ShieldCheck } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
@@ -87,14 +88,23 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const sizeChart=hasSize?await readCjSizeChart(p.cj_product_id):null;
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
-  return <div className="mx-auto max-w-6xl min-w-0 space-y-3 px-3 pb-6 pt-3 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="product">
+  const hasSpecs=Boolean(p.trbhh_category||details?.weightMin);
+  const sectionItems=[
+    ...(view.isStaff&&session?[{id:'cj-buy',label:'الخيارات والشراء'}]:[]),
+    ...(hasSpecs?[{id:'cj-specs',label:'المواصفات'}]:[]),
+    ...(descriptionAr?[{id:'cj-description',label:'تفاصيل المنتج'}]:[]),
+    {id:'cj-guarantees',label:'الشحن والضمانات'},
+    ...(others.length?[{id:'cj-related',label:'منتجات مشابهة'}]:[]),
+  ];
+
+  return <div className="mx-auto max-w-7xl min-w-0 space-y-6 px-3 pb-10 pt-4 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="product">
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>شراء خاص بالإدارة</b> — تحقّق حيّ من السعر والمخزون والشحن، ثم السلة ← إنشاء الطلب ← الاعتماد والدفع من المحفظة ← التتبّع حتى التسليم.</p>{session && <CartLink accountId={session.uid} />}</div>}
     {sp.edited === '1' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">تم حفظ تعديل السلعة.</p>}
     {sp.err === 'has_activity' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر الحذف لوجود نشاط على السلعة. يمكنك إخفاؤها.</p>}
     <Breadcrumb items={[{ label: 'منتجات تربح', href: '/cj' }, { label: title }]} />
-    <div className="grid min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-4">
-      <div className="min-w-0 lg:col-start-1 lg:row-start-1"><CjProductGallery key={id} images={gallery} title={title} /></div>
-      <section aria-label="معلومات المنتج" className="min-w-0 space-y-2 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
+      <div className="min-w-0"><CjProductGallery key={id} images={gallery} title={title} /></div>
+      <section aria-label="معلومات المنتج" className="min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6">
         {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl"><CjText original={p.name} ar={title}/></h1>
         <ProductReference id={id} pid={p.cj_product_id} sku={p.cj_sku}/>
@@ -120,17 +130,15 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}<span className="block text-slate-500" dir="ltr">SKU: {r.sku}</span></td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
+        {!hasSize&&<SizeReferenceGuide/>}
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
-      <div className="min-w-0 space-y-2 lg:col-start-1 lg:row-start-2">
-
-      {!hasSize&&<SizeReferenceGuide/>}
-    {(p.trbhh_category||details?.weightMin)&&<section className="card-3d min-w-0 rounded-2xl p-3" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-2 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["القسم",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 py-1.5"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
-    {!!descriptionAr&&<section className="card-3d min-w-0 rounded-2xl p-3" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-2 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
-      </div>
     </div>
+    <ProductSectionNav items={sectionItems}/>
+    {hasSpecs&&<section id="cj-specs" className="scroll-mt-24 min-w-0 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="cj-specs-heading"><h2 id="cj-specs-heading" className="mb-2 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["القسم",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 py-1.5"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
+    {!!descriptionAr&&<section id="cj-description" className="scroll-mt-24 min-w-0 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="cj-description-heading"><h2 id="cj-description-heading" className="mb-2 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
     {/* ضمانات الشحن والاسترجاع — بهوية تربح وأيقونات واضحة (لا تمسّ بيانات CJ). */}
-    <section className="card-3d min-w-0 rounded-2xl p-3" aria-labelledby="cj-guarantees"><h2 id="cj-guarantees" className="mb-2 text-lg font-extrabold text-primary">الشحن والضمانات</h2>
+    <section id="cj-guarantees" className="scroll-mt-24 min-w-0 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6" aria-labelledby="cj-guarantees-heading"><h2 id="cj-guarantees-heading" className="mb-2 text-lg font-extrabold text-primary">الشحن والضمانات</h2>
       <ul className="divide-y divide-slate-100 text-sm leading-7 text-slate-700">
         <li className="flex items-start gap-3 py-2.5"><Truck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>توصيل لكل مناطق المملكة</b> — تُحتسب تكلفة الشحن ومدّته حسب الوجهة وتظهر عند الطلب (مدّة التجهيز تُضاف للتوصيل).</span></li>
         <li className="flex items-start gap-3 py-2.5"><RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><span><b>استرجاع واستبدال</b> وفق سياسة تربح المعلنة.</span></li>
@@ -189,6 +197,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       </form>}
     </section>}
     {view.isStaff && !canManage && <p role="note" className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة. يمكن لمسؤول الصلاحيات مراجعتها من <Link className="font-bold text-primary underline" href="/admin/access-control">إدارة الصلاحيات</Link>.</p>}
-    {others.length > 0 && <section className="min-w-0 space-y-3"><h2 className="text-lg font-extrabold text-primary">منتجات مشابهة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
+    {others.length > 0 && <section id="cj-related" aria-labelledby="cj-related-heading" className="scroll-mt-24 min-w-0 space-y-4"><h2 id="cj-related-heading" className="text-lg font-extrabold text-primary">منتجات مشابهة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
   </div>;
 }

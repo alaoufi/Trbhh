@@ -89,6 +89,7 @@ export async function GET(request: Request) {
   const shipMinor = cheapest ? cheapest.priceMinor + cheapest.additionalMinor : 0;
   return respond({
     status: 'available',
+    ...(sourceView?{supplierPriceMinor:check.supplierPriceMinor,salePriceMinor:check.salePriceMinor,otherCostsMinor:row?.other_costs_minor??0}:{}),
     priceMinor: sourceView?check.supplierPriceMinor:check.salePriceMinor,
     shipMinor,
     stock: check.stockQuantity,

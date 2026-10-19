@@ -97,14 +97,14 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     ...(others.length?[{id:'cj-related',label:'منتجات مشابهة'}]:[]),
   ];
 
-  return <div className="mx-auto max-w-7xl min-w-0 space-y-6 px-3 pb-10 pt-4 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="product">
+  return <div className="mx-auto max-w-6xl min-w-0 space-y-6 px-3 pb-10 pt-4 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="product">
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>شراء خاص بالإدارة</b> — تحقّق حيّ من السعر والمخزون والشحن، ثم السلة ← إنشاء الطلب ← الاعتماد والدفع من المحفظة ← التتبّع حتى التسليم.</p>{session && <CartLink accountId={session.uid} />}</div>}
     {sp.edited === '1' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">تم حفظ تعديل السلعة.</p>}
     {sp.err === 'has_activity' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر الحذف لوجود نشاط على السلعة. يمكنك إخفاؤها.</p>}
     <Breadcrumb items={[{ label: 'منتجات تربح', href: '/cj' }, { label: title }]} />
-    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
+    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] lg:gap-5">
       <div className="min-w-0"><CjProductGallery key={id} images={gallery} title={title} /></div>
-      <section aria-label="معلومات المنتج" className="min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6">
+      <section aria-label="معلومات المنتج" className="min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-5">
         {p.trbhh_category && <p className="text-xs leading-5 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-lg font-extrabold leading-7 text-primary sm:text-2xl"><CjText original={p.name} ar={title}/></h1>
         <ProductReference id={id} pid={p.cj_product_id} sku={p.cj_sku}/>

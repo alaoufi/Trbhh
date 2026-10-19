@@ -18,10 +18,10 @@ export default async function ApprovedPreviewPage({ params }: { params: Promise<
   const product = await getApprovedPreview((await params).id);
   if (!product) notFound();
   if(product.cjSourceId)redirect(`/cj/${product.cjSourceId}`);
-  return <div className="mx-auto max-w-7xl min-w-0 space-y-6 px-3 py-5 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="approved-product">
+  return <div className="mx-auto max-w-6xl min-w-0 space-y-6 px-3 py-5 sm:px-5 [overflow-wrap:anywhere]" data-cj-trial="approved-product">
     <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-7 text-amber-950"><b>معاينة خاصة</b> — عرض معلومات السلعة فقط. لا شراء أو دفع أو حجز مخزون من هذه الصفحة.</p>
     <Link href="/cj?tab=trbhh" className="inline-flex min-h-11 items-center text-sm font-bold text-primary hover:underline">العودة إلى اعلانات تربح</Link>
-    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-2 lg:gap-8">
+    <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] lg:gap-5">
       <CjProductGallery images={product.images} title={product.title} />
       <section className="min-w-0 space-y-4 rounded-2xl border border-primary/10 bg-white p-4 shadow-sm sm:p-6" aria-label="معلومات السلعة المعتمدة">
         <p className="text-xs font-semibold text-slate-500">سلعة معتمدة للبيع باسم تربح</p>

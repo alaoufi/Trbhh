@@ -30,6 +30,7 @@ import { AdCategorySummary } from '@/components/ad-category-summary';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { AdRecommendations } from '@/components/ad-recommendations';
+import detailStyles from '@/components/ad-detail-layout.module.css';
 import { getSellerRating } from '@/lib/reviews';
 import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
 import { getResponseSpeed } from '@/lib/response-time';
@@ -552,11 +553,11 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       <AdMedia videoPath={ad.videoPath} audioPath={await getAdAudio(ad.id).catch(() => null)} />
 
       </div>
-      <div className="min-w-0 space-y-4">
-      <h1 className="text-xl font-bold text-primary">{ad.title}</h1>
+      <div className={`min-w-0 ${detailStyles.summary}`} data-ad-detail-summary>
+      <h1 className="text-base font-bold leading-snug text-primary">{ad.title}</h1>
 
       {/* Info grid card */}
-      <div className="card-3d grid grid-cols-2 gap-x-3 gap-y-3 rounded-2xl p-4">
+      <div className="card-3d grid grid-cols-2 gap-x-2 gap-y-1.5 rounded-xl p-2.5">
         <InfoItem icon={ArrowLeftRight}>{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</InfoItem>
         <InfoItem icon={Timer}>{timeAgo(ad.createdAt)}</InfoItem>
         <InfoItem icon={MapPin}>{ad.area ? `${ad.area} - ${ad.city}` : (ad.city || 'غير محدد')}</InfoItem>
@@ -614,6 +615,86 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <ExpandableDetail text={ad.detail || ""} />
       </div>
 
+      {/* إخلاء المسؤولية: يظهر فقط في تفاصيل إعلان عضو غير معتمد (ليس متجراً ولا بائعاً
+          موثّقاً ولا سلعة تربح/مورّد)، لتنبيه الطرفين أن المنصّة تعرض وتربط فقط.
+          عبارة «الاتفاق خارج الموقع» بلونٍ برتقالي مميّز ملفت — وحصراً هنا لئلا تلتبس
+          بسلع الموردين في الصفحات الأخرى. */}
+      {!inStore && !ad.storeOnly && !ad.seller?.trusted && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#ff6a1a]/45 bg-[#ff6a1a]/10 px-3 py-2.5 text-center text-sm font-extrabold text-[#c2410c]">
+            <ShieldAlert className="h-5 w-5 shrink-0" />
+            الاتفاق والدفع يتمّان خارج الموقع — تأكّد بنفسك من سلامة الاتفاق
+          </div>
+          <DisclaimerBar variant="full" />
+        </div>
+      )}
+
+      <div className={detailStyles.actions} data-ad-detail-actions>
+        {contactCols > 0 && <section className={detailStyles.actionBox} aria-label="بيانات التواصل"><h2>تواصل مع المعلن</h2>
+      {/* Contact tiles — only show channels the seller actually offers */}
+      <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {waNumber && (
+          <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-emerald-700">
+            <MessageCircle className="h-6 w-6" /> واتساب
+          </TrackedContact>
+        )}
+        {callPhone && (
+          <TrackedContact adId={ad.id} kind="call" href={`tel:${callPhone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+            <Phone className="h-6 w-6" /> اتصال
+          </TrackedContact>
+        )}
+        {!isAdOwner && (
+          ad.seller && session ? (
+            <Link href={`/messages/${ad.seller.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+              <Send className="h-6 w-6" /> مراسلة
+            </Link>
+          ) : (
+            <Link href="/login" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+              <Send className="h-6 w-6" /> مراسلة
+            </Link>
+          )
+        )}
+      </div>
+
+
+        </section>}
+        <section className={detailStyles.actionBox} aria-label="المشاركة والحفظ"><h2>المشاركة والحفظ</h2>
+      {/* Action tiles: (report + rate تظهر لغير صاحب الإعلان) / share / favorite */}
+      <div className={`grid gap-3 ${isAdOwner ? 'grid-cols-2' : 'grid-cols-4'}`}>
+        {!isAdOwner && (
+          <Link href={`/report?type=ad&id=${ad.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+            <Flag className="h-5 w-5" /> بلاغ
+          </Link>
+        )}
+        {!isAdOwner && (
+          <Link href={`/users/${ad.seller?.id}#review`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+            <Star className="h-5 w-5" /> تقييم
+          </Link>
+        )}
+        <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">
+          <ShareButtons
+            url={shareUrl}
+            title={ad.title}
+            text={[ad.title, (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 150)].filter(Boolean).join('\n')}
+            compact
+            card={{
+              url: shareUrl,
+              title: ad.title,
+              desc: (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+              price: ad.priceEnabled ? (ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : '')) : '',
+              city: ad.area ? `${ad.area} - ${ad.city}` : (ad.city || ''),
+              image: ad.images?.[0],
+            }}
+          />
+        </div>
+        <div className="card-3d flex items-center justify-center rounded-2xl py-1">
+          <FavoriteButton adId={ad.id} active={favorited} disabled={!session} compact />
+        </div>
+      </div>
+
+
+        </section>
+      </div>
       </div>
       </div>
 
@@ -647,20 +728,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             </Link>
           )}
           {spx.reminded === '1' && <p className="text-xs font-bold text-emerald-700">✅ سنذكّرك عند توفّر السلعة.</p>}
-        </div>
-      )}
-
-      {/* إخلاء المسؤولية: يظهر فقط في تفاصيل إعلان عضو غير معتمد (ليس متجراً ولا بائعاً
-          موثّقاً ولا سلعة تربح/مورّد)، لتنبيه الطرفين أن المنصّة تعرض وتربط فقط.
-          عبارة «الاتفاق خارج الموقع» بلونٍ برتقالي مميّز ملفت — وحصراً هنا لئلا تلتبس
-          بسلع الموردين في الصفحات الأخرى. */}
-      {!inStore && !ad.storeOnly && !ad.seller?.trusted && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#ff6a1a]/45 bg-[#ff6a1a]/10 px-3 py-2.5 text-center text-sm font-extrabold text-[#c2410c]">
-            <ShieldAlert className="h-5 w-5 shrink-0" />
-            الاتفاق والدفع يتمّان خارج الموقع — تأكّد بنفسك من سلامة الاتفاق
-          </div>
-          <DisclaimerBar variant="full" />
         </div>
       )}
 
@@ -706,31 +773,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </div>
         </div>
       )}
-      {/* Contact tiles — only show channels the seller actually offers */}
-      <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {waNumber && (
-          <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-emerald-700">
-            <MessageCircle className="h-6 w-6" /> واتساب
-          </TrackedContact>
-        )}
-        {callPhone && (
-          <TrackedContact adId={ad.id} kind="call" href={`tel:${callPhone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-            <Phone className="h-6 w-6" /> اتصال
-          </TrackedContact>
-        )}
-        {!isAdOwner && (
-          ad.seller && session ? (
-            <Link href={`/messages/${ad.seller.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-              <Send className="h-6 w-6" /> مراسلة
-            </Link>
-          ) : (
-            <Link href="/login" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-              <Send className="h-6 w-6" /> مراسلة
-            </Link>
-          )
-        )}
-      </div>
-
       {/* تنويه يظهر في تفاصيل الإعلان فقط */}
       {adNotice && (
         <p className="rounded-xl border border-amber-300/70 bg-amber-50 p-3 text-center text-xs font-medium text-amber-900">
@@ -754,39 +796,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </div>
         );
       })()}
-
-      {/* Action tiles: (report + rate تظهر لغير صاحب الإعلان) / share / favorite */}
-      <div className={`grid gap-3 ${isAdOwner ? 'grid-cols-2' : 'grid-cols-4'}`}>
-        {!isAdOwner && (
-          <Link href={`/report?type=ad&id=${ad.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-            <Flag className="h-5 w-5" /> بلاغ
-          </Link>
-        )}
-        {!isAdOwner && (
-          <Link href={`/users/${ad.seller?.id}#review`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-            <Star className="h-5 w-5" /> تقييم
-          </Link>
-        )}
-        <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">
-          <ShareButtons
-            url={shareUrl}
-            title={ad.title}
-            text={[ad.title, (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 150)].filter(Boolean).join('\n')}
-            compact
-            card={{
-              url: shareUrl,
-              title: ad.title,
-              desc: (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-              price: ad.priceEnabled ? (ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : '')) : '',
-              city: ad.area ? `${ad.area} - ${ad.city}` : (ad.city || ''),
-              image: ad.images?.[0],
-            }}
-          />
-        </div>
-        <div className="card-3d flex items-center justify-center rounded-2xl py-1">
-          <FavoriteButton adId={ad.id} active={favorited} disabled={!session} compact />
-        </div>
-      </div>
 
       {/* تقييم الإعلان وتجارب العملاء — يظهر لغير صاحب الإعلان عند تفعيله من الإدارة */}
       {reviewsOn && !ownerViewing && (

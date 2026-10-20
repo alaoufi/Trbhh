@@ -1,0 +1,5 @@
+# Compact ad overview and actions — 2026-10-20
+
+P3 visual refinement approved by the user: reduce title/metadata size and card spacing beside the existing bounded gallery; place existing contact and share/save controls in two adjacent compact panels within the overview. Reuse all original channel, owner, session and destination conditions. Preserve the safety disclaimer before contact controls, fixed mobile contact bar, source price logic, direct purchase block and administration actions. Hide an empty owner contact panel and let the remaining panel span the row.
+
+Validation: TypeScript and scoped ESLint passed, four existing ad-detail/gallery/share tests passed. Edge browser fixture extracted the actual contact/share JSX with presentation-only framework/data stubs at 1440 and 390px: two aligned panels, 154px total action height, no horizontal overflow; actual share menu opens with copy action and remains fully within viewport. Final production build passed, including the menu positioning adjustment. Authenticated production rendering is not claimed.

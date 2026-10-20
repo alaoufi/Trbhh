@@ -91,3 +91,5 @@ it('keeps every active category reachable in one visual navigation without a dup
  expect(html).not.toContain('<select');
  expect(html).not.toContain('<form');
 });
+
+it('offers a native accessible all-categories menu only when the new theme requests it',async()=>{const expanded=renderToStaticMarkup(await HomeCategoryNavigation({config,visual:true,expandedMenu:true}));expect(expanded).toContain('<details');expect(expanded).toContain('جميع الأقسام');expect(expanded).toContain('aria-label="جميع أقسام السوق"');expect(expanded).not.toContain('قسم مخفي');const classic=renderToStaticMarkup(await HomeCategoryNavigation({config,visual:true}));expect(classic).not.toContain('<details');});

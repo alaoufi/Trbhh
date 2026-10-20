@@ -1,8 +1,8 @@
 import {beforeEach,expect,it,vi} from 'vitest';
 import {isValidElement,type ReactElement} from 'react';
 import {CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
-const state=vi.hoisted(()=>({enabled:true,search:vi.fn(),featured:vi.fn(),latest:vi.fn(),personalized:vi.fn()}));
-vi.mock('next/headers',()=>({cookies:async()=>({get:()=>undefined})}));
+const state=vi.hoisted(()=>({enabled:true,homeTheme:'classic' as string|undefined,opportunities:vi.fn(),search:vi.fn(),featured:vi.fn(),latest:vi.fn(),personalized:vi.fn()}));
+vi.mock('next/headers',()=>({cookies:async()=>({get:(key:string)=>key==='home_theme'&&state.homeTheme?{value:state.homeTheme}:undefined})}));
 vi.mock('@/lib/auth',()=>({getSession:async()=>({uid:1})}));
 vi.mock('@/lib/ad-categories/service',()=>({getCategoryFormConfig:async()=>({enabled:state.enabled,labels:CATEGORY_LABELS,categories:[{id:90,name:'Other',active:true,order:0},{id:91,name:'Hidden',active:false,order:1}],subcategories:[]})}));
 vi.mock('@/lib/data',()=>({
@@ -17,7 +17,9 @@ vi.mock('@/components/ad-card',()=>({AdGrid:()=>null}));
 vi.mock('@/components/public-search-form',()=>({PublicSearchForm:()=>null}));
 vi.mock('@/components/promo-slot',()=>({PromoSlot:()=>null}));
 vi.mock('@/components/platform-rating-widget',()=>({PlatformRatingWidget:()=>null}));
+vi.mock('@/lib/home-opportunities-server',()=>({getHomeOpportunities:state.opportunities}));
 import HomePage from '@/app/page';
+import {HomeMarketHub} from '@/components/home-market-hub';
 import {AdGrid} from '@/components/ad-card';
 import {PublicSearchForm} from '@/components/public-search-form';
 import {HomeCategoryNavigation} from '@/components/home-category-navigation';
@@ -28,7 +30,7 @@ function elements(value:unknown):ReactElement<Record<string,unknown>>[]{
  if(!isValidElement<Record<string,unknown>>(value))return [];
  return [value,...elements(value.props.children)];
 }
-beforeEach(()=>{vi.clearAllMocks();state.enabled=true;state.featured.mockResolvedValue([{id:2}]);state.latest.mockResolvedValue([{id:3},{id:2}]);state.personalized.mockResolvedValue([{id:40}]);state.search.mockResolvedValue([{id:90},{id:89}]);});
+beforeEach(()=>{vi.clearAllMocks();state.enabled=true;state.homeTheme='classic';state.opportunities.mockResolvedValue({tiles:[],ads:[]});state.featured.mockResolvedValue([{id:2}]);state.latest.mockResolvedValue([{id:3},{id:2}]);state.personalized.mockResolvedValue([{id:40}]);state.search.mockResolvedValue([{id:90},{id:89}]);});
 it('renders only bounded category results in one grid, preserves query order and search link',async()=>{
  const tree=elements(await HomePage({searchParams:Promise.resolve({category:'90'})}));
  const grids=tree.filter(e=>e.type===AdGrid);
@@ -145,4 +147,17 @@ it('keeps categories visible without an empty search control when discovery is d
  const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
  expect(tree.some(e=>e.props['data-home-search']!==undefined)).toBe(false);
  expect(tree.filter(e=>e.type===HomeCategoryNavigation)).toHaveLength(1);
+});
+
+it('defaults to the independent market layout without a homepage cookie and ignores generic views',async()=>{
+ state.homeTheme=undefined;const settings=await import('@/lib/settings');const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ const opportunity={categoryId:90,categoryName:'Other',href:'/?category=90',image:null};state.opportunities.mockResolvedValue({tiles:[opportunity],ads:[]});
+ try{const tree=elements(await HomePage({searchParams:Promise.resolve({})}));expect(tree[0].props['data-home-theme']).toBe('market');expect(tree.filter(e=>e.type==='h1')).toHaveLength(1);expect(tree.find(e=>e.type===HomeMarketHub)?.props).toMatchObject({opportunities:[opportunity],ads:[],isLoggedIn:true});expect(tree.some(e=>e.type===CommerceHero)).toBe(false);expect(state.opportunities).toHaveBeenCalledOnce();}finally{flag.mockRestore();}
+});
+it('preserves the classic homepage without querying the new opportunity service',async()=>{
+ const settings=await import('@/lib/settings');const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ try{const tree=elements(await HomePage({searchParams:Promise.resolve({})}));expect(tree[0].props['data-home-theme']).toBe('classic');expect(tree.some(e=>e.type===CommerceHero)).toBe(true);expect(tree.some(e=>e.type===HomeMarketHub)).toBe(false);expect(state.opportunities).not.toHaveBeenCalled();}finally{flag.mockRestore();}
+});
+it('does not add unrelated opportunity inventory to a selected category or disabled discovery',async()=>{
+ state.homeTheme=undefined;await HomePage({searchParams:Promise.resolve({category:'90'})});expect(state.opportunities).not.toHaveBeenCalled();const tree=elements(await HomePage({searchParams:Promise.resolve({})}));expect(tree.some(e=>e.type===HomeMarketHub)).toBe(false);expect(state.opportunities).not.toHaveBeenCalled();
 });

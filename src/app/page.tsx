@@ -39,6 +39,9 @@ import { CommerceHero } from '@/components/commerce/commerce-hero';
 import { publicHomeHero } from '@/lib/public-home';
 import { isNationalDayCampaignActive, NATIONAL_DAY_HERO_INTERVAL_MS, nationalDayHeroSlides } from '@/lib/national-day';
 import { NationalDayBanner, NationalDayEntry, NationalDayHeroFrame } from '@/components/national-day-banner';
+import { HomeMarketHub } from '@/components/home-market-hub';
+import { getHomeOpportunities } from '@/lib/home-opportunities-server';
+import { resolveHomeTheme } from '@/lib/home-theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,7 +96,9 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   // تنويع الرئيسية: تغذية مضغوطة أكثف + شريط إعلانات صغيرة بين البطاقات — كلها قابلة
   // للتحكم والتراجع من الإعدادات (الافتراضي مفعّل)، ولا تؤثر على تكامل CJ/التجارة.
   const design = (await cookies()).get('design')?.value || '';
-  const compactStripOn = !selectedCategory && !['shop', 'list'].includes(design) && await getSettingBool('home_compact_strip_on', true).catch(() => false);
+  const homeTheme = resolveHomeTheme((await cookies()).get('home_theme')?.value);
+  const marketTheme = homeTheme === 'market';
+  const compactStripOn = !marketTheme && !selectedCategory && !['shop', 'list'].includes(design) && await getSettingBool('home_compact_strip_on', true).catch(() => false);
   const [denseFeed, stripMotion] = await Promise.all([
     getSettingBool('home_dense_feed_on', true).catch(() => true),
     getSettingBool('home_strip_motion_on', true).catch(() => true),
@@ -144,9 +149,13 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     feedSearchHref,
   );
   const heroSlides = nationalDayActive ? nationalDayHeroSlides() : marketplaceHeroSlides;
+  const opportunities = marketTheme && discoveryOn && !selectedCategory
+    ? await getHomeOpportunities(categoryConfig, feedAds).catch(() => ({ tiles: [], ads: [] }))
+    : { tiles: [], ads: [] };
 
   return (
-    <div className={`commerce-scope public-marketplace-home space-y-4 sm:space-y-5 ${feedStyles.catalog} ${denseFeed ? feedStyles.dense : ''}`} data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
+    <div className={`commerce-scope public-marketplace-home space-y-4 sm:space-y-5 ${feedStyles.catalog} ${marketTheme ? feedStyles.market : ''} ${denseFeed ? feedStyles.dense : ''}`} data-home-theme={homeTheme} data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
+      {marketTheme && <h1 className="sr-only">سوق تربح — إعلانات ومتاجر وأعمال</h1>}
       {nationalDayActive && <NationalDayEntry active />}
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
@@ -163,15 +172,16 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder === 'ماذا تبحث عنه؟' ? 'وش تبحث عنه اليوم؟' : discoveryPlaceholder} compact inline
             inlineAction={<Link data-home-search-add href="/ads/new" className={feedStyles.searchAdd}><Megaphone className="h-4 w-4" /><span>{discoveryAddLabel}</span></Link>} />
         </div>}
-        <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
+        <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual expandedMenu={marketTheme} />
       </div>
-      {discoveryOn && (
+      {marketTheme && discoveryOn && !selectedCategory && <HomeMarketHub opportunities={opportunities.tiles} ads={opportunities.ads} categories={categoryConfig?.enabled ? categoryConfig.categories.filter(category => category.active).map(category => ({ id: category.id, name: category.name })) : []} isLoggedIn={!!session} motion={stripMotion} />}
+      {discoveryOn && (!marketTheme || nationalDayActive) && (
         <section className="space-y-3" aria-label="اكتشف سوق تربح">
           <NationalDayHeroFrame active={nationalDayActive}>
             <CommerceHero
               compact
               intervalMs={nationalDayActive ? NATIONAL_DAY_HERO_INTERVAL_MS : undefined}
-              headingLevel={1}
+              headingLevel={marketTheme ? 2 : 1}
               label={nationalDayActive ? 'احتفال تربح باليوم الوطني' : 'اكتشف تربح'}
               slides={heroSlides}
             />

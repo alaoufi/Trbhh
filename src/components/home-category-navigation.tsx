@@ -5,14 +5,15 @@ import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
 import { selectedHomeCategory } from '@/lib/home-feed';
 
 /** Uses the same rollout switch and editable category labels as the ad form. */
-export async function HomeCategoryNavigation({ selectedCategory, config: suppliedConfig, visual = false }: { selectedCategory?: string | string[]; config?: CategoryFormConfig | null; visual?: boolean }) {
+export async function HomeCategoryNavigation({ selectedCategory, config: suppliedConfig, visual = false, expandedMenu = false }: { selectedCategory?: string | string[]; config?: CategoryFormConfig | null; visual?: boolean; expandedMenu?: boolean }) {
   const config = suppliedConfig === undefined ? await getCategoryFormConfig().catch(() => null) : suppliedConfig;
   if (!config?.enabled) return null;
   const categories = config.categories.filter(category => category.active);
   if (!categories.length) return null;
   const { browse: browseLabel, clear: clearLabel } = config.labels;
   const selected = selectedHomeCategory(config, selectedCategory);
-  if (visual) return <section data-testid="home-category-navigation" aria-label={config.labels.category} className={styles.categoryShell}>
+  if (visual) return <section data-testid="home-category-navigation" aria-label={config.labels.category} className={expandedMenu ? styles.expandedCategories : styles.categoryShell}>
+    {expandedMenu && <details className={styles.categoryMenu}><summary>جميع الأقسام</summary><nav className={styles.categoryPanel} aria-label="جميع أقسام السوق">{categories.map(category => <Link key={category.id} href={`/?category=${category.id}`}>{category.name}</Link>)}</nav></details>}
     <nav aria-label="تصنيفات السوق" className={styles.categoryRow}>
       {selected && <Link href="/" className={styles.categoryClear}>{clearLabel}</Link>}
       {categories.map(category => <Link key={category.id} href={`/?category=${category.id}`} aria-current={selected?.id === category.id ? 'page' : undefined} className={styles.categoryChip}>{category.name}</Link>)}

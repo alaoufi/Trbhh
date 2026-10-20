@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, LayoutTemplate, ArrowRight, Megaphone } from 'lucide-react';
 import { DESIGNS, applyDesign } from '@/components/design-picker';
+import { HomeThemePicker } from '@/components/home-theme-picker';
 
 // A small live sample rendered inside a data-design wrapper so its identity
 // shows exactly as it would site-wide — a real preview before adopting.
@@ -75,7 +76,9 @@ export default function DesignGalleryPage() {
         <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><LayoutTemplate className="h-5 w-5" /> قوالب التصميم</h1>
         <Link href="/account" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"><ArrowRight className="h-4 w-4" /> لوحة التحكم</Link>
       </div>
-      <p className="text-sm text-muted-foreground">اختر الهوية البصرية التي تناسبك. المعاينة أدناه تُظهر شكل البطاقات فعلياً قبل الاعتماد، ويبقى «ثلاثي الأبعاد» هو الافتراضي.</p>
+      <div className="rounded-2xl border border-border bg-card p-4"><HomeThemePicker /></div>
+      <h2 className="text-lg font-bold text-primary">ألوان الموقع وهويته البصرية</h2>
+      <p className="text-sm text-muted-foreground">اختر الهوية البصرية التي تناسبك بشكل مستقل عن ترتيب الرئيسية. المعاينة أدناه تُظهر شكل البطاقات فعلياً قبل الاعتماد، ويبقى «ثلاثي الأبعاد» هو الافتراضي للهوية البصرية.</p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {DESIGNS.map((d) => {

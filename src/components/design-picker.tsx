@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Check, LayoutTemplate } from 'lucide-react';
+import { HomeThemePicker } from '@/components/home-theme-picker';
 
 export const DESIGNS: { id: string; name: string; desc: string }[] = [
   { id: '', name: 'ثلاثي الأبعاد', desc: 'الحالي — بطاقات بارزة بإطار وظلّ' },
@@ -27,8 +28,9 @@ export function DesignPicker() {
   }, []);
   return (
     <div className="px-3 py-2">
+      <div className="mb-4 border-b border-border pb-4"><HomeThemePicker /></div>
       <div className="mb-2 flex items-center gap-2 text-[13px] font-bold text-muted-foreground">
-        <LayoutTemplate className="h-4 w-4 text-primary" /> قالب التصميم (هوية الموقع)
+        <LayoutTemplate className="h-4 w-4 text-primary" /> الألوان والهوية (الموقع كله)
       </div>
       <div className="grid grid-cols-2 gap-2">
         {DESIGNS.map((d) => {

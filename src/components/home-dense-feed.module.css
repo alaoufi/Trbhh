@@ -1,7 +1,6 @@
-/* Explicit tracks keep short rows the same size as full rows. Only marketplace
-   feed grids opt in; the list and shop designs retain their own layouts. */
+/* Homepage appearance wins over saved generic views; other pages keep those views. */
 .catalog [data-home-feed-grid] {grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}
-.catalog [data-home-feed-grid] :global(.marketplace-card) {border-radius:12px;}
+.catalog [data-home-feed-grid] :global(.marketplace-card) {border-radius:8px;border-color:transparent;box-shadow:none;}
 .catalog [data-home-feed-grid] :global(.marketplace-card)>div:first-child {aspect-ratio:1;}
 .catalog [data-home-feed-grid] :global(.marketplace-card)>div:nth-child(2) {padding:12px;gap:6px;flex:0 0 auto;}
 .catalog [data-home-feed-grid] :global(.marketplace-card)>div:nth-child(2)>div:last-child {margin-top:0;}

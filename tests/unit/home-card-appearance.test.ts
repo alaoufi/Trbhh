@@ -1,0 +1,13 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createElement} from 'react';
+import type {AdCard} from '@/lib/data';
+const state=vi.hoisted(()=>({design:''}));
+vi.mock('next/headers',()=>({cookies:async()=>({get:(key:string)=>key==='design'?{value:state.design}:undefined})}));
+vi.mock('next/image',()=>({default:({src,alt}: {src:string;alt:string})=>createElement('img',{src,alt})}));
+vi.mock('@/app/error-actions',()=>({reportClientErrorAction:async()=>{}}));
+import {AdGrid} from '@/components/ad-card';
+const ad:AdCard={id:12,title:'رافعة للإيجار',price:4000,adsType:'offer',image:'/lift.jpg',cityName:'الرياض',categoryName:'معدات',createdAt:null,special:false,urgent:false,views:0,sellerName:'المعلن',sellerTrusted:false};
+beforeEach(()=>{state.design='';});
+it.each(['','shop','list'])('honors explicit homepage appearance with saved design %s',async design=>{state.design=design;const html=renderToStaticMarkup(await AdGrid({ads:[ad],appearance:'marketplace'}));expect(html).toContain('data-home-feed-grid');expect(html).toContain('marketplace-card');expect(html).toContain('/ads/12');expect(html).toContain('4,000');});
+it.each(['shop','list'])('preserves saved design %s outside homepage appearance',async design=>{state.design=design;const html=renderToStaticMarkup(await AdGrid({ads:[ad]}));expect(html).not.toContain('data-home-feed-grid');expect(html).not.toContain('marketplace-card');expect(html).toContain('/ads/12');});

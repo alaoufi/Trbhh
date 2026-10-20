@@ -304,7 +304,8 @@ export async function AdGrid({ ads, className, appearance }: { ads: AdCardType[]
     const msg = await getEmptyText('ads').catch(() => 'لا توجد إعلانات لعرضها حالياً.');
     return <p className="py-12 text-center text-muted-foreground">{msg}</p>;
   }
-  const design = (await cookies()).get('design')?.value || '';
+  // Explicit page composition wins over the visitor's generic saved view.
+  const design = appearance === 'marketplace' ? '' : (await cookies()).get('design')?.value || '';
   // كل بطاقة داخل حدّ خطأ دقيق: فشل تصيير إعلان واحد (بيانات ناقصة/تالفة) يعرض بديلاً
   // بدل إسقاط الصفحة كلها لشاشة «حدث خطأ غير متوقع».
   if (design === 'shop') {

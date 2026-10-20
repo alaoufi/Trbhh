@@ -29,7 +29,7 @@ import { ExpandableDetail } from '@/components/expandable-detail';
 import { AdCategorySummary } from '@/components/ad-category-summary';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { AdGrid } from '@/components/ad-card';
+import { AdRecommendations } from '@/components/ad-recommendations';
 import { getSellerRating } from '@/lib/reviews';
 import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
 import { getResponseSpeed } from '@/lib/response-time';
@@ -1040,18 +1040,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       )}
 
       {/* ذات صلة (لنفس المعلن) + المشابهة — تُخفى لإعلان المتجر (استقلال تام) */}
-      {!inStore && sellerAds.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات ذات صلة — لنفس المعلن</h2>
-          <AdGrid ads={sellerAds} />
-        </section>
-      )}
-      {!inStore && similar.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات مشابهة</h2>
-          <AdGrid ads={similar} />
-        </section>
-      )}
+      {!inStore && <AdRecommendations sellerAds={sellerAds} similar={similar} />}
     </div>
   );
 }

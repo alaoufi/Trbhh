@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{spawnSync}=require('node:child_process');
 const deploy=fs.readFileSync('scripts/release/manual-arabic-app-deploy.sh','utf8'),timer=fs.readFileSync('scripts/release/install-cj-arabic-worker-timer.sh','utf8');
 test('code only deploy requires candidate, pins live baseline, and preserves runtime and store state',()=>{
- for(const guard of ['candidate=${2:-}','CANDIDATE_REQUIRED','baseline=88fa5c2e815836886d4c95f82ef5842cd0ca927e','trbhh-finance-deploy.lock','ACTIVE_DEPLOYMENT','runtimeMatches(config,before)','verify-runtime.cjs','ROLLBACK_RUNTIME_VERIFIED','SHOP_PRODUCT_FINGERPRINT_AND_FLAGS_PRESERVED','sha256sum .env'])assert.ok(deploy.includes(guard),guard);
+ for(const guard of ['candidate=${2:-}','CANDIDATE_REQUIRED','baseline=fdb25312f2ad31dbed9edc513a080ef9eaba203d','trbhh-finance-deploy.lock','ACTIVE_DEPLOYMENT','runtimeMatches(config,before)','verify-runtime.cjs','ROLLBACK_RUNTIME_VERIFIED','SHOP_PRODUCT_FINGERPRINT_AND_FLAGS_PRESERVED','sha256sum .env'])assert.ok(deploy.includes(guard),guard);
  assert.ok(deploy.includes('SELECT * FROM commerce_products WHERE id>? ORDER BY id LIMIT 100'));assert.ok(deploy.includes('productSha256'));assert.ok(deploy.includes('cj_storefront_public'));assert.ok(deploy.includes('commerce_gateway_enabled'));assert.ok(deploy.includes('verified_direct_sale_enabled'));assert.ok(deploy.includes('commerce_enabled'));
  assert.doesNotMatch(deploy,/ollama|embedding|\$executeRaw|site_settings\.(update|upsert)|docker\s+(volume\s+rm|system\s+prune)/);
  assert.ok(deploy.includes('--no-build --pull never --no-deps --force-recreate app'));

@@ -1,7 +1,7 @@
 import type { CategoryFormConfig, CategoryOption } from './ad-categories/contracts';
 import type { AdCard } from './data';
 
-export type HomeOpportunityTile = { categoryId: number; categoryName: string; href: string; image: string | null };
+export type HomeOpportunityTile = { categoryId: number | null; categoryName: string; href: string; image: string | null; adId?: number; title?: string; featured?: boolean };
 export type HomeOpportunities = { tiles: HomeOpportunityTile[]; ads: AdCard[] };
 export type HomeOpportunityInventory = { categoryId: number; ads: AdCard[] };
 const normalized = (value: string) => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ar');
@@ -32,26 +32,37 @@ function sellerIdentity(ad: AdCard): string | null {
   const name=ad.storeName?.trim() || ad.sellerName?.trim();
   return name ? `name:${normalized(name)}` : null;
 }
+/** Only source promotion flags establish priority; never infer paid promotion. */
+function featuredRank(ad: AdCard) {
+  return ad.tier === 'gold' ? 3 : ad.tier === 'silver' ? 2 : ad.special ? 1 : 0;
+}
 /** Inputs must already be public-qualified by the existing feed/search services. */
 export function selectHomeOpportunities(config: CategoryFormConfig | null, seedAds: AdCard[], inventory: HomeOpportunityInventory[], now = new Date()): HomeOpportunities {
   const categories=opportunityCategories(config,seedAds,now);
-  if (!categories.length) return {tiles:[],ads:[]};
   const allActive=activeCategories(config);
   const seenIds=new Set<number>();const seenTitles=new Set<string>();
-  const groups=new Map(categories.map(category=>[category.id,[] as AdCard[]]));
-  // Keep only records within the selected category scope, including public seed fallback.
-  for (const {categoryId,ads} of [...inventory, ...seedAds.map(ad=>({categoryId:categoryForAd(allActive,ad)?.id ?? -1,ads:[ad]}))]) {
-    const group=groups.get(categoryId); if (!group) continue;
-    for (const ad of ads) {
-      const title=normalized(ad.title);
-      if (seenIds.has(ad.id) || (title && seenTitles.has(title))) continue;
-      seenIds.add(ad.id);if(title) seenTitles.add(title);group.push(ad);
-    }
+  const allowed=new Set(categories.map(category=>category.id));
+  const candidates=[...inventory.filter(group=>allowed.has(group.categoryId)).flatMap(group=>group.ads),...seedAds];
+  // Public seed records may fill empty placements from any real source category.
+  const ranked=candidates.map((ad,index)=>({ad,index})).sort((a,b)=>featuredRank(b.ad)-featuredRank(a.ad)||a.index-b.index);
+  const pool:AdCard[]=[];
+  for(const {ad} of ranked) {
+    const title=normalized(ad.title);
+    if(seenIds.has(ad.id)||(title&&seenTitles.has(title)))continue;
+    seenIds.add(ad.id);if(title)seenTitles.add(title);pool.push(ad);
   }
-  const tiles=categories.slice(0,4).map(category=>({categoryId:category.id,categoryName:category.name,href:`/?category=${category.id}`,image:groups.get(category.id)?.find(ad=>ad.image)?.image || null}));
-  const ads:AdCard[]=[];const sellers=new Set<string>();
-  // First sweep gives distinct public seller identities priority across categories.
+  const ads=pool.filter(ad=>featuredRank(ad)>0).slice(0,8);
+  const sellers=new Set(ads.map(sellerIdentity).filter((key):key is string=>!!key));
+  const groups=new Map<string,AdCard[]>();
+  for(const ad of pool.filter(ad=>featuredRank(ad)===0)) {
+    const category=categoryForAd(allActive,ad);
+    const key=category?`category:${category.id}`:`source:${normalized(ad.categoryName||'')}`;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key)!.push(ad);
+  }
+  // After featured inventory, prefer distinct sellers and categories before filling.
   for (const group of groups.values()) {
+    if(ads.length>=8)break;
     const index=group.findIndex(ad=>{const key=sellerIdentity(ad);return !key || !sellers.has(key);});
     if(index<0) continue;
     const [ad]=group.splice(index,1);ads.push(ad);const key=sellerIdentity(ad);if(key)sellers.add(key);
@@ -61,5 +72,6 @@ export function selectHomeOpportunities(config: CategoryFormConfig | null, seedA
     for(const group of groups.values()) {if(ads.length>=8)break;const ad=group.shift();if(ad){ads.push(ad);added=true;}}
     if(!added)break;
   }
+  const tiles=ads.slice(0,4).map(ad=>({adId:ad.id,categoryId:categoryForAd(allActive,ad)?.id??null,categoryName:ad.categoryName?.trim()||'إعلان من السوق',title:ad.title,href:ad.href??`/ads/${ad.id}`,image:ad.image||null,featured:featuredRank(ad)>0}));
   return {tiles,ads};
 }

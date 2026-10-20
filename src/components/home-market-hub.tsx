@@ -7,9 +7,10 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Grid2X2, Store } from 'lucide-rea
 import type { AdCard } from '@/lib/data';
 import { adPriceLabel } from '@/lib/ad-presentation';
 import styles from './home-market-hub.module.css';
+import type { HomeOpportunityTile } from '@/lib/home-opportunities';
 
 export interface HomeMarketHubProps {
-  opportunities: { categoryId: number; categoryName: string; href: string; image: string | null }[];
+  opportunities: HomeOpportunityTile[];
   ads: AdCard[];
   categories: { id: number; name: string }[];
   isLoggedIn: boolean;
@@ -47,16 +48,17 @@ export function HomeMarketHub({ opportunities, ads, categories, isLoggedIn, moti
     return () => window.clearInterval(timer);
   }, [motion, reducedMotion, hidden, paused, hovered, focused, pages]);
 
-  const distinctOpportunities = opportunities.filter((item, index, all) => all.findIndex(other => other.categoryId === item.categoryId) === index).slice(0, 4);
+  const distinctOpportunities = opportunities.filter((item, index, all) => all.findIndex(other => other.href === item.href) === index).slice(0, 4);
   const move = (step: number) => setPage((activePage + step + pages) % pages);
 
   return <section className={styles.root} dir="rtl" aria-label="اكتشف السوق">
     <div className={styles.band}>
       <div><h2>فرص لعملك.. تبدأ من تربح</h2><p>اكتشف الأقسام، قارن الخيارات، وتواصل مباشرة.</p></div>
-      <nav className={styles.tiles} aria-label="فرص حسب القسم">
-        {distinctOpportunities.map(item => <Link key={item.categoryId} href={item.href}>
-          <span className={styles.tileImage}>{item.image ? <Image src={item.image} alt="" fill sizes="64px" className={styles.image} /> : <Grid2X2 aria-hidden="true" size={24} />}</span><span>{item.categoryName}</span>
+      <nav className={styles.tiles} aria-label="فرص من إعلانات السوق" style={{gridTemplateColumns:`repeat(${Math.max(1,distinctOpportunities.length)},minmax(0,1fr))`}}>
+        {distinctOpportunities.map(item => <Link key={item.href} href={item.href}>
+          <span className={styles.tileImage}>{item.image ? <Image src={item.image} alt="" fill sizes="64px" className={styles.image} /> : <Grid2X2 aria-hidden="true" size={24} />}</span><span className={styles.tileText}>{item.title ? <><strong>{item.title}</strong><small>{item.featured && <b>مميّز · </b>}{item.categoryName}</small></> : item.categoryName}</span>
         </Link>)}
+        {!distinctOpportunities.length && <Link href="/ads/new">ابدأ بإعلانك في تربح</Link>}
       </nav>
     </div>
     <div className={styles.hub}>

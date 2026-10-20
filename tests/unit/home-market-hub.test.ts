@@ -41,3 +41,6 @@ describe('home market hub', () => {
   });
 });
 
+
+it('keeps distinct fallback ads from the same category and marks only true featured promotion',()=>{const html=render({opportunities:[{adId:1,categoryId:1,categoryName:'معدات',title:'المميز الحقيقي',featured:true,href:'/ads/1',image:'/one.jpg'},{adId:2,categoryId:1,categoryName:'معدات',title:'إعلان بديل',featured:false,href:'/ads/2',image:'/two.jpg'}]});expect(html).toContain('href="/ads/1"');expect(html).toContain('href="/ads/2"');expect(html).toContain('المميز الحقيقي');expect(html).toContain('إعلان بديل');expect((html.match(/مميّز · /g)||[])).toHaveLength(1);expect(html).toContain('repeat(2,minmax(0,1fr))');});
+it('fills the band with an honest publish action when the whole public pool is empty',()=>{const html=render({opportunities:[]});expect(html).toContain('ابدأ بإعلانك في تربح');expect(html).toContain('repeat(1,minmax(0,1fr))');});

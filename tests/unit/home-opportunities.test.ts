@@ -5,10 +5,10 @@ import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
 const config: CategoryFormConfig = {enabled:true,categories:Array.from({length:9},(_,i)=>({id:i+1,name:`Category ${i+1}`,active:true,order:i})),subcategories:[],labels:{}};
 const ad = (id:number, category=1, seller:string|null='Seller'): AdCard => ({id,title:`Item ${id}`,price:15,adsType:'sale',image:'/real.jpg',cityName:null,categoryName:`Category ${category}`,createdAt:null,special:false,urgent:false,views:0,sellerName:seller,sellerTrusted:false});
 describe('homepage opportunity selection',()=>{
- it('returns nothing for unavailable configuration',()=>{
+ it('retains public fallback even when category navigation is unavailable',()=>{
   expect(opportunityCategories(null,[])).toEqual([]);
-  expect(selectHomeOpportunities({...config,categories:[]},[ad(1)],[])).toEqual({tiles:[],ads:[]});
-  expect(selectHomeOpportunities({...config,enabled:false},[ad(1)],[])).toEqual({tiles:[],ads:[]});
+  expect(selectHomeOpportunities({...config,categories:[]},[ad(1)],[]).tiles[0].href).toBe('/ads/1');
+  expect(selectHomeOpportunities({...config,enabled:false},[ad(1)],[]).ads.map(x=>x.id)).toEqual([1]);
  });
  it('deduplicates active categories, prefers relevant seeds and bounds candidates',()=>{
   const c={...config,categories:[...config.categories,{...config.categories[0]}, {id:20,name:'Hidden',active:false,order:0}]};
@@ -20,9 +20,9 @@ describe('homepage opportunity selection',()=>{
   expect(opportunityCategories(config,[],new Date('2026-10-20T10:00:00Z'))).toEqual(a);
   expect(opportunityCategories(config,[],new Date('2026-10-20T21:00:00Z'))).not.toEqual(a);
  });
- it('provides honest category navigation even for empty inventory',()=>{
+ it('does not manufacture advertisements for entirely empty inventory',()=>{
   const result=selectHomeOpportunities(config,[],[],new Date('2026-10-20T12:00:00Z'));
-  expect(result.ads).toEqual([]);expect(result.tiles).toHaveLength(4);
+  expect(result.ads).toEqual([]);expect(result.tiles).toHaveLength(0);
   expect(result.tiles.every(x=>x.image===null&&x.href===`/?category=${x.categoryId}`)).toBe(true);
  });
  it('diversifies categories and sellers before dominant inventory and preserves prices',()=>{
@@ -41,7 +41,7 @@ import { searchAds } from '@/lib/data';
 import { getHomeOpportunities } from '@/lib/home-opportunities-server';
 describe('opportunity public loader',()=>{
  it('makes no queries when disabled',async()=>{
-  vi.mocked(searchAds).mockReset(); expect(await getHomeOpportunities(null,[ad(1)])).toEqual({tiles:[],ads:[]});expect(searchAds).not.toHaveBeenCalled();
+  vi.mocked(searchAds).mockReset(); expect((await getHomeOpportunities(null,[ad(1)])).ads.map(x=>x.id)).toEqual([1]);expect(searchAds).not.toHaveBeenCalled();
  });
  it('keeps successful public results when another category query fails',async()=>{
   vi.mocked(searchAds).mockReset().mockImplementation(async args=>{if(args.categoryId===1)return [ad(90)];throw new Error('offline');});
@@ -52,7 +52,14 @@ describe('opportunity public loader',()=>{
   vi.mocked(searchAds).mockReset().mockRejectedValue(new Error('unavailable'));
   const result=await getHomeOpportunities(config,[ad(1)]);
   expect(searchAds).toHaveBeenCalledTimes(6);for(const [args] of vi.mocked(searchAds).mock.calls) expect(args).toEqual({categoryId:expect.any(Number),take:3,skip:0});
-  expect(result.ads.map(x=>x.id)).toEqual([1]);expect(result.tiles).toHaveLength(4);
+  expect(result.ads.map(x=>x.id)).toEqual([1]);expect(result.tiles).toHaveLength(1);
  });
 });
 
+
+describe('featured-first filled opportunity placements',()=>{
+ it('fills four placements with real ads even when all inventory belongs to one category',()=>{const source=[ad(1),ad(2),ad(3),ad(4)];const result=selectHomeOpportunities(config,source,[]);expect(result.tiles).toHaveLength(4);expect(result.tiles.every(tile=>tile.image&&tile.href.startsWith('/ads/'))).toBe(true);expect(new Set(result.tiles.map(tile=>tile.href)).size).toBe(4);});
+ it('puts genuine featured ads first even from outside the queried category set',()=>{const featured={...ad(99,9),special:true};const source=[ad(1),ad(2),ad(3),featured];const result=selectHomeOpportunities(config,source,[]);expect(result.tiles[0].href).toBe('/ads/99');expect(result.ads[0].id).toBe(99);});
+ it('does not label a cross-category fallback with the empty category name',()=>{const c={...config,categories:config.categories.slice(0,4)};const result=selectHomeOpportunities(c,[{...ad(10,8),href:'/companies/source/10'}],[]);expect(result.tiles).toHaveLength(1);expect(result.tiles[0]).toMatchObject({href:'/companies/source/10',categoryName:'Category 8',image:'/real.jpg'});});
+ it('uses available public fallback without querying categories when category configuration is disabled',async()=>{vi.mocked(searchAds).mockReset();const result=await getHomeOpportunities({...config,enabled:false},[ad(1)]);expect(result.tiles[0]?.href).toBe('/ads/1');expect(searchAds).not.toHaveBeenCalled();});
+});

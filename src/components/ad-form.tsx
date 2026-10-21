@@ -234,6 +234,7 @@ export function AdForm({
           ⏳ <b>{rejection?.title}:</b> {rejection?.reason} الرجاء الانتظار{gapWait ? ` نحو ${gapWait} ثانية` : ' قليلاً'} ثم أعد المحاولة.
         </div>
       )}
+      {error === 'store' && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep} <Link href="/store" className="underline">فتح متجري</Link></div>}
       {error === 'repeat' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}

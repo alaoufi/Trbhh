@@ -7,7 +7,7 @@ import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage, type WatermarkOptions } from '@/lib/watermark';
 import { logClientError } from '@/lib/error-log';
-import { aHash, hashSimilarity } from '@/lib/phash';
+import { aHash } from '@/lib/phash';
 import { bumpDupAttempts, banUserFor, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
 import { canRepeatOwnAdWithPackage, getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getStrikeBanDays } from '@/lib/settings';
@@ -20,7 +20,7 @@ import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
 import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '@/lib/profiles';
-import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
+import { isDuplicateAdText, isKeywordStuffing } from '@/domain/text';
 import { writeAdWithCategory } from '@/lib/ad-categories/service';
 import { CategoryValidationError } from '@/lib/ad-categories/validation';
 
@@ -114,55 +114,11 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
   await Promise.all(images.map((img) => storeOneImage(img, userId, adId, wm)));
 }
 
-/**
- * Decide whether a new ad must be held for admin approval before publishing.
- * Triggers when — versus any existing PUBLISHED ad:
- *   • title similarity ≥ 90%, OR
- *   • detail similarity ≥ 90%, OR
- *   • an uploaded image is byte-identical to an existing ad image.
- */
-/** Duplicate against the SAME user's own ads (reposting the same ad).
- *  Comparison is ONLY on the AD TITLE and AD DETAILS — each with its own
- *  admin-configurable threshold (no image/price matching). Returns the matched
- *  ad (id + title) so we can tell the member/admin exactly which ad it
- *  duplicates — or null when it is not a duplicate. */
-async function ownDuplicateOf(userId: number, title: string, detail: string, images: PreparedImage[]): Promise<{ id: number; title: string } | null> {
-  const { title: titlePct, detail: detailPct, image: imagePct } = await getDupThresholds();
-
-  // 1) text: title / details vs the user's own ads, each with its own threshold
-  const mine = await prisma.ads.findMany({
-    where: { user_id: BigInt(userId) },
-    select: { id: true, title: true, detail: true },
-    orderBy: { id: 'desc' },
-    take: 300,
-  });
-  const nTitle = normalizeAr(title);
-  const nDetail = normalizeAr(detail);
-  for (const r of mine) {
-    const titleMatch = similarity(nTitle, normalizeAr(r.title)) * 100 >= titlePct;
-    const detailMatch = similarity(nDetail, normalizeAr(r.detail)) * 100 >= detailPct;
-    if (titleMatch || detailMatch) return { id: toInt(r.id), title: r.title };
-  }
-
-  // 2) images: perceptual similarity (aHash) vs the user's own ad images
-  if (images.length) {
-    const newHashes = (await Promise.all(images.map((i) => aHash(i.buf)))).filter(Boolean);
-    if (newHashes.length) {
-      const ups = await prisma.uploads.findMany({
-        where: { user_id: userId, type: 'ad', phash: { not: null } },
-        select: { id: true, phash: true },
-        orderBy: { id: 'desc' },
-        take: 800,
-      }).catch(() => []);
-      for (const up of ups) {
-        if (newHashes.some((h) => hashSimilarity(h, up.phash || '') >= imagePct)) {
-          const ph = await prisma.photos.findFirst({ where: { photo_path: String(toInt(up.id)) }, select: { other_id: true } }).catch(() => null);
-          const a = ph ? await prisma.ads.findUnique({ where: { id: BigInt(ph.other_id) }, select: { id: true, title: true } }).catch(() => null) : null;
-          if (a) return { id: toInt(a.id), title: a.title };
-        }
-      }
-    }
-  }
+/** Same-member duplicates require both title and description evidence. */
+async function ownDuplicateOf(userId: number, title: string, detail: string): Promise<{id:number;title:string}|null> {
+  const thresholds=await getDupThresholds();
+  const mine=await prisma.ads.findMany({where:{user_id:BigInt(userId),store_only:0,status:1,state:'active'},select:{id:true,title:true,detail:true},orderBy:{id:'desc'},take:300});
+  for(const prior of mine) if(isDuplicateAdText(title,detail,prior.title,prior.detail,thresholds)) return {id:toInt(prior.id),title:prior.title};
   return null;
 }
 
@@ -172,20 +128,16 @@ async function ownDuplicateOf(userId: number, title: string, detail: string, ima
  *  legitimately share the same manufacturer/stock photo. Scoped to the last 30
  *  days so the comparison set stays bounded and relevant. */
 export async function crossUserDuplicateOf(userId: number, title: string, detail: string): Promise<{ id: number; title: string } | null> {
-  const { title: titlePct, detail: detailPct } = await getDupThresholds();
+  const thresholds = await getDupThresholds();
   const since = new Date(Date.now() - 30 * 86_400_000);
   const others = await prisma.ads.findMany({
-    where: { user_id: { not: BigInt(userId) }, created_at: { gte: since } },
+    where: { user_id: { not: BigInt(userId) }, created_at: { gte: since }, store_only: 0, status: 1, state: 'active' },
     select: { id: true, title: true, detail: true },
     orderBy: { id: 'desc' },
     take: 1500,
   });
-  const nTitle = normalizeAr(title);
-  const nDetail = normalizeAr(detail);
   for (const r of others) {
-    const titleMatch = similarity(nTitle, normalizeAr(r.title)) * 100 >= titlePct;
-    const detailMatch = similarity(nDetail, normalizeAr(r.detail)) * 100 >= detailPct;
-    if (titleMatch || detailMatch) return { id: toInt(r.id), title: r.title };
+    if(isDuplicateAdText(title,detail,r.title,r.detail,thresholds,true)) return {id:toInt(r.id),title:r.title};
   }
   return null;
 }
@@ -229,14 +181,17 @@ export async function createAdAction(formData: FormData) {
     active = await ensureDefaultProfile(session.uid);
   }
   const q = dest ? '&dest=store' : '';
+  let publishingStoreId = 0;
   // متجر موقوف (مؤقتاً أو نهائياً): لا يُسمح بنشر إعلانات منه
   if (dest === 'store') {
-    const { storeStatusOfUser, storeIdOfUser } = await import('@/lib/merchant');
+    const { storeStatusOfUser, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
     const st = await storeStatusOfUser(session.uid).catch(() => 1);
     if (st === 2 || st === 3) redirect(st === 3 ? '/store?error=suspended_perm' : '/store?error=suspended');
     // انتهاء اشتراك المتجر لا يُحوّل العضو إلى شاشة خطأ عامة: يُنقل إلى التجديد
     // حيث يرى رصيده والخطط وخيار الشحن إن لم يكفِ الرصيد.
-    const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+    publishingStoreId = (await getActiveStoreId(session.uid)) || (await staffStoreId(session.uid));
+    if (!publishingStoreId) redirect('/ads/new?error=store&dest=store');
+    const storeId = publishingStoreId;
     if (storeId) {
       const { isStoreSubBlocked } = await import('@/lib/subscription');
       if (await isStoreSubBlocked(storeId)) redirect('/store?sub=expired&from=ad#sub');
@@ -260,7 +215,7 @@ export async function createAdAction(formData: FormData) {
   // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
   if (!phone && !whatsapp) redirect(`/ads/new?error=contact${q}`);
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
-  if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
+  if (isKeywordStuffing(title, detail)) redirect(`/ads/new?error=repeat${q}`);
 
   // سياسة المحتوى النصّي (متّفق عليها): الكلمة المخالفة لا تحجب الإعلان إطلاقاً — تُشفَّر بنجوم
   // فقط ويُنشر الإعلان، إلا إن كانت من الكلمات المستثناة (قائمة السماح مثل «وايت سكس») فتبقى كما هي.
@@ -366,7 +321,7 @@ export async function createAdAction(formData: FormData) {
 
   // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار تربح ولا تسعيراتها (سياسة
   // المتجر مختلفة). أمّا إعلانات تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
-  const dup = dest === 'store' || canRepeatOwnAdWithPackage(pkg) ? null : await ownDuplicateOf(session.uid, title, detail, images);
+  const dup = dest === 'store' || canRepeatOwnAdWithPackage(pkg) ? null : await ownDuplicateOf(session.uid, title, detail);
   if (dup) {
     // تكرار الإعلان الذاتي مع الباقة المجانية سياسة استحقاق، وليس مخالفة سبام:
     // لا نسجل إنذاراً ولا نحظر الحساب؛ نوضح الباقة المطلوبة فقط.
@@ -396,7 +351,8 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
-  const ad = await writeAdWithCategory(prisma, formData, (tx, category) => tx.ads.create({
+  const ad = await writeAdWithCategory(prisma, formData, async (tx, category) => {
+    const created = await tx.ads.create({
     data: {
       title: finalTitle, detail: finalDetail, price, adsType,
       category_id: catId,
@@ -430,7 +386,13 @@ export async function createAdAction(formData: FormData) {
         ...(!category.goodsEnabled ? { stock_state: 0, old_price: 0 } : {}),
       } : {}),
     },
-  })).catch(error => {
+    });
+    // Showcase membership and the ad must commit in the same transaction.
+    if (dest === 'store') await tx.store_products.createMany({
+      data: [{ store_id: publishingStoreId, ad_id: toInt(created.id) }], skipDuplicates: true,
+    });
+    return created;
+  }).catch(error => {
     if (error instanceof CategoryValidationError) redirect(`/ads/new?error=category${q}`);
     throw error;
   });
@@ -494,6 +456,13 @@ export async function createAdAction(formData: FormData) {
     }
   }
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
+  revalidatePath('/');
+  revalidatePath('/search');
+  revalidatePath('/account/ads');
+  if (publishingStoreId) {
+    revalidatePath(`/companies/${publishingStoreId}`);
+    revalidatePath('/store');
+  }
   if (!requireApproval && dest !== 'store' && !scheduledAt) {
     // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
@@ -503,16 +472,16 @@ export async function createAdAction(formData: FormData) {
   }
   // كلمات مخالفة قليلة: نُشر الإعلان للعامة بعد حجب تلك الكلمات بنجمات — أعلِم صاحبه بذلك.
   if (flagTerms) {
-    await notifyModBlock(session.uid, `نُشر إعلانك «${finalTitle.slice(0, 40)}» بعد حجب كلمات مخالفة بنجمات (${flagTerms}). إن رأيت المنع خطأً راسل الإدارة.`, `/ads/${toInt(ad.id)}`).catch(() => {});
+    const resultLabel = requireApproval ? 'حُفظ إعلانك بانتظار المراجعة' : scheduledAt ? 'حُفظ إعلانك للنشر في الموعد المحدد' : 'نُشر إعلانك';
+    await notifyModBlock(session.uid, `${resultLabel} «${finalTitle.slice(0, 40)}» بعد حجب كلمات مخالفة بنجمات (${flagTerms}). إن رأيت المنع خطأً راسل الإدارة.`, `/ads/${toInt(ad.id)}`).catch(() => {});
   }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
-    const { addStoreProduct, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
-    await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
+    const { notifyStoreFollowers } = await import('@/lib/merchant');
+    if (!requireApproval) await notifyStoreFollowers(publishingStoreId, toInt(ad.id), session.uid).catch(() => {});
     if (requireApproval) redirect('/store?added=pending'); // بانتظار الموافقة → لا يظهر بعد
     // المالك أو الموظف — كلاهما يعود لواجهة المتجر الفعّال نفسه
-    const sid = (await getActiveStoreId(session.uid).catch(() => 0)) || (await staffStoreId(session.uid).catch(() => 0));
-    redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
+    redirect(`/companies/${publishingStoreId}?added=1`);
   }
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة أو مجدولاً
   const extraFlags: string[] = [];
@@ -521,9 +490,9 @@ export async function createAdAction(formData: FormData) {
   if (featuredState === 'ok') extraFlags.push('featured=1');
   if (featuredState === 'need') extraFlags.push('featuredneed=1');
   const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
-  if (flagTerms && !scheduledAt) redirect(`/account/ads?censored=1${needFlags}`);
-  if (scheduledAt) redirect(`/account/ads?scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);
+  if (scheduledAt) redirect(`/account/ads?scheduled=1${needFlags}`);
   if (requireApproval) redirect(`/account/ads?pending=1${needFlags}`);
+  if (flagTerms) redirect(`/account/ads?censored=1${needFlags}`);
   // نجاح فوري بلا رسوم إضافية معلّقة: رسالة «تم نشر إعلانك» + تحويل للصفحة الرئيسية حيث يظهر.
   if (extraFlags.length === 0) redirect(`/?published=${toInt(ad.id)}`);
   // شراء «عاجل/مميز» أو نقص رصيدهما: ابقَ على صفحة الإعلان لإتمام/معالجة ذلك قربه.

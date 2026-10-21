@@ -29,6 +29,16 @@ export function similarity(a: string, b: string): number {
   return inter / (ta.size + tb.size - inter);
 }
 
+/** A common trade title or a stock photo alone is not evidence of a duplicate. */
+export function isDuplicateAdText(title: string, detail: string, priorTitle: string, priorDetail: string,
+  thresholds: {title: number; detail: number}, crossMember = false): boolean {
+  const a = normalizeAr(title), b = normalizeAr(detail);
+  const c = normalizeAr(priorTitle), d = normalizeAr(priorDetail);
+  if (!a || !b || !c || !d) return false;
+  if (crossMember && (new Set(b.split(' ')).size < 8 || new Set(d.split(' ')).size < 8)) return false;
+  return similarity(a,c) * 100 >= thresholds.title && similarity(b,d) * 100 >= thresholds.detail;
+}
+
 /**
  * Detect keyword-stuffing (حشو الكلمات): the same word or short phrase repeated
  * many times to manipulate Google search. Returns true when the text is spammy.
@@ -42,8 +52,9 @@ export function isKeywordStuffing(title: string, detail: string): boolean {
   for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
   let topCount = 0;
   for (const c of freq.values()) if (c > topCount) topCount = c;
-  if (topCount >= 6 && topCount / words.length >= 0.28) return true;
-  if (topCount >= 12) return true; // extreme absolute repetition regardless of length
+  // Trade words naturally recur in service/specification lists. Block dominance,
+  // not an absolute occurrence count in a long useful description.
+  if (topCount >= 6 && topCount / words.length >= 0.6) return true;
 
   // 2) a repeated adjacent phrase (bigram), e.g. "رافعة شوكية رافعة شوكية …"
   const bigrams = new Map<string, number>();
@@ -51,7 +62,18 @@ export function isKeywordStuffing(title: string, detail: string): boolean {
     const key = `${words[i]} ${words[i + 1]}`;
     bigrams.set(key, (bigrams.get(key) || 0) + 1);
   }
-  for (const c of bigrams.values()) if (c >= 4) return true;
+  for (const c of bigrams.values()) if (c >= 4 && c * 2 / words.length >= 0.6) return true;
+
+  // Keep protection against longer repeated blocks after relaxing trade words.
+  for (let size = 3; size <= 6; size++) {
+    const phrases = new Map<string, number>();
+    for (let i = 0; i <= words.length - size; i++) {
+      const phrase = words.slice(i, i + size).join(' ');
+      const count = (phrases.get(phrase) || 0) + 1;
+      phrases.set(phrase, count);
+      if (count >= 4 && count * size / words.length >= 0.75) return true;
+    }
+  }
 
   return false;
 }

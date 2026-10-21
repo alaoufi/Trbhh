@@ -297,7 +297,7 @@ export async function addStoreProduct(userId: number, adId: number) {
 }
 
 /** يُنبّه متابعي المتجر بمنتج جديد — بإدراج جماعي واحد (كفؤ) مع حدّ أمان للعدد. */
-async function notifyStoreFollowers(storeId: number, adId: number, ownerId: number): Promise<void> {
+export async function notifyStoreFollowers(storeId: number, adId: number, ownerId: number): Promise<void> {
   const followers = await prisma.store_follows.findMany({ where: { store_id: storeId, user_id: { not: ownerId } }, select: { user_id: true }, take: 3000 }).catch(() => []);
   if (!followers.length) return;
   const [meta, ad] = await Promise.all([

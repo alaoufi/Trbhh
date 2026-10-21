@@ -6,7 +6,7 @@
 export type AdPublishRejectionCode =
   | 'missing' | 'contact' | 'pledge' | 'blocked' | 'toomany' | 'image'
   | 'flood' | 'repeat' | 'free-duplicate' | 'crossdup' | 'needdup'
-  | 'needcredit' | 'banned' | 'editWindow' | 'limit' | 'gap';
+  | 'needcredit' | 'banned' | 'editWindow' | 'limit' | 'gap' | 'store';
 
 export type AdPublishRejection = {
   title: string;
@@ -17,6 +17,7 @@ export type AdPublishRejection = {
 };
 
 const REJECTIONS: Record<AdPublishRejectionCode, AdPublishRejection> = {
+  store: { title: 'لم يُحفظ الإعلان', reason: 'لم يتحدد متجر متاح للنشر باسمك.', nextStep: 'افتح متجرك الصحيح ثم أعد إضافة الإعلان، أو اختر النشر باسمك الشخصي.', actionHref: '/store', actionLabel: 'فتح متجري' },
   missing: { title: 'لم يُنشر الإعلان', reason: 'العنوان أو التفاصيل المطلوبة غير مكتملة.', nextStep: 'أكمل الحقول المطلوبة ثم أعد النشر.' },
   contact: { title: 'لم يُنشر الإعلان', reason: 'لا توجد وسيلة تواصل ظاهرة للمشتري.', nextStep: 'أضف رقم الجوال أو واتساب ثم أعد النشر.' },
   pledge: { title: 'لم يُنشر الإعلان', reason: 'لم تؤكد تعهّد صحة الإعلان.', nextStep: 'فعّل مربع التعهّد ثم أعد النشر.' },

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   storeLink: vi.fn(async () => ({count:1})),
+  others: [] as {id:bigint;title:string;detail:string}[],
+  ban:vi.fn(),dupAttempt:vi.fn(async()=>3),
   storeId: 44, approval:false, censored:false,
   followers:vi.fn(async()=>{}),
   cache: vi.fn(async () => {}),
@@ -12,7 +14,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: {
   profiles: {findFirst:async()=>({id:9n})},
   store_products: {createMany:mocks.storeLink},
   users: { findUnique: async () => ({ country_id: 1 }), update: async () => ({}) },
-  ads: { create: mocks.create, update: mocks.update, findMany: async () => [], count: async () => 2 },
+  ads: { create: mocks.create, update: mocks.update, findMany: async () => mocks.others, count: async () => 2 },
 } }));
 vi.mock('@/lib/auth', () => ({ requireUser: async () => ({ uid: 7 }) }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error(url); } }));
@@ -21,7 +23,7 @@ vi.mock('@/lib/storage', () => ({}));
 vi.mock('@/lib/watermark', () => ({}));
 vi.mock('@/lib/error-log', () => ({}));
 vi.mock('@/lib/phash', () => ({}));
-vi.mock('@/lib/moderation', () => ({ isUserBanned: async () => false, notifyModBlock:async()=>{}, checkFlood: async () => ({ blocked: false }) }));
+vi.mock('@/lib/moderation', () => ({ isUserBanned: async () => false, logMod:async()=>{}, banUserFor:mocks.ban, bumpDupAttempts:mocks.dupAttempt, DUP_LIMIT:3, notifyModBlock:async()=>{}, checkFlood: async () => ({ blocked: false }) }));
 vi.mock('@/lib/packages', () => ({
   getUserPackage: async () => ({ adsPerDay: 0, gapHours: 0 }), canRepeatOwnAdWithPackage: () => true,
   applyFeaturedToNewAd: async () => {}, logAdPublish: async () => {},
@@ -54,7 +56,7 @@ function form(extras: Record<string, string | undefined>) {
 }
 
 describe('actual new ad action preserves created source for paid extras', () => {
-  beforeEach(() => { vi.clearAllMocks(); mocks.storeId=44;mocks.approval=false;mocks.censored=false; mocks.storeLink.mockResolvedValue({count:1}); mocks.charge.mockResolvedValue({ ok: true, balance: 100 }); });
+  beforeEach(() => { vi.clearAllMocks();mocks.others=[]; mocks.storeId=44;mocks.approval=false;mocks.censored=false; mocks.storeLink.mockResolvedValue({count:1}); mocks.charge.mockResolvedValue({ ok: true, balance: 100 }); });
   it.each([
     { extras: { featuredDur: 'month' }, reason: 'featured', price: 37, flag: 'featured=1' },
     { extras: { urgent: '48' }, reason: 'urgent', price: 19, flag: 'urgent=1' },
@@ -105,4 +107,14 @@ describe('publish outcome accuracy',()=>{
  beforeEach(()=>{vi.clearAllMocks();mocks.approval=false;mocks.censored=false;});
  it('reports pending review instead of falsely reporting public publication after censoring',async()=>{mocks.approval=true;mocks.censored=true;await expect(createAdAction(form({}))).rejects.toThrow('/account/ads?pending=1');expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({status:0})}));});
  it('keeps the normal published result linked to the actual persisted ad',async()=>{await expect(createAdAction(form({}))).rejects.toThrow('/?published=817');expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({status:1,store_only:0,state:'active'})}));});
+});
+
+describe('duplicate warnings do not ban members',()=>{
+ it('rejects copied substantial text without escalating repeated retries to an account ban',async()=>{
+ vi.clearAllMocks();mocks.approval=false;mocks.censored=false;
+ const title='رافعة كهربائية للإيجار';const detail='رافعة كهربائية حمولة ثلاثة اطنان موديل حديث بحالة ممتازة مع صيانة دورية وتوصيل للمستودع';
+ mocks.others=[{id:91n,title,detail}];
+ for(let i=0;i<3;i++) await expect(createAdAction(form({title,detail}))).rejects.toThrow('/ads/new?error=crossdup&dup=91');
+ expect(mocks.ban).not.toHaveBeenCalled();expect(mocks.dupAttempt).not.toHaveBeenCalled();expect(mocks.create).not.toHaveBeenCalled();mocks.others=[];
+ });
 });

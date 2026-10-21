@@ -8,9 +8,9 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage, type WatermarkOptions } from '@/lib/watermark';
 import { logClientError } from '@/lib/error-log';
 import { aHash } from '@/lib/phash';
-import { bumpDupAttempts, banUserFor, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
+import { handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
 import { canRepeatOwnAdWithPackage, getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getStrikeBanDays } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds } from '@/lib/settings';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
@@ -302,21 +302,14 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
-  // تكرار عبر أعضاء مختلفين (شبكات سبام تنشر نفس النص بأرقام/حسابات متعددة —
-  // مثل إعلانات "دينا" المتكررة). منع فوري دون خيار الدفع (المحتوى ليس ملكه
-  // أصلاً)، مع نفس نظام المخالفات المتدرّج قبل الحظر.
+  // تشابه جوهري بين عنوان الإعلان ووصفه وإعلان عضو آخر: نطلب تعديل النص
+  // دون إنذار حظر أو تراكم مخالفات على الحساب بسبب المطابقة الآلية.
   // يُفحص قبل التكرار الذاتي عمداً: هذا الفحص لا تقبل الباقة المدفوعة تجاوزه إطلاقاً.
   const crossDup = dest === 'store' ? null : await crossUserDuplicateOf(session.uid, title, detail);
   if (crossDup) {
-    const n = await bumpDupAttempts(session.uid);
-    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}`, adId: crossDup.id });
-    if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays(), 'auto', 'تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين');
-      await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين.`);
-      redirect('/ads/new?error=banned');
-    }
-    await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان عضو آخر — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
-    redirect(`/ads/new?error=crossdup&left=${Math.max(0, DUP_LIMIT - n)}&dup=${crossDup.id}`);
+    // A content match blocks this submission, not the member's account.
+    await logMod(session.uid, {kind:'duplicate_cross',action:'blocked',snippet:'تشابه نصي يحتاج تعديل الإعلان، دون حظر الحساب',adId:crossDup.id});
+    redirect(`/ads/new?error=crossdup&dup=${crossDup.id}`);
   }
 
   // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار تربح ولا تسعيراتها (سياسة
@@ -403,9 +396,6 @@ export async function createAdAction(formData: FormData) {
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await logAdPublish(session.uid); // سجل ثابت لحدّ الباقة — لا يتأثر بحذف الإعلان لاحقاً
-  // لا تصفير لعدّاد محاولات التكرار هنا: تصفيره عند أي نشر ناجح كان يتيح
-  // للمخالف التناوب بين إعلان سليم وآخر مكرّر بلا نهاية دون بلوغ حدّ الحظر
-  // (bumpDupAttempts أدناه يتكفّل بتقادم العدّاد تلقائياً بعد ٢٤ ساعة هدوء).
   // نقاط أول إعلان + مكافأة الإحالة — لا تعطّل النشر
   import('@/lib/points').then(async (m) => {
     const count = await prisma.ads.count({ where: { user_id: BigInt(session.uid) } }).catch(() => 99);

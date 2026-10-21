@@ -255,9 +255,7 @@ export function AdForm({
           {dupId && Number(dupId) > 0 && (
             <span> الإعلان المطابق: <a href={`/ads/${dupId}`} target="_blank" rel="noopener noreferrer" className="font-bold underline">افتح الإعلان رقم {dupId}</a>.</span>
           )}
-          {dupLeft && Number(dupLeft) > 0
-            ? ` تبقّى لك ${dupLeft} ${Number(dupLeft) === 1 ? 'محاولة' : 'محاولات'} قبل حظر حسابك.`
-            : ' هذه محاولتك الأخيرة قبل الحظر.'}
+          <span> عدّل وصف السلعة أو الخدمة ليوضح ما يميّز عرضك. هذا التنبيه لا يحظر حسابك.</span>
         </div>
       )}
       {error === 'needdup' && (

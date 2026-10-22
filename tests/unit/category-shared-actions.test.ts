@@ -6,7 +6,7 @@ vi.mock('@/lib/settings',()=>({setSetting:vi.fn()}));
 vi.mock('@/lib/data',()=>({bustAdCaches:async()=>{}}));
 vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
 vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw Error(url);}}));
-import {saveSharedCategoryFields} from '@/app/admin/categories/actions';
+import {saveSharedCategoryFields,autosaveCategoryFields} from '@/app/admin/categories/actions';
 import {groupCategoryFields} from '@/lib/ad-categories/shared-fields';
 import type {SubcategoryOption} from '@/lib/ad-categories/contracts';
 const field={key:'color',label:'اللون',type:'text' as const,group:'',visible:true,required:true,order:0,options:[]};
@@ -20,3 +20,12 @@ describe('shared field admin write',()=>{
  it('does not access or write database after authorization failure',async()=>{f.access.mockRejectedValueOnce(Error('forbidden'));await expect(saveSharedCategoryFields(form())).rejects.toThrow('forbidden');expect(f.execute).not.toHaveBeenCalled();});
  it('refuses a forged field signature',async()=>{const fd=form();fd.set('changes_json',JSON.stringify([{id:'other-category',required:true}]));await expect(saveSharedCategoryFields(fd)).rejects.toThrow('error=input');expect(f.execute).not.toHaveBeenCalled();});
 });
+
+ it('autosaves without redirect and returns authoritative flags and incremented versions',async()=>{
+   const result=await autosaveCategoryFields(form());
+   expect(result[0]).toMatchObject({id:2,version:5,fields:[{...field,visible:false,required:false}]});
+ });
+ it('limits a child exception to that child while retaining full version checks',async()=>{
+   f.rows.push({...f.rows[0],id:3n});const fd=form();fd.set('versions_json',JSON.stringify([{id:2,version:4},{id:3,version:4}]));fd.set('subcategory_id','2');
+   const result=await autosaveCategoryFields(fd);expect(result.map(s=>s.version)).toEqual([5,4]);expect(result[1].fields[0].visible).toBe(true);
+ });

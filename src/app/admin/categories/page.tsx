@@ -13,7 +13,7 @@ import {
   isCategoryAdminView, isCategoryEditorSection, categoryAdminQuery, categoryEditorPath,
   type CategoryAdminQuery,
 } from '@/lib/ad-categories/admin-navigation';
-import { saveCategory, saveCategorySettings, saveSubcategory, toggleCategory, saveSharedCategoryFields } from './actions';
+import { saveCategory, saveCategorySettings, saveSubcategory, toggleCategory, autosaveCategoryFields } from './actions';
 
 const input = 'min-h-11 w-full min-w-0 rounded-lg border p-2 text-sm';
 const button = 'inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold';
@@ -39,14 +39,12 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
     if(!category||q.sub||(q.section!=='requirements'&&q.section!=='display'))notFound();
     const section=q.section;
     const subs=cfg.subcategories.filter(s=>s.categoryId===category.id);
-    const here=`/admin/categories?scope=parent&category=${category.id}&section=${section}`;
     return <div dir="rtl" className="min-w-0 space-y-4">
-      <h1 className="text-xl font-bold">حقول {category.name} — {CATEGORY_EDITOR_SECTIONS[section]}</h1>
+      <h1 className="text-xl font-bold">حقول {category.name} — الظهور والإلزام</h1>
       <p className="text-sm">عرض الحقول المتشابهة مرة واحدة. الحقول المختلفة في النوع أو الخيارات تبقى منفصلة. تعديل قسم فرعي وحده يبقى مستقلاً حتى تغيّر ذلك الحقل جماعيًا مرة أخرى.</p>
-      <nav className="flex flex-wrap gap-2" aria-label="تبويبات الحقول المشتركة">{(['requirements','display'] as const).map(k=><Link key={k} className={`${button} ${k===section?'bg-primary text-white':''}`} aria-current={k===section?'page':undefined} href={`/admin/categories?scope=parent&category=${category.id}&section=${k}`}>{CATEGORY_EDITOR_SECTIONS[k]}</Link>)}</nav>
       <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">تعديل قسم فرعي وحده أو اختيار قسم آخر</summary><CategoryFieldPicker categories={cfg.categories} subcategories={cfg.subcategories} section={section} initialCategory={category.id} initialSubcategory={null}/></details>
       {notice}
-      <AccessBoundary module="categories" action="edit"><CategorySharedFieldsEditor key={`${category.id}:${section}:${subs.map(s=>`${s.id}:${s.version}`).join(',')}`} categoryId={category.id} subs={subs} section={section} action={saveSharedCategoryFields} returnTo={here}/></AccessBoundary>
+      <AccessBoundary module="categories" action="edit"><CategorySharedFieldsEditor key={category.id} categoryId={category.id} subs={subs} action={autosaveCategoryFields}/></AccessBoundary>
     </div>;
   }
 
@@ -66,18 +64,18 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
           {(section==='requirements'||section==='display')&&<Link className={button} href={`/admin/categories?scope=parent&category=${sub.categoryId}&section=${section}`}>حقول القسم الرئيسي مجمّعة</Link>}
         </div>
         <h1 className="text-xl font-bold">{CATEGORY_EDITOR_SECTIONS[section]} — {sub.name}</h1>
-        <p className="text-sm text-muted-foreground">{category?.name} / {sub.name} — احفظ قبل الانتقال لتبويب آخر.</p>
+        <p className="text-sm text-muted-foreground">{category?.name} / {sub.name}</p>
         <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">القسم المختار: {sub.name} — تغيير القسم</summary><CategoryFieldPicker key={`${sid}:${section}`} categories={cfg.categories} subcategories={cfg.subcategories} section={section} initialCategory={sub.categoryId} initialSubcategory={sid}/></details>
         <nav aria-label="تبويبات الحقول" className="flex flex-wrap gap-2">
-          {(Object.entries(CATEGORY_EDITOR_SECTIONS) as [keyof typeof CATEGORY_EDITOR_SECTIONS, string][]).map(([k, label]) => (
-            <Link key={k} href={categoryEditorPath(sid, k)} aria-current={section === k ? 'page' : undefined} className={`${button} ${section === k ? 'bg-primary text-white' : ''}`}>{label}</Link>
+          {(Object.entries(CATEGORY_EDITOR_SECTIONS) as [keyof typeof CATEGORY_EDITOR_SECTIONS, string][]).filter(([k])=>k!=='display').map(([k, label]) => (
+            <Link key={k} href={categoryEditorPath(sid, k)} aria-current={section === k ? 'page' : undefined} className={`${button} ${section === k ? 'bg-primary text-white' : ''}`}>{k==='requirements'?'الظهور والإلزام':label}</Link>
           ))}
         </nav>
         {section === 'requirements' && <p className="rounded-lg bg-slate-50 p-3 text-sm">إجباري: يجب على العضو تعبئته عند ظهوره. اختياري: يمكن تركه فارغاً. الحقل المخفي اختياري دائماً.</p>}
         {section === 'display' && <p className="rounded-lg bg-slate-50 p-3 text-sm">تحكّم بظهور كل حقل في نموذج الإعلان. إخفاء الحقل يجعله اختيارياً تلقائياً.</p>}
         {notice}
         <AccessBoundary module="categories" action="edit">
-          <AdCategoryEditor key={`${sid}:${sub.version}:${section}`} initial={sub} categoryId={sub.categoryId} section={section} returnTo={here} action={saveSubcategory} />
+          {section==='requirements'||section==='display'?<CategorySharedFieldsEditor key={sid} categoryId={sub.categoryId} subcategoryId={sid} subs={cfg.subcategories.filter(s=>s.categoryId===sub.categoryId)} action={autosaveCategoryFields}/>:<AdCategoryEditor key={`${sid}:${sub.version}:${section}`} initial={sub} categoryId={sub.categoryId} section={section} returnTo={here} action={saveSubcategory} />}
         </AccessBoundary>
       </div>
     );

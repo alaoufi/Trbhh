@@ -66,7 +66,7 @@ export async function saveSubcategory(fd:FormData){
 }
 
 /** Only flag changes; versions/membership are checked under the same locks. */
-export async function saveSharedCategoryFields(fd:FormData){
+async function writeSharedCategoryFields(fd:FormData){
   const actor=await requireAccess('categories','edit');
   try {
     const cid=categoryId(fd.get('category_id'));
@@ -76,20 +76,34 @@ export async function saveSharedCategoryFields(fd:FormData){
     try{expected=JSON.parse(versionText);changes=JSON.parse(changeText);}catch{throw new CategoryValidationError('','طلب غير صالح');}
     if(!Array.isArray(expected)||expected.length>2000||expected.some(s=>!s||!Number.isSafeInteger(s.id)||s.id<=0||!Number.isSafeInteger(s.version)||s.version<0)
       ||new Set(expected.map(s=>s.id)).size!==expected.length)throw new CategoryValidationError('','نسخ الأقسام غير صالحة');
-    await prisma.$transaction(async tx=>{
+    return await prisma.$transaction(async tx=>{
       const parent=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM categories WHERE id=${cid} FOR UPDATE`;
       if(!parent.length)throw new CategoryValidationError('','القسم غير موجود');
       const rows=await tx.$queryRaw<{id:bigint;name:string;version:number|null;fields_json:unknown}[]>`SELECT s.id,s.name,d.version,d.fields_json FROM sub_categories s LEFT JOIN ad_category_definitions d ON d.subcategory_id=s.id WHERE s.category_id=${cid} ORDER BY s.id FOR UPDATE`;
       if(rows.length!==expected.length||rows.some(r=>expected.find(s=>s.id===Number(r.id))?.version!==(r.version??0)))throw new CategoryValidationError('','تغيّرت الأقسام؛ أعد تحميل الصفحة');
       const subs:SubcategoryOption[]=rows.map(r=>({id:Number(r.id),name:r.name,categoryId:cid,version:r.version??0,active:true,order:0,kind:'other',priceEnabled:false,goodsEnabled:false,
         fields:r.version===null?[]:validateDefinition(typeof r.fields_json==='string'?JSON.parse(r.fields_json):r.fields_json)}));
-      const updates=planCategoryFieldChanges(subs,changes);
+      const target=fd.get('subcategory_id');
+      const selected=target?subs.filter(s=>s.id===categoryId(target)):subs;
+      if(target&&!selected.length)throw new CategoryValidationError('','القسم الفرعي غير موجود');
+      const updates=planCategoryFieldChanges(selected,changes);
       for(const sub of updates){
         const count=await tx.$executeRaw`UPDATE ad_category_definitions SET fields_json=${JSON.stringify(sub.fields)},version=version+1 WHERE subcategory_id=${sub.id} AND version=${sub.version}`;
         if(count!==1)throw new CategoryValidationError('','تغيّر التعريف');
       }
       if(updates.length)await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'shared_field_flags',${JSON.stringify({categoryId:cid,subcategories:updates.map(s=>s.id),changes})})`;
+      return subs.map(sub=>{const changed=updates.find(s=>s.id===sub.id);return changed?{...changed,version:sub.version+1}:sub;});
     });
-  }catch(e){if(e instanceof CategoryValidationError)redirect(back(fd,'error','input'));throw e;}
+  }catch(e){throw e;}
+}
+
+export async function saveSharedCategoryFields(fd:FormData){
+  try{await writeSharedCategoryFields(fd);}catch(e){if(e instanceof CategoryValidationError)redirect(back(fd,'error','input'));throw e;}
   await refresh();redirect(back(fd,'saved'));
+}
+export async function autosaveCategoryFields(fd:FormData){
+  const subs=await writeSharedCategoryFields(fd);
+  await bustAdCaches();
+  // Category definitions are read from the database; do not refresh the admin route.
+  return subs;
 }

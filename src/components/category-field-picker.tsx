@@ -27,6 +27,7 @@ export function CategoryFieldPicker({ categories, subcategories, section, initia
           </select></div>
       </div>
       {category && !subcategories.some(s => String(s.categoryId) === category) && <p role="status" className="text-sm">لا توجد أقسام فرعية هنا. أضِفها من «إضافة وتعديل الأقسام».</p>}
+      {category && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary px-4 py-2 font-bold text-primary" href={`/admin/categories?scope=parent&category=${category}&section=${section==='display'?'display':'requirements'}`}>حقول القسم الرئيسي — عرض المتشابه مرة واحدة</Link>}
       {selected
         ? <Link className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-bold text-white" href={categoryEditorPath(selected.id, section)}>فتح حقول «{selected.name}»</Link>
         : <p className="text-sm text-muted-foreground">حدّد القسمين ليظهر زر فتح الحقول.</p>}

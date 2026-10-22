@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { categoryEditorPath, type CategoryEditorSection } from '@/lib/ad-categories/admin-navigation';
 type Choice = { id: number; name: string };
 export function CategoryFieldPicker({ categories, subcategories, section, initialCategory, initialSubcategory }: {
-  categories: Choice[]; subcategories: (Choice & { categoryId: number })[];
+  categories: Choice[]; subcategories: (Choice & { categoryId: number; fields?: unknown[] })[];
   section: CategoryEditorSection; initialCategory: number | null; initialSubcategory: number | null;
 }) {
   const [category, setCategory] = useState(String(initialCategory ?? subcategories.find(s => s.id === initialSubcategory)?.categoryId ?? ''));
@@ -18,12 +18,12 @@ export function CategoryFieldPicker({ categories, subcategories, section, initia
         <div><label htmlFor="fp-cat">القسم الرئيسي</label>
           <select id="fp-cat" className={input} value={category} onChange={e => { setCategory(e.target.value); setSubcategory(''); }}>
             <option value="">اختر القسم الرئيسي</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}{categories.filter(x=>x.name===c.name).length>1?` (#${c.id})`:''} — {subcategories.filter(s=>s.categoryId===c.id).length} فروع{subcategories.filter(s=>s.categoryId===c.id).every(s=>s.fields?.length===0)?' · بلا حقول مخصصة':''}</option>)}
           </select></div>
         <div><label htmlFor="fp-sub">القسم الفرعي</label>
           <select id="fp-sub" className={input} value={subcategory} disabled={!category} onChange={e => setSubcategory(e.target.value)}>
             <option value="">اختر القسم الفرعي</option>
-            {subcategories.filter(s => String(s.categoryId) === category).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {subcategories.filter(s => String(s.categoryId) === category).map(s => <option key={s.id} value={s.id}>{s.name}{subcategories.filter(x=>x.categoryId===s.categoryId&&x.name===s.name).length>1?` (#${s.id})`:''}{s.fields?` — ${s.fields.length} حقول`:''}</option>)}
           </select></div>
       </div>
       {category && !subcategories.some(s => String(s.categoryId) === category) && <p role="status" className="text-sm">لا توجد أقسام فرعية هنا. أضِفها من «إضافة وتعديل الأقسام».</p>}

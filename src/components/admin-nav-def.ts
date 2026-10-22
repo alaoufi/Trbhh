@@ -118,7 +118,7 @@ items.push(
  {href:'/admin/commerce/commissions',label:'كشف عمولات الأعضاء الموثوقين',icon:Coins,perm:'commerce'},
  {href:'/admin/name-requests',label:'طلبات تغيير الاسم',icon:Users,perm:'users'},
  {href:'/admin/integrity',label:'نزاهة الهويات',icon:ShieldCheck,perm:'users'},
- {href:'/admin/smart-ads',label:'إدارة حقول الكيانات',icon:Megaphone,perm:'ads'},
+ {href:'/admin/smart-ads',label:'الأقسام الفعلية ومختبر النماذج',icon:Megaphone,perm:'ads'},
  {href:'/admin/payments/private-topup',label:'شحن رصيد خاص — مصرف الراجحي',icon:CreditCard,perm:'users'},
  {href:'/admin/payments/sandbox',label:'اختبار خاص — بوابة الراجحي Sandbox',icon:CreditCard,perm:'users'},
  { href: '/admin/suppliers/integrations', label: 'ربط المتاجر والمزامنة', icon: LinkIcon, perm: 'suppliers' },

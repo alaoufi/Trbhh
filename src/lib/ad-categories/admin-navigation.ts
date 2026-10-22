@@ -3,7 +3,7 @@
 export const CATEGORY_ADMIN_PAGES = {
   manage: { title: 'إضافة وتعديل الأقسام', desc: 'إضافة وتعديل وإظهار وإخفاء الأقسام الرئيسية والفرعية.' },
   fields: { title: 'إضافة وتعديل الحقول', desc: 'اختر القسم الفرعي ثم أضف الحقول أو عدّل أسماءها وأنواعها وخياراتها.' },
-  requirements: { title: 'الحقول الإجبارية والاختيارية', desc: 'اختر القسم الفرعي ثم حدّد الحقول الإجبارية والاختيارية.' },
+  requirements: { title: 'الظهور والإلزام', desc: 'عرض وإخفاء الحقول وتحديد الإجباري والاختياري في صفحة واحدة بحفظ تلقائي.' },
   display: { title: 'إظهار وإخفاء الحقول', desc: 'اختر القسم الفرعي ثم تحكّم بظهور كل حقل في نموذج الإعلان.' },
   ads: { title: 'إعلانات الأقسام', desc: 'استعراض الإعلانات حسب القسم والقسم الفرعي.' },
   settings: { title: 'إعدادات الأقسام والنصوص', desc: 'التفعيل العام والنصوص التي تظهر للأعضاء.' },
@@ -16,7 +16,7 @@ export function isCategoryAdminView(v: string | undefined): v is CategoryAdminVi
 // أقسام محرّر القسم الفرعي (تبويبات التعديل المركّزة).
 export const CATEGORY_EDITOR_SECTIONS = {
   fields: 'إضافة وتعديل الحقول',
-  requirements: 'إجباري / اختياري',
+  requirements: 'الظهور والإلزام',
   display: 'إظهار / إخفاء',
 } as const;
 export type CategoryEditorSection = keyof typeof CATEGORY_EDITOR_SECTIONS;
@@ -40,3 +40,6 @@ export function categoryAdminQuery(q: CategoryAdminQuery) {
     invalid: !safeId(q.category) || !safeId(q.subcategory) || !safeId(q.sub),
   };
 }
+
+/** Legacy display links remain valid, but have one visible task. */
+export const CATEGORY_ADMIN_TASKS=Object.entries(CATEGORY_ADMIN_PAGES).filter(([key])=>key!=='display');

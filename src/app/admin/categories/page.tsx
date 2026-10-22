@@ -119,7 +119,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
 
   return (
     <div dir="rtl" className="min-w-0 space-y-4">
-      <h1 className="text-xl font-bold">{CATEGORY_ADMIN_PAGES[view].title}</h1>
+      <h1 className="text-xl font-bold">{CATEGORY_ADMIN_PAGES[view==='display'?'requirements':view].title}</h1>
       <CategoryAdminNavigation current={view} />
       {notice}
 
@@ -136,6 +136,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
 
       {view === 'manage' && (
         <>
+          <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">إضافة قسم رئيسي جديد</summary>
           <AccessBoundary module="categories" action="create">
             <form action={saveCategory} className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
               <input type="hidden" name="return_to" value="/admin/categories?view=manage" />
@@ -144,13 +145,17 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
               <button className={`${button} bg-primary text-white`}>إضافة قسم مخفي</button>
             </form>
           </AccessBoundary>
+          </details>
+          <form action="/admin/categories" className="flex flex-wrap items-end gap-2 rounded-xl border p-3"><input type="hidden" name="view" value="manage"/><label className="min-w-0 flex-1">اختر قسماً قائماً لإدارته<select name="category" className={input} defaultValue={filter.category??''} required><option value="" disabled>اختر القسم الرئيسي</option>{cfg.categories.map(c=><option key={c.id} value={c.id}>{c.name} — #{c.id} — {c.active?'ظاهر':'مخفي'}</option>)}</select></label><button className={button}>فتح القسم</button></form>
+          {!filter.category&&<p className="rounded-lg bg-slate-50 p-3 text-sm">اختر القسم لعرض فروعه وحقوله. إنشاء قسم جديد مستقل عن اختيار قسم قائم.</p>}
           {(() => {
-            const emptySubs = cfg.subcategories.filter((s) => s.version < 1 || s.fields.length === 0);
+            const emptySubs = cfg.subcategories.filter((s) => s.categoryId===filter.category && (s.version < 1 || s.fields.length === 0));
+            if(!filter.category)return null;
             if (emptySubs.length === 0) return <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">كل الأقسام الفرعية لها حقول ✓</p>;
             return (
               <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                 <p className="font-bold">أقسام فرعية بلا حقول بعد: {emptySubs.length}</p>
-                <p className="mt-1 text-xs">تُعبّأ تلقائياً من القوالب المطابقة بالاسم عند الإقلاع. إن بقيت، فاسمها لا يطابق أي قالب — أرسل لي هذه الأسماء لأضيف مطابقتها:</p>
+                <p className="mt-1 text-xs">افتح «تعديل الحقول» في الفرع المطلوب لإضافة حقوله. خلو الحقول لا يعني خلو القسم من الإعلانات.</p>
                 <ul className="mt-2 list-inside list-disc text-xs">
                   {emptySubs.slice(0, 60).map((s) => {
                     const cat = cfg.categories.find((c) => c.id === s.categoryId)?.name || '';
@@ -160,14 +165,14 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
               </div>
             );
           })()}
-          {cfg.categories.map((c) => (
+          {cfg.categories.filter(c=>c.id===filter.category).map((c) => (
             <details key={c.id} open={filter.category === c.id} className="space-y-3 rounded-xl border p-3">
               <summary className="flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 font-bold hover:bg-secondary"><span>{c.name} — {c.active ? 'ظاهر' : 'مخفي'} (#{c.id})</span><span className="text-xs font-normal text-muted-foreground">اضغط ▾</span></summary>
               <AccessBoundary module="categories" action="edit">
-                <form action={saveCategory} className="flex flex-wrap items-end gap-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="return_to" value="/admin/categories?view=manage" /><label className="min-w-0 flex-1">اسم القسم<input className={input} name="name" required defaultValue={c.name} /></label><label>الترتيب<input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order} /></label><button className={button}>حفظ القسم</button></form>
+                <form action={saveCategory} className="flex flex-wrap items-end gap-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="return_to" value={`/admin/categories?view=manage&category=${c.id}`} /><label className="min-w-0 flex-1">اسم القسم<input className={input} name="name" required defaultValue={c.name} /></label><label>الترتيب<input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order} /></label><button className={button}>حفظ القسم</button></form>
               </AccessBoundary>
               <AccessBoundary module="categories" action="suspend">
-                <form action={toggleCategory}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="active" value={c.active ? '0' : '1'} /><input type="hidden" name="return_to" value="/admin/categories?view=manage" /><button className={button}>{c.active ? 'إخفاء القسم' : 'إظهار القسم'}</button></form>
+                <form action={toggleCategory}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="active" value={c.active ? '0' : '1'} /><input type="hidden" name="return_to" value={`/admin/categories?view=manage&category=${c.id}`} /><button className={button}>{c.active ? 'إخفاء القسم' : 'إظهار القسم'}</button></form>
               </AccessBoundary>
               {cfg.subcategories.filter((s) => s.categoryId === c.id).map((s) => (
                 <section key={s.id} className="space-y-2 rounded-lg border bg-slate-50 p-3">
@@ -175,13 +180,13 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
                   <div className="grid gap-2 sm:grid-cols-3">
                     <Link className={`${button} bg-primary text-white`} href={categoryEditorPath(s.id, 'fields')}>✏️ تعديل الحقول</Link>
                     <Link className={button} href={`/admin/categories?view=ads&category=${c.id}&subcategory=${s.id}`}>إعلانات هذا القسم</Link>
-                    <AccessBoundary module="categories" action="suspend"><form action={toggleCategory}><input type="hidden" name="sub" value="1" /><input type="hidden" name="id" value={s.id} /><input type="hidden" name="active" value={s.active ? '0' : '1'} /><input type="hidden" name="return_to" value="/admin/categories?view=manage" /><button className={`${button} w-full`}>{s.active ? 'إخفاء الفرعي' : 'إظهار الفرعي'}</button></form></AccessBoundary>
+                    <AccessBoundary module="categories" action="suspend"><form action={toggleCategory}><input type="hidden" name="sub" value="1" /><input type="hidden" name="id" value={s.id} /><input type="hidden" name="active" value={s.active ? '0' : '1'} /><input type="hidden" name="return_to" value={`/admin/categories?view=manage&category=${c.id}`} /><button className={`${button} w-full`}>{s.active ? 'إخفاء الفرعي' : 'إظهار الفرعي'}</button></form></AccessBoundary>
                   </div>
                 </section>
               ))}
               {!cfg.subcategories.some((s) => s.categoryId === c.id) && <p className="text-sm">لا توجد أقسام فرعية بعد. أضِفها أدناه.</p>}
               <AccessBoundary module="categories" action="create">
-                <details className="rounded-lg border p-2"><summary className="cursor-pointer px-2 py-2 text-sm font-bold">➕ إضافة قسم فرعي مخفي</summary><div className="pt-2"><AdCategoryEditor categoryId={c.id} returnTo="/admin/categories?view=manage" action={saveSubcategory} /></div></details>
+                <details className="rounded-lg border p-2"><summary className="cursor-pointer px-2 py-2 text-sm font-bold">➕ إضافة قسم فرعي مخفي</summary><div className="pt-2"><AdCategoryEditor categoryId={c.id} returnTo={`/admin/categories?view=manage&category=${c.id}`} action={saveSubcategory} /></div></details>
               </AccessBoundary>
             </details>
           ))}
@@ -189,7 +194,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
       )}
 
       {(view === 'fields' || view === 'requirements' || view === 'display') && (
-        <CategoryFieldPicker key={`${view}:${filter.category}:${filter.subcategory}`} section={view} categories={cfg.categories.map(({ id, name }) => ({ id, name }))} subcategories={cfg.subcategories.map(({ id, name, categoryId }) => ({ id, name, categoryId }))} initialCategory={filter.category} initialSubcategory={filter.subcategory} />
+        <CategoryFieldPicker key={`${view}:${filter.category}:${filter.subcategory}`} section={view} categories={cfg.categories} subcategories={cfg.subcategories} initialCategory={filter.category} initialSubcategory={filter.subcategory} />
       )}
 
       {view === 'ads' && (

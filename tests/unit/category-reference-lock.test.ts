@@ -1,0 +1,10 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+const f=vi.hoisted(()=>({roots:true,sub:true,order:[] as string[],execute:vi.fn(async()=>1)}));
+vi.mock('@/lib/prisma',()=>({prisma:{$transaction:async(work:(tx:unknown)=>unknown)=>work({$queryRaw:async(strings:TemplateStringsArray)=>{const q=strings.join('?');f.order.push(q);return q.includes('FROM sub_categories')?(f.sub?[{id:2n}]:[]):(f.roots?[{id:13n}]:[]);},$executeRaw:(...args:unknown[])=>{f.order.push('write');return f.execute(...args as []);}})}}));
+import {setCjProductCategoryRef,upsertCjProduct} from '@/lib/cj/mapping';
+import {computePrice} from '@/lib/cj/pricing';
+beforeEach(()=>{f.roots=true;f.sub=true;f.order=[];f.execute.mockClear();});
+it('locks and revalidates the category before a CJ reference write',async()=>{await setCjProductCategoryRef(1,13,2,'عروض');expect(f.order[0]).toContain('FOR SHARE');expect(f.order[1]).toContain('FROM sub_categories');expect(f.order.at(-1)).toBe('write');});
+it('rejects a stale category after a concurrent merge instead of writing an orphan',async()=>{f.roots=false;await expect(setCjProductCategoryRef(1,13,null,'عروض')).rejects.toThrow('دمجه');expect(f.execute).not.toHaveBeenCalled();});
+it('rejects stale category IDs on create-only imports too',async()=>{f.roots=false;await expect(upsertCjProduct({cjProductId:'TEST',categoryId:13,price:computePrice(1000,0,0,3000)},{createOnly:true})).rejects.toThrow('دمجه');expect(f.execute).not.toHaveBeenCalled();});
+it('refuses a branch belonging to a different category',async()=>{f.sub=false;await expect(setCjProductCategoryRef(1,13,2,'عروض')).rejects.toThrow('الفرع');expect(f.execute).not.toHaveBeenCalled();});

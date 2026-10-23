@@ -1,4 +1,5 @@
 import 'server-only';
+import {lockCategoryReference} from '@/lib/ad-categories/reference-lock';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { PriceBreakdown } from './pricing';
@@ -166,7 +167,7 @@ export async function upsertCjProduct(input: UpsertCjInput, opts: { createOnly?:
   const categoryId = input.categoryId && input.categoryId > 0 ? BigInt(input.categoryId) : null;
   const imagesJson = input.images && input.images.length ? JSON.stringify([...new Set(input.images.filter(Boolean))].slice(0, 12)) : null;
   const detailsJson = input.detailsJson ?? null;
-  await prisma.$executeRaw`
+  const write=async (tx:typeof prisma|Prisma.TransactionClient)=>tx.$executeRaw`
     INSERT INTO cj_products
       (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, category_id, source_category, image, images, details_json, availability_json, availability_checked_at,
        supplier_cost_minor, shipping_cost_minor, other_costs_minor, profit_minor, sale_price_minor, margin_bps, currency, last_sync_at)
@@ -189,6 +190,8 @@ export async function upsertCjProduct(input: UpsertCjInput, opts: { createOnly?:
       other_costs_minor=VALUES(other_costs_minor), profit_minor=VALUES(profit_minor),
       sale_price_minor=VALUES(sale_price_minor), margin_bps=VALUES(margin_bps), currency=VALUES(currency),
       last_sync_at=CURRENT_TIMESTAMP(3)`}`;
+  if(categoryId)await prisma.$transaction(async tx=>{await lockCategoryReference(tx,categoryId);await write(tx);});
+  else await write(prisma);
 }
 
 /** حفظ حقول المراجعة/العرض (عنوان/وصف عربي، تصنيف تربح، الحالة). لا يمسّ المصدر. */
@@ -350,7 +353,11 @@ export async function setCjProductCategoryRef(
   if (!Number.isInteger(id) || id <= 0) return;
   const cat = categoryId && categoryId > 0 ? BigInt(categoryId) : null;
   const sub = subcategoryId && subcategoryId > 0 ? subcategoryId : null;
-  await prisma.$executeRaw`UPDATE cj_products SET category_id=${cat}, subcategory_id=${sub}, trbhh_category=${label.slice(0, 200)} WHERE id=${BigInt(id)}`.catch(() => {});
+  await prisma.$transaction(async tx=>{
+    if(cat)await lockCategoryReference(tx,cat,sub);
+    else if(sub)throw new Error('category_required_for_subcategory');
+    await tx.$executeRaw`UPDATE cj_products SET category_id=${cat}, subcategory_id=${sub}, trbhh_category=${label.slice(0, 200)} WHERE id=${BigInt(id)}`;
+  });
 }
 
 /** Preserve a legacy English category as source before replacing its display value. */

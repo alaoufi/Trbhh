@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {previewCategoryMergeAction,applyCategoryMergeAction} from './merge-actions';
 import {CategoryAdminTree} from '@/components/category-admin-tree';
 import {categoryTree} from '@/lib/ad-categories/tree';
 import {loadCategoryTreeAds,removeEmptyTreeNode,removeCategoryTreeAd} from './tree-actions';
@@ -101,7 +102,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   if(view==='tree'){
     const buckets=await prisma.ads.groupBy({by:['category_id','subcategory_id'],_count:{_all:true}});
     const nodes=categoryTree(cfg.categories,cfg.subcategories,buckets.map(b=>({categoryId:Number(b.category_id),subcategoryId:b.subcategory_id,count:b._count._all})));
-    return <div dir="rtl" className="min-w-0 space-y-4"><h1 className="text-xl font-bold">شجرة الأقسام والإعلانات</h1><CategoryAdminNavigation current="tree"/><CategoryAdminTree categories={nodes} canReadAds={keys.has('ads:view')} canDeleteAds={keys.has('ads:delete')&&keys.has('ads:view')} canArchiveAds={keys.has('ads:archive')&&keys.has('ads:view')} canDeleteCategories={keys.has('categories:delete')} load={loadCategoryTreeAds} removeNode={removeEmptyTreeNode} removeAd={removeCategoryTreeAd}/></div>;
+    return <div dir="rtl" className="min-w-0 space-y-4"><h1 className="text-xl font-bold">شجرة الأقسام والإعلانات</h1><CategoryAdminNavigation current="tree"/><CategoryAdminTree categories={nodes} canReadAds={keys.has('ads:view')} canDeleteAds={keys.has('ads:delete')&&keys.has('ads:view')} canArchiveAds={keys.has('ads:archive')&&keys.has('ads:view')} canDeleteCategories={keys.has('categories:delete')} merge={keys.has('categories:edit')&&keys.has('categories:delete')?{preview:previewCategoryMergeAction,apply:applyCategoryMergeAction}:undefined} load={loadCategoryTreeAds} removeNode={removeEmptyTreeNode} removeAd={removeCategoryTreeAd}/></div>;
   }
 
   if (filter.category && !cfg.categories.some((c) => c.id === filter.category)) notFound();

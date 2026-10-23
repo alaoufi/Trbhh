@@ -2,6 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import {lockCategoryReference} from '@/lib/ad-categories/reference-lock';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword, setStoreUsername, STORE_HIDE_KEYS } from '@/lib/merchant';
@@ -433,7 +434,9 @@ export async function bulkUploadProductsAction(formData: FormData) {
     }
     const price = Math.max(0, parseInt(priceRaw.replace(/[^0-9]/g, ''), 10) || 0);
     try {
-      const ad = await prisma.ads.create({
+      const ad = await prisma.$transaction(async tx=>{
+        await lockCategoryReference(tx,BigInt(categoryId));
+        return tx.ads.create({
         data: {
           title: title.slice(0, 120),
           detail: (detail || title).slice(0, 3000),
@@ -453,6 +456,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
           bumped_at: now,
           created_at: now,
         },
+      });
       });
       await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
       await logAdPublish(session.uid);

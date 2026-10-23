@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
+  root: vi.fn(async()=>[{id:1n}]),
   storeLink: vi.fn(async () => ({count:1})),
   others: [] as {id:bigint;title:string;detail:string}[],
   ban:vi.fn(),dupAttempt:vi.fn(async()=>3),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(async () => ({})),
 }));
 vi.mock('@/lib/prisma', () => ({ prisma: {
+  $queryRaw:mocks.root,
   profiles: {findFirst:async()=>({id:9n})},
   store_products: {createMany:mocks.storeLink},
   users: { findUnique: async () => ({ country_id: 1 }), update: async () => ({}) },
@@ -117,4 +119,10 @@ describe('duplicate warnings do not ban members',()=>{
  for(let i=0;i<3;i++) await expect(createAdAction(form({title,detail}))).rejects.toThrow('/ads/new?error=crossdup&dup=91');
  expect(mocks.ban).not.toHaveBeenCalled();expect(mocks.dupAttempt).not.toHaveBeenCalled();expect(mocks.create).not.toHaveBeenCalled();mocks.others=[];
  });
+});
+
+it('rejects a stale fallback category before persisting or charging extras',async()=>{
+ vi.clearAllMocks();mocks.root.mockResolvedValueOnce([]);
+ await expect(createAdAction(form({featuredDur:'month'}))).rejects.toThrow('/ads/new?error=category');
+ expect(mocks.create).not.toHaveBeenCalled();expect(mocks.charge).not.toHaveBeenCalled();
 });

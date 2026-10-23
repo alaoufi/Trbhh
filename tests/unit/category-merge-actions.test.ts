@@ -1,0 +1,12 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+const f=vi.hoisted(()=>({access:vi.fn(async()=>({uid:7})),preview:vi.fn(async()=>({token:'x'})),apply:vi.fn(async()=>({})),cache:vi.fn(async()=>{})}));
+vi.mock('@/lib/access-control/guards',()=>({requireAccess:f.access}));
+vi.mock('@/lib/ad-categories/merge',()=>({previewCategoryMerge:f.preview,mergeCategories:f.apply}));
+vi.mock('@/lib/redis',()=>({cacheDel:f.cache}));
+vi.mock('@/lib/data',()=>({bustAdCaches:async()=>{}}));
+vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
+import {previewCategoryMergeAction,applyCategoryMergeAction} from '@/app/admin/categories/merge-actions';
+beforeEach(()=>{vi.clearAllMocks();f.access.mockReset();f.access.mockResolvedValue({uid:7});});
+it('requires category view edit and delete before preparing a merge',async()=>{await previewCategoryMergeAction(13,32);expect(f.access.mock.calls).toEqual([['categories','view'],['categories','edit'],['categories','delete']]);expect(f.preview).toHaveBeenCalledWith(13,32);});
+it('does not read or mutate definitions on permission denial',async()=>{f.access.mockRejectedValueOnce(Error('denied'));await expect(applyCategoryMergeAction(13,32,'token')).rejects.toThrow('denied');expect(f.apply).not.toHaveBeenCalled();});
+it('takes actor identity from the server session and preserves the preview token',async()=>{expect((await applyCategoryMergeAction(13,32,'token')).ok).toBe(true);expect(f.apply).toHaveBeenCalledWith(7,13,32,'token');expect(f.cache).toHaveBeenCalledWith('categories:active');});

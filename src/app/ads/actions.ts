@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createHash } from 'crypto';
 import { prisma } from '@/lib/prisma';
+import {lockCategoryReference} from '@/lib/ad-categories/reference-lock';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage, type WatermarkOptions } from '@/lib/watermark';
@@ -345,6 +346,7 @@ export async function createAdAction(formData: FormData) {
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
   const ad = await writeAdWithCategory(prisma, formData, async (tx, category) => {
+    if(!category)await lockCategoryReference(tx,catId);
     const created = await tx.ads.create({
     data: {
       title: finalTitle, detail: finalDetail, price, adsType,

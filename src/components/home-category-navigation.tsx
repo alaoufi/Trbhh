@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import styles from './home-dense-feed.module.css';
-import { getCategoryFormConfig } from '@/lib/ad-categories/service';
+import { getBrowseCategoryConfig } from '@/lib/ad-categories/browse';
 import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
 import { selectedHomeCategory } from '@/lib/home-feed';
 
 /** Uses the same rollout switch and editable category labels as the ad form. */
 export async function HomeCategoryNavigation({ selectedCategory, config: suppliedConfig, visual = false, expandedMenu = false }: { selectedCategory?: string | string[]; config?: CategoryFormConfig | null; visual?: boolean; expandedMenu?: boolean }) {
-  const config = suppliedConfig === undefined ? await getCategoryFormConfig().catch(() => null) : suppliedConfig;
+  const config = suppliedConfig === undefined ? await getBrowseCategoryConfig().catch(() => null) : suppliedConfig;
   if (!config?.enabled) return null;
   const categories = config.categories.filter(category => category.active);
   if (!categories.length) return null;

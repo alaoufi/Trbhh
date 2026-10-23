@@ -18,7 +18,7 @@ import { AdGrid } from '@/components/ad-card';
 import { HomeCompactStrip } from '@/components/home-compact-strip';
 import feedStyles from '@/components/home-dense-feed.module.css';
 import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
-import { getCategoryFormConfig } from '@/lib/ad-categories/service';
+import { getBrowseCategoryConfig } from '@/lib/ad-categories/browse';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
 import { getHomeStats, getHomeClassifiedText, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
@@ -64,7 +64,7 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string; category?: string | string[] }> }) {
   const sp = (await searchParams) || {};
   const nationalDayActive = isNationalDayCampaignActive();
-  const categoryConfig = await getCategoryFormConfig().catch(() => null);
+  const categoryConfig = await getBrowseCategoryConfig().catch(() => null);
   const selectedCategory = selectedHomeCategory(categoryConfig, sp.category);
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});

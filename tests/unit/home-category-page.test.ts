@@ -4,7 +4,7 @@ import {CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
 const state=vi.hoisted(()=>({enabled:true,homeTheme:'classic' as string|undefined,opportunities:vi.fn(),search:vi.fn(),featured:vi.fn(),latest:vi.fn(),personalized:vi.fn()}));
 vi.mock('next/headers',()=>({cookies:async()=>({get:(key:string)=>key==='home_theme'&&state.homeTheme?{value:state.homeTheme}:undefined})}));
 vi.mock('@/lib/auth',()=>({getSession:async()=>({uid:1})}));
-vi.mock('@/lib/ad-categories/service',()=>({getCategoryFormConfig:async()=>({enabled:state.enabled,labels:CATEGORY_LABELS,categories:[{id:90,name:'Other',active:true,order:0},{id:91,name:'Hidden',active:false,order:1}],subcategories:[]})}));
+vi.mock('@/lib/ad-categories/browse',()=>({getBrowseCategoryConfig:async()=>({enabled:state.enabled,labels:CATEGORY_LABELS,categories:[{id:90,name:'Other',active:true,order:0},{id:91,name:'Hidden',active:false,order:1}],subcategories:[]})}));
 vi.mock('@/lib/data',()=>({
  getFeaturedAds:state.featured,getHomeLatestAds:state.latest,searchAds:state.search,getPersonalizedAds:state.personalized,
  getMostViewedAds:async()=>[],getTopRatedAds:async()=>[],getStats:async()=>({ads:0,users:0,views:0}),getCities:async()=>[],getAreas:async()=>[],promoteScheduledAds:async()=>{},

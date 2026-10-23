@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { CATEGORY_LABELS } from '@/lib/ad-categories/contracts';
 const state = vi.hoisted(() => ({ config: vi.fn(), search: vi.fn(), setting: vi.fn() }));
 vi.mock('@/lib/settings', () => ({ getSetting: state.setting }));
-vi.mock('@/lib/ad-categories/service', () => ({ getCategoryFormConfig: state.config }));
+vi.mock('@/lib/ad-categories/browse', () => ({ getBrowseCategoryConfig: state.config }));
 vi.mock('@/lib/data', () => ({ searchAds: state.search }));
 vi.mock('@/components/ad-card', () => ({ AdGrid: ({ ads }: { ads: { id: number; title: string }[] }) => createElement('ul', {}, ads.map(ad => createElement('li', { key: ad.id }, ad.title))) }));
 import { HomeCategoryNavigation } from '@/components/home-category-navigation';

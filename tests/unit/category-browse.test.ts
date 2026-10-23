@@ -1,0 +1,17 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+import {CATEGORY_LABELS,type CategoryFormConfig} from '@/lib/ad-categories/contracts';
+const state=vi.hoisted(()=>({form:vi.fn(),where:vi.fn(),group:vi.fn()}));
+vi.mock('@/lib/ad-categories/service',()=>({getCategoryFormConfig:state.form}));
+vi.mock('@/lib/data',()=>({publicAdSearchWhere:state.where}));
+vi.mock('@/lib/prisma',()=>({prisma:{ads:{groupBy:state.group}}}));
+import {getBrowseCategoryConfig} from '@/lib/ad-categories/browse';
+const cfg:CategoryFormConfig={enabled:true,labels:CATEGORY_LABELS,categories:[1,2,3].map(id=>({id,name:'قسم '+id,active:id!==3,order:id})),subcategories:[{id:10,name:'فرع',categoryId:1,active:true,order:0,version:0,kind:'other',priceEnabled:true,goodsEnabled:false,fields:[]},{id:11,name:'فارغ',categoryId:1,active:true,order:1,version:0,kind:'other',priceEnabled:true,goodsEnabled:false,fields:[]}]};
+beforeEach(()=>{vi.clearAllMocks();state.form.mockResolvedValue(cfg);state.where.mockResolvedValue({status:1,state:'active',AND:[{user_id:{notIn:[99n]}}]});state.group.mockResolvedValue([{category_id:1n,subcategory_id:10,_count:1}]);});
+it('shows only occupied active roots and matching occupied branches',async()=>{const value=await getBrowseCategoryConfig();expect(value.categories.map(c=>c.id)).toEqual([1]);expect(value.subcategories.map(c=>c.id)).toEqual([10]);});
+it('does not mutate the complete configuration used by new ads and administration',async()=>{await getBrowseCategoryConfig();expect(cfg.categories).toHaveLength(3);expect(cfg.subcategories).toHaveLength(2);expect(state.form).toHaveBeenCalledWith();});
+it('retains a root with direct ads even without branches',async()=>{state.group.mockResolvedValue([{category_id:2n,subcategory_id:null,_count:3}]);const value=await getBrowseCategoryConfig();expect(value.categories.map(c=>c.id)).toEqual([2]);expect(value.subcategories).toEqual([]);});
+it('never attributes a mismatched branch to a different root',async()=>{state.group.mockResolvedValue([{category_id:2n,subcategory_id:10,_count:1}]);const value=await getBrowseCategoryConfig();expect(value.categories.map(c=>c.id)).toEqual([2]);expect(value.subcategories).toEqual([]);});
+it('uses the public search entitlement and card eligibility before grouping',async()=>{await getBrowseCategoryConfig();expect(state.where).toHaveBeenCalledWith({});const query=state.group.mock.calls[0][0];expect(query.by).toEqual(['category_id','subcategory_id']);expect(query.where.AND[0]).toEqual(await state.where.mock.results[0].value);expect(query.where.AND).toContainEqual({paused_by_owner:0,platform_hidden_at:null,platform_archived_at:null});expect(query.where.AND).toContainEqual({OR:[{data_archive:null},{data_archive:''}]});expect(query.where.AND).toContainEqual({OR:[{data_delete:null},{data_delete:''}]});});
+it('returns no public categories when inventory is empty',async()=>{state.group.mockResolvedValue([]);expect((await getBrowseCategoryConfig()).categories).toEqual([]);});
+it('does not query inventory when categories are disabled',async()=>{state.form.mockResolvedValue({...cfg,enabled:false});expect((await getBrowseCategoryConfig()).enabled).toBe(false);expect(state.group).not.toHaveBeenCalled();});
+it('fails closed on an inventory failure instead of displaying all categories',async()=>{state.group.mockRejectedValue(Error('offline'));await expect(getBrowseCategoryConfig()).rejects.toThrow('offline');});

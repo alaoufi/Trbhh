@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { catalogStores } from '@/lib/cj/catalog-stores';
 import { cjStorefrontView } from '@/lib/cj/storefront';
 import { CJ_CATALOG_TABS, loadCjCatalog, type CjCatalogQuery } from '@/lib/cj/catalog-feed';
@@ -12,7 +13,7 @@ export const metadata = { title: 'منتجات تربح', robots: { index: false
 
 export default async function CjStorePage({ searchParams }: { searchParams?: Promise<CjCatalogQuery> } = {}) {
   const view = await cjStorefrontView();
-  if (!view.isStaff) return <div className="mx-auto max-w-3xl px-4 py-16 text-center"><h1 className="text-2xl font-extrabold text-primary">هذا القسم غير متاح</h1><Link href="/" className="mt-5 inline-block rounded-xl bg-primary px-5 py-3 font-bold text-white">العودة للرئيسية</Link></div>;
+  if (!view.isStaff) notFound();
   const [catalog, categories, stores] = await Promise.all([loadCjCatalog(await searchParams ?? {}), getCategories(), catalogStores()]);
   const qParam = catalog.q ? `&q=${encodeURIComponent(catalog.q)}` : '';
   const catParam = catalog.cat ? `&cat=${catalog.cat}` : '';

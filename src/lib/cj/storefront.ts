@@ -1,5 +1,5 @@
 import 'server-only';
-import { getSetting, setSetting } from '@/lib/settings';
+import { setSetting } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { hasAccess } from '@/lib/access-control/guards';
 import type { AdCard } from '@/lib/data';
@@ -51,30 +51,23 @@ export function importedToAdCard(r: CjProductRow): AdCard {
   };
 }
 
-/**
- * مفتاح إظهار متجر CJ للعامة (قابل للتحكّم من لوحة الإدارة — لا قيمة ثابتة بالكود).
- * OFF افتراضياً: الصفحات العامة تظهر للمشرفين فقط (معاينة/تجريب)، ولا تُعلَن للعامة.
- * بعد نجاح التجربة يفعّلها المشرف فتصبح مرئية للجميع. الشراء يبقى معطّلاً بمفتاحه المستقل.
- */
+/** Administrative trial only. A saved legacy flag cannot reopen public access. */
 const KEY = 'cj_storefront_public';
 
 export async function cjStorefrontPublic(): Promise<boolean> {
-  return (await getSetting(KEY, '0').catch(() => '0')) === '1';
+  return false;
 }
 export async function setCjStorefrontPublic(v: boolean): Promise<void> {
-  await setSetting(KEY, v ? '1' : '0');
+  if (v) throw new Error('cj_storefront_admin_only');
+  await setSetting(KEY, '0');
 }
 
 export type StorefrontView = { visible: boolean; isPublic: boolean; isStaff: boolean };
 
-/**
- * تقرّر رؤية صفحات متجر CJ العامة:
- * - عامة مفعّلة → يراها الجميع.
- * - غير مفعّلة → يراها المشرف فقط (معاينة)، ويُعرض للعامة «قريباً».
- */
+/** Only an authenticated products:view grant permits preview. Fail closed. */
 export async function cjStorefrontView(): Promise<StorefrontView> {
-  const isPublic = await cjStorefrontPublic();
+  const isPublic = false;
   const session = await getSession().catch(() => null);
   const isStaff = session ? await hasAccess(session.uid, 'products', 'view').catch(() => false) : false;
-  return { visible: isPublic || isStaff, isPublic, isStaff };
+  return { visible: isStaff, isPublic, isStaff };
 }

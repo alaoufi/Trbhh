@@ -1,12 +1,14 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {GET} from '@/app/api/cj/img/route';
 
+const auth=vi.hoisted(()=>({staff:true}));
+vi.mock('@/lib/cj/storefront',()=>({cjStorefrontView:async()=>({isStaff:auth.staff})}));
 const host='cc-west-usa.oss-us-west-1.aliyuncs.com';
 const jpeg=Uint8Array.from([0xff,0xd8,0xff,0xe0,0,0,0xff,0xd9]);
 const fetchImage=vi.fn();
 const request=(url=`https://${host}/product.jpg`)=>new Request('https://trbhh.test/api/cj/img?u='+encodeURIComponent(url));
 const upstream=(body:BodyInit=jpeg,type='image/jpeg',headers:Record<string,string>={})=>new Response(body,{headers:{'Content-Type':type,...headers}});
-beforeEach(()=>{vi.clearAllMocks();vi.stubGlobal('fetch',fetchImage);fetchImage.mockResolvedValue(upstream());});
+beforeEach(()=>{auth.staff=true;vi.clearAllMocks();vi.stubGlobal('fetch',fetchImage);fetchImage.mockResolvedValue(upstream());});
 afterEach(()=>vi.unstubAllGlobals());
 function protectedResponse(response:Response){
   expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
@@ -89,3 +91,5 @@ describe('CJ raster image proxy security',()=>{
     expect(response.status).toBe(404);expect(await response.text()).not.toContain('private');protectedResponse(response);
   });
 });
+
+it('denies nonstaff before contacting the CDN',async()=>{auth.staff=false;const response=await GET(request());expect(response.status).toBe(404);expect(response.headers.get('Cache-Control')).toBe('no-store');expect(fetchImage).not.toHaveBeenCalled();});

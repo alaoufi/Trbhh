@@ -28,7 +28,7 @@ vi.mock('@/lib/cj/translate-warm', () => ({ warmCjTranslations: vi.fn(), refresh
 vi.mock('@/components/ad-card', () => ({ AdGrid: () => null }));
 vi.mock('@/components/share-buttons', () => ({ ShareButtons: () => null }));
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '@/app/admin/suppliers/cj/actions';
-import { cjStorefrontView } from '@/lib/cj/storefront';
+import { cjStorefrontView, cjStorefrontPublic, setCjStorefrontPublic } from '@/lib/cj/storefront';
 import ProductPage from '@/app/cj/[id]/page';
 import CatalogPage from '@/app/cj/page';
 
@@ -38,6 +38,19 @@ async function html() { return renderToStaticMarkup(await ProductPage({ params: 
 beforeEach(() => { vi.clearAllMocks(); state.keys = new Set(['audit:view']); state.session.mockResolvedValue({ uid: 9 }); state.active = false; state.assigned = null; state.public = false; state.gallery = ['https://example.test/photo.jpg']; state.details = null; state.verifiedVariants = [{ vid: 'test-vid', name: 'Black XL', optionKey: 'Color-Black-Size-XL', sku: 'SKU-1', priceUsd: 2, weight: 100, attributes: {} }]; });
 
 describe('CJ storefront precise capabilities', () => {
+ it('cannot reactivate public visibility through the old setter',async()=>{
+  state.public=true;expect(await cjStorefrontPublic()).toBe(false);
+  await expect(setCjStorefrontPublic(true)).rejects.toThrow('cj_storefront_admin_only');
+  await expect(setCjStorefrontPublic(false)).resolves.toBeUndefined();
+ });
+ it('ignores the legacy public flag for guests and ordinary members',async()=>{
+  state.public=true;state.keys.clear();state.session.mockResolvedValue(null);
+  expect(await cjStorefrontView()).toEqual({visible:false,isPublic:false,isStaff:false});
+  state.session.mockResolvedValue({uid:9});
+  expect(await cjStorefrontView()).toEqual({visible:false,isPublic:false,isStaff:false});
+  state.keys.add('products:view');
+  expect(await cjStorefrontView()).toEqual({visible:true,isPublic:false,isStaff:true});
+ });
   it('an unrelated staff grant does not expose private storefront preview', async () => {
     expect(await cjStorefrontView()).toEqual({ visible: false, isPublic: false, isStaff: false });
     state.keys = new Set(['products:view']); expect((await cjStorefrontView()).isStaff).toBe(true);
@@ -91,7 +104,7 @@ describe('CJ storefront precise capabilities', () => {
   });
   it('keeps the new trial private even if the legacy public switch is enabled', async () => {
     state.public = true; state.keys.clear();
-    expect(renderToStaticMarkup(await CatalogPage())).toContain('هذا القسم غير متاح');
+    await expect(CatalogPage()).rejects.toThrow('not_found');
     await expect(html()).rejects.toThrow('not_found');
     state.session.mockResolvedValue(null);
     await expect(html()).rejects.toThrow('not_found');

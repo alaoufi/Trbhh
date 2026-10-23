@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cjStorefrontView } from '@/lib/cj/storefront';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ function matchesRaster(bytes:Buffer,type:string):boolean {
 }
 
 export async function GET(request: Request) {
+  if (!(await cjStorefrontView()).isStaff) return failure('not_found',404);
   const u = new URL(request.url).searchParams.get('u') || '';
   let target: URL;
   try { target = new URL(u); } catch { return failure('bad_url',400); }

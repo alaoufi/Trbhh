@@ -10,3 +10,10 @@ it('counts direct, branch and mismatched ads without double counting within a pa
 it('colors spelling variants and reviewed overlapping families consistently without merging identities',()=>{
  const nodes=categoryTree(cats,subs,[]);expect(nodes.map(n=>n.id)).toEqual([1,2,3,4]);expect(nodes[0].similar).toBe(nodes[1].similar);expect(nodes[2].similar).toBe(nodes[3].similar);expect(categoryReviewColor(nodes[0].similar!)).toEqual(categoryReviewColor(nodes[1].similar!));expect(normalizedCategoryName('أُخرى')).toBe('اخري');
 });
+
+it('groups interleaved similar roots and siblings while preserving hidden nodes',()=>{
+ const result=categoryTree([cats[0],cats[2],{...cats[0],id:5,name:'قسم مستقل'},cats[1],cats[3]],[subs[0],{...subs[0],id:11,name:'مختلف'},{...subs[0],id:12,active:false}],[]);
+ expect(result.map(n=>n.id)).toEqual([1,2,3,4,5]);
+ expect(result[0].children.map(n=>n.id)).toEqual([10,12,11]);
+ expect(result[0].children[1].active).toBe(false);
+});

@@ -36,6 +36,7 @@ export const metadata = { title: 'تفاصيل السلعة', robots: { index: f
 
 export default async function CjStoreProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const view = await cjStorefrontView();
+  if (!view.isStaff) notFound();
   const { id: idStr } = await params;
   const sp = await searchParams;
   const id = Number(idStr);
@@ -44,9 +45,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const p = await getStorefrontCjProduct(id, view.isPublic);
   if (!p) notFound();
   const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
-  // صفحة السلعة خاصة (تجربة CJ): يفتحها الموظّف، أو وكيل السلعة النشط لإدارة سلعته
-  // (يختارها/يعدّلها/يتابع شحنها/تصله رسائل الشراء) حتى لو لم يكن موظّفاً. غيرهما ممنوع.
-  if (!view.isStaff) notFound();
+  // Product data is read only after the administrative preview permission check.
   const canManage = capabilities.edit || capabilities.suspend || capabilities.delete;
   // عدد عمليات الشراء الحقيقية من طلبات CJ — بيانات تتراكم من النشاط الفعلي (تبدأ من صفر، بلا تزييف).
   const soldCount = await cjProductOrderCount(p.cj_product_id).catch(() => 0);

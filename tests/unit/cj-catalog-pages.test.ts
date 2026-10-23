@@ -18,7 +18,7 @@ beforeEach(() => { state.staff = true; vi.clearAllMocks(); state.feed.mockResolv
 describe('private catalog navigation and approved preview', () => {
   it('never reads catalog or approved detail for a nonstaff visitor', async () => {
     state.staff = false;
-    expect(renderToStaticMarkup(await Catalog())).toContain('هذا القسم غير متاح');
+    await expect(Catalog()).rejects.toThrow('not_found');
     await expect(ApprovedPage({ params: Promise.resolve({ id: '12' }) })).rejects.toThrow('not_found');
     expect(state.feed).not.toHaveBeenCalled(); expect(state.preview).not.toHaveBeenCalled();
   });

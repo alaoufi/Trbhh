@@ -93,7 +93,7 @@ export function AdForm({
   const [subcategoryId, setSubcategoryId] = useState(String(initial?.subcategoryId || ''));
   const [categoryValues, setCategoryValues] = useState<CategoryValues>(initial?.categoryValues || {});
   const eligibleSubs = categoryConfig?.subcategories.filter(s => s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active)) || [];
-  const eligibleCategories = categoryConfig?.categories.filter(c => c.active && eligibleSubs.some(s => s.categoryId === c.id)) || [];
+  const eligibleCategories = categoryConfig?.categories.filter(c => c.active && (eligibleSubs.some(s => s.categoryId === c.id) || !(c.hasActiveChildren ?? categoryConfig.subcategories.some(s=>s.categoryId===c.id&&s.active)))) || [];
   const categorySubs = eligibleSubs.filter(s => String(s.categoryId) === categoryId);
   const selectedSub = eligibleSubs.find(s => String(s.id) === subcategoryId && String(s.categoryId) === categoryId);
   const categoryOn = categoryConfig?.enabled === true;
@@ -328,8 +328,8 @@ export function AdForm({
               <option value="">{categoryConfig.labels.choose}</option>{categorySubs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select></label>}
           </div>
-          <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>
-          {selectedSub && <AdCategoryFields fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
+          <input type="hidden" name="category_version" value={selectedSub?.version || (categoryId && eligibleCategories.some(c=>String(c.id)===categoryId) && categorySubs.length===0 ? 'parent' : '')}/>
+          {selectedSub && <AdCategoryFields key={selectedSub.id} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
           </>}
         </fieldset>}
         <div>

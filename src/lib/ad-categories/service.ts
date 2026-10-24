@@ -24,9 +24,9 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   if(!enabled&&!admin) return {enabled,labels,categories:[],subcategories:[]};
   const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:{ordered:'asc'}}),prisma.sub_categories.findMany({orderBy:{order:'asc'}}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
-  return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered})),subcategories:subs.filter(s=>admin||(s.active===1&&dm.has(Number(s.id))&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?safeDefinition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}))};
+  return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered,hasActiveChildren:subs.some(s=>s.category_id===Number(c.id)&&s.active===1)})),subcategories:subs.filter(s=>admin||(s.active===1&&dm.has(Number(s.id))&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?safeDefinition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}))};
 }
-export type CategorySelection={category_id:bigint;subcategory_id:number;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean};
+export type CategorySelection={category_id:bigint;subcategory_id:number|null;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean};
 export type CategoryEditContext={adId:bigint;memberId:bigint};
 type PreservedPricing={price:number;price_type:string|null;rent_period:string|null;old_price:number;stock_state:number};
 /** The caller's actual ads.create/update and its values commit or rollback together. */
@@ -54,8 +54,17 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
       if(fd.has('category_version')) throw new CategoryValidationError('','تم إيقاف الأقسام؛ أعد تحميل الصفحة');
       return write(tx,null);
     }
-    const cid=categoryId(fd.get('category_id')),sid=categoryId(fd.get('subcategory_id'));
+    const cid=categoryId(fd.get('category_id'));
     const cats=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM categories WHERE id=${cid} AND is_active='yes' FOR SHARE`;
+    if(fd.get('category_version')==='parent') {
+      if(!cats.length||fd.has('subcategory_id')||fd.has('category_values'))throw new CategoryValidationError('','القسم غير متاح');
+      const children=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM sub_categories WHERE category_id=${cid} AND active=1 FOR SHARE`;
+      if(children.length)throw new CategoryValidationError('','اختر القسم الفرعي؛ تغيّرت فروع القسم');
+      const ad=await write(tx,{category_id:BigInt(cid),subcategory_id:null,cat_reviewed:1,priceEnabled:false,goodsEnabled:false});
+      if(edit){if(ad.id!==edit.adId)throw new CategoryValidationError('','الإعلان غير مطابق');await tx.$executeRaw`DELETE FROM ad_category_values WHERE ad_id=${ad.id}`;}
+      return ad;
+    }
+    const sid=categoryId(fd.get('subcategory_id'));
     const subs=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM sub_categories WHERE id=${sid} AND category_id=${cid} AND active=1 FOR SHARE`;
     const defs=await tx.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions WHERE subcategory_id=${sid} FOR SHARE`;
     if(!cats.length||!subs.length||!defs.length) throw new CategoryValidationError('','القسم غير متاح');

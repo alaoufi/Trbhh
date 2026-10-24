@@ -50,8 +50,8 @@ export function AdCategoryFields({ fields, values, onChange }: {
         {group && <legend className="px-2 text-sm font-bold text-primary">{group}</legend>}
         {/* الحقول الإجبارية تبقى ظاهرة دائماً — لا تنكمش ولا تختفي (قاعدة). */}
         {requiredFields.length > 0 && <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2">{requiredFields.map(renderField)}</div>}
-        {/* الحقول الاختيارية المتشابهة تُجمع في صندوق قابل للطيّ والتمدّد (تسهيل الإدخال). */}
-        {optionalFields.length > 0 && <details className={`group rounded-lg border border-primary/15 bg-primary/[0.03] ${requiredFields.length ? 'mt-2' : ''}`}>
+        {/* ظاهر يعني معروض منذ البداية؛ الاختياري يبقى قابلاً للطي دون فرض الإدخال. */}
+        {optionalFields.length > 0 && <details open className={`group rounded-lg border border-primary/15 bg-primary/[0.03] ${requiredFields.length ? 'mt-2' : ''}`}>
           <summary className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 text-sm font-bold text-primary">
             <span>حقول اختيارية{group ? ` — ${group}` : ''} ({optionalFields.length})</span>
             <span className="text-xs font-normal text-muted-foreground transition group-open:hidden">اضغط للعرض ▾</span>

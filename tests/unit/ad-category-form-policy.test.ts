@@ -67,3 +67,5 @@ it('preserves legacy fallback editing without forcing an empty required subcateg
   expect(html).not.toContain('name="category_id"');expect(html).not.toContain('name="subcategory_id"');
   expect(html).not.toContain('name="category_version"');
 });
+
+it('offers a visible parent without branches such as student services without an empty child select',()=>{const config={...cfg,categories:[...cfg.categories,{id:50,name:'خدمات طلابية وقرطاسية',active:true,order:5}],subcategories:cfg.subcategories};const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{categoryId:50,subcategoryId:null},categoryConfig:config}));expect(html).toContain('خدمات طلابية وقرطاسية');expect(html).not.toContain('name="subcategory_id"');expect(html).toContain('value="parent"');expect(html).not.toContain('name="price"');});

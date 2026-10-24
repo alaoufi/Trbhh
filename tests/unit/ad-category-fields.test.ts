@@ -26,3 +26,5 @@ describe('single-page grouped category fields', () => {
     expect(html).toContain('دائم');
   });
 });
+
+it('opens visible optional fields by default without making them required',()=>{const html=renderToStaticMarkup(createElement(AdCategoryFields,{fields,values:{},onChange:()=>{}}));expect(html).toMatch(/<details[^>]*\sopen(?:=|[ >])/);const skills=html.match(/<select[^>]*id="category-field-skills"[^>]*>/)?.[0];expect(skills).toBeTruthy();expect(skills).not.toContain('required');expect(html).not.toContain('id="category-field-hidden"');});

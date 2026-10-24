@@ -1,3 +1,5 @@
+import {randomUUID} from 'node:crypto';
+import {CategoryAdminWorkspace} from '@/components/category-admin-workspace';
 import Link from 'next/link';
 import {CategoryOrderBoard} from '@/components/category-order-board';
 import {saveCategoryOrderAction,loadCategoryOrderAction} from './order-actions';
@@ -30,6 +32,12 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   const { keys } = await readActorAccess(session.uid);
   const q = await searchParams;
   const cfg = await getCategoryFormConfig(true);
+  const selectedSub=cfg.subcategories.find(s=>s.id===Number(q.sub||q.subcategory));
+  const initial={categoryId:Number(q.category)||selectedSub?.categoryId||null,subcategoryId:selectedSub?.id||null};
+  const visitKey='/admin/categories?'+new URLSearchParams(Object.entries(q).filter((entry):entry is [string,string]=>typeof entry[1]==='string')).toString();
+  const content=await renderContent();
+  return <CategoryAdminWorkspace taxonomy={{categories:cfg.categories.map(c=>({id:c.id})),subcategories:cfg.subcategories.map(s=>({id:s.id,categoryId:s.categoryId}))}} initial={initial} visitKey={visitKey} renderKey={randomUUID()} storageKey={'trbhh:category-workspace:'+session.uid}>{content}</CategoryAdminWorkspace>;
+  async function renderContent(){
   const filter = categoryAdminQuery(q);
   if (filter.invalid) notFound();
 
@@ -46,7 +54,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
     const section=q.section;
     const subs=cfg.subcategories.filter(s=>s.categoryId===category.id);
     return <div dir="rtl" className="min-w-0 space-y-4">
-      <h1 className="text-xl font-bold">حقول {category.name} — الظهور والإلزام</h1>
+      <CategoryAdminNavigation current="requirements"/><h1 className="text-xl font-bold">حقول {category.name} — الظهور والإلزام</h1>
       <p className="text-sm">عرض الحقول المتشابهة مرة واحدة. الحقول المختلفة في النوع أو الخيارات تبقى منفصلة. تعديل قسم فرعي وحده يبقى مستقلاً حتى تغيّر ذلك الحقل جماعيًا مرة أخرى.</p>
       <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">تعديل قسم فرعي وحده أو اختيار قسم آخر</summary><CategoryFieldPicker categories={cfg.categories} subcategories={cfg.subcategories} section={section} initialCategory={category.id} initialSubcategory={null}/></details>
       {notice}
@@ -69,7 +77,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
           <Link className={button} href={`/admin/categories?view=${section}&category=${sub.categoryId}&subcategory=${sid}`}>اختيار قسم آخر</Link>
           {(section==='requirements'||section==='display')&&<Link className={button} href={`/admin/categories?scope=parent&category=${sub.categoryId}&section=${section}`}>حقول القسم الرئيسي مجمّعة</Link>}
         </div>
-        <h1 className="text-xl font-bold">{CATEGORY_EDITOR_SECTIONS[section]} — {sub.name}</h1>
+        <CategoryAdminNavigation current={section}/><h1 className="text-xl font-bold">{CATEGORY_EDITOR_SECTIONS[section]} — {sub.name}</h1>
         <p className="text-sm text-muted-foreground">{category?.name} / {sub.name}</p>
         <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">القسم المختار: {sub.name} — تغيير القسم</summary><CategoryFieldPicker key={`${sid}:${section}`} categories={cfg.categories} subcategories={cfg.subcategories} section={section} initialCategory={sub.categoryId} initialSubcategory={sid}/></details>
         <nav aria-label="تبويبات الحقول" className="flex flex-wrap gap-2">
@@ -227,4 +235,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
       )}
     </div>
   );
+}
+
 }

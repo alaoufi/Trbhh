@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import {useCategoryWorkspace} from './category-admin-workspace';
 import { useState } from 'react';
 import { categoryEditorPath, type CategoryEditorSection } from '@/lib/ad-categories/admin-navigation';
 type Choice = { id: number; name: string };
@@ -7,8 +8,11 @@ export function CategoryFieldPicker({ categories, subcategories, section, initia
   categories: Choice[]; subcategories: (Choice & { categoryId: number; fields?: unknown[] })[];
   section: CategoryEditorSection; initialCategory: number | null; initialSubcategory: number | null;
 }) {
-  const [category, setCategory] = useState(String(initialCategory ?? subcategories.find(s => s.id === initialSubcategory)?.categoryId ?? ''));
-  const [subcategory, setSubcategory] = useState(String(initialSubcategory ?? ''));
+  const workspace=useCategoryWorkspace();
+  const [localCategory, setCategory] = useState(String(initialCategory ?? subcategories.find(s => s.id === initialSubcategory)?.categoryId ?? ''));
+  const [localSubcategory, setSubcategory] = useState(String(initialSubcategory ?? ''));
+  const category=workspace?String(workspace.categoryId??''):localCategory;
+  const subcategory=workspace?String(workspace.subcategoryId??''):localSubcategory;
   const branches = subcategories.filter(s => String(s.categoryId) === category);
   const selected = subcategories.find(s => String(s.id) === subcategory && String(s.categoryId) === category);
   const input = 'mt-1 min-h-11 w-full min-w-0 rounded-lg border bg-white p-2 text-sm';
@@ -17,12 +21,12 @@ export function CategoryFieldPicker({ categories, subcategories, section, initia
       <p className="text-sm">اختر القسم الرئيسي ثم الفرعي، ثم افتح حقوله. لا تتغيّر أي بيانات بمجرّد الاختيار.</p>
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <div><label htmlFor="fp-cat">القسم الرئيسي</label>
-          <select id="fp-cat" className={input} value={category} onChange={e => { setCategory(e.target.value); setSubcategory(''); }}>
+          <select id="fp-cat" className={input} value={category} onChange={e => { setCategory(e.target.value); setSubcategory(''); workspace?.selectCategory(Number(e.target.value)||null); }}>
             <option value="">اختر القسم الرئيسي</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}{categories.filter(x=>x.name===c.name).length>1?` (#${c.id})`:''} — {subcategories.filter(s=>s.categoryId===c.id).length} فروع{subcategories.filter(s=>s.categoryId===c.id).every(s=>s.fields?.length===0)?' · بلا حقول مخصصة':''}</option>)}
           </select></div>
         {branches.length > 0 && <div><label htmlFor="fp-sub">القسم الفرعي</label>
-          <select id="fp-sub" className={input} value={subcategory} disabled={!category} onChange={e => setSubcategory(e.target.value)}>
+          <select id="fp-sub" className={input} value={subcategory} disabled={!category} onChange={e => {setSubcategory(e.target.value);workspace?.selectSubcategory(Number(e.target.value)||null);}}>
             <option value="">اختر القسم الفرعي</option>
             {branches.map(s => <option key={s.id} value={s.id}>{s.name}{subcategories.filter(x=>x.categoryId===s.categoryId&&x.name===s.name).length>1?` (#${s.id})`:''}{s.fields?` — ${s.fields.length} حقول`:''}</option>)}
           </select></div>}

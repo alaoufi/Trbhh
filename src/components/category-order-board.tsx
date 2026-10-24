@@ -1,4 +1,5 @@
 'use client';
+import {useCategoryWorkspace} from './category-admin-workspace';
 import {useEffect,useRef,useState} from 'react';
 import {GripVertical,ArrowUp,ArrowDown} from 'lucide-react';
 import type {CategoryOrderItem,CategoryOrderRequest,CategoryOrderResult} from '@/lib/ad-categories/ordering';
@@ -41,10 +42,12 @@ function OrderList({items,parentId,canEdit,selected,onSelect,onSaved,onSaving,lo
  </div>;
 }
 export function CategoryOrderBoard({categories,subcategories,initialCategory,canEdit,...ops}:{categories:CategoryOrderItem[];subcategories:(CategoryOrderItem&{categoryId:number})[];initialCategory?:number|null;canEdit:boolean}&Operations){
+ const workspace=useCategoryWorkspace();
  const [boardBusy,setBoardBusy]=useState(false);
- const [roots,setRoots]=useState(categories),[subs,setSubs]=useState(subcategories),[selected,setSelected]=useState(initialCategory&&categories.some(c=>c.id===initialCategory)?initialCategory:categories[0]?.id??null);
+ const [roots,setRoots]=useState(categories),[subs,setSubs]=useState(subcategories),[localSelected,setSelected]=useState(initialCategory&&categories.some(c=>c.id===initialCategory)?initialCategory:categories[0]?.id??null);
+ const selected=workspace?.categoryId??localSelected;
  const root=roots.find(c=>c.id===selected);
  return <section className="min-w-0 space-y-3" aria-label="ترتيب الأقسام بالسحب والإفلات"><p className="rounded-xl bg-slate-50 p-3 text-sm leading-7">اسحب من المقبض لترتيب العناصر؛ يُحفظ الترتيب عند الإفلات. اضغط اسم الرئيسي لعرض فروعه. يمكنك استخدام الأسهم أو لوحة المفاتيح أيضاً. ترتيب الفروع داخل رئيسيها فقط.</p>{!canEdit&&<p>العرض فقط؛ تغيير الترتيب يتطلب صلاحية تعديل الأقسام.</p>}
- <div className="grid min-w-0 gap-4 lg:grid-cols-2"><div className="min-w-0"><h2 className="font-bold">الأقسام الرئيسية</h2><OrderList items={roots} parentId={null} canEdit={canEdit} onSaving={setBoardBusy} locked={boardBusy} selected={selected} onSelect={setSelected} onSaved={setRoots} {...ops}/></div><div className="min-w-0"><h2 className="font-bold">{root?'فروع '+root.name:'اختر قسماً رئيسياً'}</h2>{root&&<OrderList key={root.id} items={subs.filter(s=>s.categoryId===root.id)} parentId={root.id} canEdit={canEdit} onSaving={setBoardBusy} locked={boardBusy} onSaved={rows=>setSubs(old=>[...old.filter(s=>s.categoryId!==root.id),...rows.map(r=>({...r,categoryId:root.id}))])} {...ops}/>}</div></div>
+ <div className="grid min-w-0 gap-4 lg:grid-cols-2"><div className="min-w-0"><h2 className="font-bold">الأقسام الرئيسية</h2><OrderList items={roots} parentId={null} canEdit={canEdit} onSaving={setBoardBusy} locked={boardBusy} selected={selected} onSelect={id=>{setSelected(id);workspace?.selectCategory(id);}} onSaved={setRoots} {...ops}/></div><div className="min-w-0"><h2 className="font-bold">{root?'فروع '+root.name:'اختر قسماً رئيسياً'}</h2>{root&&<OrderList key={root.id} items={subs.filter(s=>s.categoryId===root.id)} parentId={root.id} canEdit={canEdit} onSaving={setBoardBusy} locked={boardBusy} onSaved={rows=>setSubs(old=>[...old.filter(s=>s.categoryId!==root.id),...rows.map(r=>({...r,categoryId:root.id}))])} {...ops}/>}</div></div>
  </section>;
 }

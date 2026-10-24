@@ -23,7 +23,7 @@ export function CategorySharedFieldsEditor({subs,categoryId,subcategoryId,action
   }
   return <div className="space-y-2 rounded-xl border p-3" aria-busy={saving!==null}>
     <p className="rounded-lg bg-slate-50 p-2 text-sm">التعديل يُحفظ تلقائياً. إخفاء الحقل يجعله اختيارياً؛ إظهاره لا يجعله إجبارياً. التغيير يشمل الأقسام المذكورة تحت الحقل فقط.</p>
-    {groups.map(g=><div key={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2">
+    {groups.map(g=><div key={g.id} data-category-field={g.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2">
       <div className="min-w-0 flex-1"><b>{g.field.label}</b><span className="mr-2 text-xs text-muted-foreground">{g.field.key}</span>
         {!subcategoryId&&<p className="text-xs text-muted-foreground">{g.subcategoryIds.map(id=>current.find(s=>s.id===id)?.name).join('، ')}</p>}
       </div>

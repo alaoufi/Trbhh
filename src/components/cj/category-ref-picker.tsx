@@ -38,7 +38,7 @@ export function CategoryRefPicker({
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
-      <label className="block">
+      {subs.length > 0 && <label className="block">
         <span className="mb-1 block text-[13px] font-bold text-slate-700">القسم الفرعي</span>
         <select
           className={selectClassName}
@@ -49,7 +49,7 @@ export function CategoryRefPicker({
           <option value="">{!catId ? '— اختر القسم الرئيسي أولاً —' : subs.length === 0 ? '— لا فروع —' : '— بلا قسم فرعي —'}</option>
           {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-      </label>
+      </label>}
     </div>
   );
 }

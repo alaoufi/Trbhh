@@ -1,0 +1,4 @@
+import React from 'react';import {renderToStaticMarkup} from 'react-dom/server';import {expect,it,vi} from 'vitest';import {CategoryRefPicker} from '@/components/cj/category-ref-picker';vi.stubGlobal('React',React);
+const base={categories:[{id:1,name:'قسم'}],subcategories:[],currentCategoryId:1,currentSubcategoryId:0,selectClassName:''};
+it('hides an empty optional child picker and preserves the parent-only reference',()=>{const html=renderToStaticMarkup(React.createElement(CategoryRefPicker,base));expect(html.match(/<select/g)).toHaveLength(1);expect(html).not.toContain('القسم الفرعي');expect(html).toContain('value="1:"');});
+it('renders children only for the selected parent',()=>{const html=renderToStaticMarkup(React.createElement(CategoryRefPicker,{...base,subcategories:[{id:4,name:'فرع',categoryId:1}]}));expect(html.match(/<select/g)).toHaveLength(2);expect(html).toContain('فرع');});

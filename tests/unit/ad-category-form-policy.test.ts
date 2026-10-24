@@ -36,7 +36,7 @@ it.each([null,99])('allows keeping unavailable classification %s on edit without
 });
 it('never offers legacy preservation to a new ad',()=>{
   const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',categoryConfig:cfg}));
-  expect(html).not.toContain('value="preserve"');expect(html).toContain('name="subcategory_id"');
+  expect(html).not.toContain('value="preserve"');expect(html).not.toContain('name="subcategory_id"');expect(html).toContain('name="category_id"');
 });
 it('preservation does not expose editable generic prices even if an inactive option was included',()=>{
   const html=form({...cfg,subcategories:[{...cfg.subcategories[0],active:false,kind:'goods',priceEnabled:true,goodsEnabled:true}]});

@@ -19,3 +19,6 @@ it('offers bulk flags and child exception from the combined task',()=>{
  const html=renderToStaticMarkup(React.createElement(CategoryFieldPicker,{categories,subcategories:subs,section:'requirements',initialCategory:1,initialSubcategory:3}));
  expect(html).toContain('scope=parent');expect(html).toContain('sub=3&amp;section=requirements');
 });
+
+it('hides the empty branch picker for roots with no branches',()=>{const html=renderToStaticMarkup(React.createElement(CategoryFieldPicker,{categories,subcategories:subs,section:'fields',initialCategory:2,initialSubcategory:null}));expect(html).not.toContain('id="fp-sub"');expect(html).toContain('id="fp-cat"');expect(html).toContain('view=manage&amp;category=2');});
+it('retains branch selection when the selected root has branches',()=>{const html=renderToStaticMarkup(React.createElement(CategoryFieldPicker,{categories,subcategories:subs,section:'fields',initialCategory:1,initialSubcategory:3}));expect(html).toContain('id="fp-sub"');expect(html).toContain('value="3"');});

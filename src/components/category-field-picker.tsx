@@ -9,6 +9,7 @@ export function CategoryFieldPicker({ categories, subcategories, section, initia
 }) {
   const [category, setCategory] = useState(String(initialCategory ?? subcategories.find(s => s.id === initialSubcategory)?.categoryId ?? ''));
   const [subcategory, setSubcategory] = useState(String(initialSubcategory ?? ''));
+  const branches = subcategories.filter(s => String(s.categoryId) === category);
   const selected = subcategories.find(s => String(s.id) === subcategory && String(s.categoryId) === category);
   const input = 'mt-1 min-h-11 w-full min-w-0 rounded-lg border bg-white p-2 text-sm';
   return (
@@ -20,17 +21,17 @@ export function CategoryFieldPicker({ categories, subcategories, section, initia
             <option value="">اختر القسم الرئيسي</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}{categories.filter(x=>x.name===c.name).length>1?` (#${c.id})`:''} — {subcategories.filter(s=>s.categoryId===c.id).length} فروع{subcategories.filter(s=>s.categoryId===c.id).every(s=>s.fields?.length===0)?' · بلا حقول مخصصة':''}</option>)}
           </select></div>
-        <div><label htmlFor="fp-sub">القسم الفرعي</label>
+        {branches.length > 0 && <div><label htmlFor="fp-sub">القسم الفرعي</label>
           <select id="fp-sub" className={input} value={subcategory} disabled={!category} onChange={e => setSubcategory(e.target.value)}>
             <option value="">اختر القسم الفرعي</option>
-            {subcategories.filter(s => String(s.categoryId) === category).map(s => <option key={s.id} value={s.id}>{s.name}{subcategories.filter(x=>x.categoryId===s.categoryId&&x.name===s.name).length>1?` (#${s.id})`:''}{s.fields?` — ${s.fields.length} حقول`:''}</option>)}
-          </select></div>
+            {branches.map(s => <option key={s.id} value={s.id}>{s.name}{subcategories.filter(x=>x.categoryId===s.categoryId&&x.name===s.name).length>1?` (#${s.id})`:''}{s.fields?` — ${s.fields.length} حقول`:''}</option>)}
+          </select></div>}
       </div>
-      {category && !subcategories.some(s => String(s.categoryId) === category) && <p role="status" className="text-sm">لا توجد أقسام فرعية هنا. أضِفها من «إضافة وتعديل الأقسام».</p>}
+      {category && branches.length === 0 && <p role="status" className="text-sm">لا توجد أقسام فرعية هنا. أضِفها من «إضافة وتعديل الأقسام».</p>}
       {category && section!=='fields' && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary px-4 py-2 font-bold text-primary" href={`/admin/categories?scope=parent&category=${category}&section=${section==='display'?'display':'requirements'}`}>الظهور والإلزام — الحقول المتشابهة مجمّعة</Link>}
       {selected
         ? <Link className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 font-bold text-white" href={categoryEditorPath(selected.id, section)}>فتح حقول «{selected.name}»</Link>
-        : <p className="text-sm text-muted-foreground">حدّد القسمين ليظهر زر فتح الحقول.</p>}
+        : branches.length > 0 ? <p className="text-sm text-muted-foreground">حدّد القسمين ليظهر زر فتح الحقول.</p> : null}
       {category&&section==='fields'&&<Link className="inline-flex min-h-11 items-center rounded-lg border px-3 text-sm" href={`/admin/categories?view=manage&category=${category}`}>إدارة فروع هذا القسم أو إضافة فرع جديد</Link>}
     </section>
   );

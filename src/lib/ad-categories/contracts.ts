@@ -2,7 +2,7 @@ import {CategoryValidationError, validateCategoryValues, visibleCategoryValues, 
 export const CATEGORY_KINDS = ['goods','property','jobs','service','livestock','plants','other'] as const;
 export type CategoryKind = typeof CATEGORY_KINDS[number];
 export type CategoryOption = {id:number;name:string;active:boolean;order:number;hasActiveChildren?:boolean};
-export type SubcategoryOption = CategoryOption & {categoryId:number;version:number;kind:CategoryKind;priceEnabled:boolean;goodsEnabled:boolean;fields:CategoryField[]};
+export type SubcategoryOption = CategoryOption & {categoryId:number;version:number;kind:CategoryKind;priceEnabled:boolean;goodsEnabled:boolean;fields:CategoryField[];definitionStatus?:'ready'|'missing'|'invalid'};
 export type CategoryFormConfig = {enabled:boolean;categories:CategoryOption[];subcategories:SubcategoryOption[];labels:Record<string,string>};
 export const CATEGORY_LABELS = {section:'تصنيف الإعلان',category:'القسم',subcategory:'القسم الفرعي',choose:'اختر',error:'راجع القسم والحقول؛ ربما تغيّر تعريفها. أعد تحميل الصفحة ثم حاول مجدداً.',details:'مواصفات الإعلان',preserve:'إبقاء التصنيف الحالي دون تغيير',reclassify:'اختيار تصنيف جديد',preserveHint:'التصنيف الحالي غير متاح للاختيار. يمكنك تصحيح الإعلان مع إبقاء تصنيفه وقيمه وأسعاره الحالية، أو اختيار تصنيف جديد.',browse:'عرض الإعلانات',clear:'مسح التصفية',resultsTitle:'{category} — عرض حتى {limit} إعلانًا',emptyText:'لا توجد إعلانات متاحة في هذا القسم حاليًا.'};
 export const categoryEnabled = (v:unknown) => v === '1';
@@ -23,3 +23,9 @@ export function parseCategorySubmission(fd:FormData, sub:Pick<SubcategoryOption,
   return validateCategoryValues(sub.fields,values);
 }
 export const projectCategory=visibleCategoryValues;
+
+/** Visibility is the only category-list gate. A missing field definition is not a hidden category. */
+export function categoryFormChoices(config:CategoryFormConfig){
+ const categories=config.categories.filter(c=>c.active),roots=new Set(categories.map(c=>c.id));
+ return {categories,subcategories:config.subcategories.filter(s=>s.active&&roots.has(s.categoryId))};
+}

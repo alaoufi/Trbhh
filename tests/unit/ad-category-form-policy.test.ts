@@ -52,20 +52,22 @@ const choiceConfig:CategoryFormConfig={
     {...cfg.subcategories[0],id:38,categoryId:91,name:'فرعي لأب مخفي'},
   ],
 };
-it('offers only active categories with an active configured child and only eligible dependent options',()=>{
+it('uses visibility for root and branch choices even without custom field definitions',()=>{
   const html=form(choiceConfig);
   const category=html.match(/<select[^>]*name="category_id"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
   const subcategory=html.match(/<select[^>]*name="subcategory_id"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
   expect(category).toContain('الوظائف');
-  expect(category).not.toContain('عروض أخرى');expect(category).not.toContain('غير مفعّل');
+  expect(category).toContain('عروض أخرى');expect(category).not.toContain('غير مفعّل');
   expect(subcategory).toContain('وظائف إدارية');
-  expect(subcategory).not.toContain('بلا تعريف');expect(subcategory).not.toContain('فرعي مخفي');
+  expect(subcategory).toContain('بلا تعريف');expect(subcategory).not.toContain('فرعي مخفي');
 });
-it('preserves legacy fallback editing without forcing an empty required subcategory',()=>{
+it('edits an active unconfigured branch through the same zero-version form',()=>{
   const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{id:1,categoryId:90,subcategoryId:37},categoryConfig:choiceConfig}));
-  expect(html).toContain('value="preserve"');
-  expect(html).not.toContain('name="category_id"');expect(html).not.toContain('name="subcategory_id"');
-  expect(html).not.toContain('name="category_version"');
+  expect(html).not.toContain('value="preserve"');
+  expect(html).toContain('name="category_id"');expect(html).toContain('name="subcategory_id"');
+  expect(html).toContain('name="category_version" value="0"');
 });
 
 it('offers a visible parent without branches such as student services without an empty child select',()=>{const config={...cfg,categories:[...cfg.categories,{id:50,name:'خدمات طلابية وقرطاسية',active:true,order:5}],subcategories:cfg.subcategories};const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{categoryId:50,subcategoryId:null},categoryConfig:config}));expect(html).toContain('خدمات طلابية وقرطاسية');expect(html).not.toContain('name="subcategory_id"');expect(html).toContain('value="parent"');expect(html).not.toContain('name="price"');});
+
+it('shows a root with an invalid field definition but disables its broken branch with a clear reason',()=>{const config={...choiceConfig,subcategories:choiceConfig.subcategories.map(s=>({...s,definitionStatus:s.id===34?'invalid' as const:'missing' as const}))};const html=form(config);expect(html).toContain('الوظائف');expect(html).toContain('تعريف الحقول يحتاج مراجعة');expect(html).toMatch(/<option[^>]*value="34"[^>]*disabled/);});

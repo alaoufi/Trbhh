@@ -8,14 +8,15 @@ type Tx=Prisma.TransactionClient;
 type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
 const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
 function definition(r:DefinitionRow) {
+  if(!Number.isSafeInteger(r.version)||r.version<1)throw new CategoryValidationError('','نسخة تعريف الحقول غير صالحة');
   return {version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(json(r.fields_json))};
 }
 /** تعريف متسامح للعرض العام: صفٌّ واحد بتعريف حقول تالف (fields_json غير صالح أو JSON
  *  معطوب) لا يجوز أن يُسقط الصفحة كلها — يتدهور لتعريف افتراضي بلا حقول، ويبقى الباقي يعمل.
  *  التحقق الصارم يبقى في مسارات الكتابة/الإدارة (definition) حيث يجب رفض التالف. */
-function safeDefinition(r:DefinitionRow):ReturnType<typeof definition> {
-  try { return definition(r); }
-  catch { return {version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[] as ReturnType<typeof validateDefinition>}; }
+function safeDefinition(r:DefinitionRow):ReturnType<typeof definition>&{definitionStatus:'ready'|'invalid'} {
+  try { return {...definition(r),definitionStatus:'ready'}; }
+  catch { return {version:0,kind:'other' as const,priceEnabled:false,goodsEnabled:false,fields:[] as ReturnType<typeof validateDefinition>,definitionStatus:'invalid'}; }
 }
 export async function getCategoryFormConfig(admin=false):Promise<CategoryFormConfig> {
   const enabled=categoryEnabled(await getSetting('categories_v2_enabled','0'));
@@ -24,7 +25,7 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   if(!enabled&&!admin) return {enabled,labels,categories:[],subcategories:[]};
   const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:{ordered:'asc'}}),prisma.sub_categories.findMany({orderBy:{order:'asc'}}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
-  return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered,hasActiveChildren:subs.some(s=>s.category_id===Number(c.id)&&s.active===1)})),subcategories:subs.filter(s=>admin||(s.active===1&&dm.has(Number(s.id))&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?safeDefinition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}))};
+  return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered,hasActiveChildren:subs.some(s=>s.category_id===Number(c.id)&&s.active===1)})),subcategories:subs.filter(s=>admin||(s.active===1&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?safeDefinition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:false,goodsEnabled:false,fields:[],definitionStatus:'missing' as const})}))};
 }
 export type CategorySelection={category_id:bigint;subcategory_id:number|null;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean};
 export type CategoryEditContext={adId:bigint;memberId:bigint};
@@ -36,6 +37,15 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
     // Edit authority comes only from the authenticated caller, never FormData IDs.
     const existing=edit?(await tx.$queryRaw<(PreservedPricing&{id:bigint;user_id:bigint;category_id:bigint;subcategory_id:number|null;cat_reviewed:number})[]>`SELECT id,user_id,category_id,subcategory_id,cat_reviewed,price,price_type,rent_period,old_price,stock_state FROM ads WHERE id=${edit.adId} FOR UPDATE`)[0]:undefined;
     if(edit&&(!existing||existing.user_id!==edit.memberId)) throw new CategoryValidationError('','الإعلان غير متاح للتعديل');
+    async function writeBasicCategory(cid:number,sid:number|null){
+      const selection={category_id:BigInt(cid),subcategory_id:sid,cat_reviewed:1,priceEnabled:false,goodsEnabled:false};
+      // Missing field policy is not permission to erase an existing ad's pricing.
+      const unchanged=existing&&existing.category_id===BigInt(cid)&&existing.subcategory_id===sid;
+      const preserved:PreservedPricing|undefined=unchanged?{price:existing.price,price_type:existing.price_type,rent_period:existing.rent_period,old_price:existing.old_price,stock_state:existing.stock_state}:undefined;
+      const ad=preserved?await write(tx,selection,preserved):await write(tx,selection);
+      if(edit){if(ad.id!==edit.adId)throw new CategoryValidationError('','الإعلان غير مطابق');await tx.$executeRaw`DELETE FROM ad_category_values WHERE ad_id=${ad.id}`;}
+      return ad;
+    }
     if(fd.get('category_mode')==='preserve') {
       if(!existing||!edit) throw new CategoryValidationError('','إبقاء التصنيف متاح للتعديل فقط');
       if(['category_id','subcategory_id','category_version','category_values'].some(k=>fd.has(k))) throw new CategoryValidationError('','لا يمكن تغيير التصنيف في وضع الإبقاء');
@@ -60,14 +70,16 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
       if(!cats.length||fd.has('subcategory_id')||fd.has('category_values'))throw new CategoryValidationError('','القسم غير متاح');
       const children=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM sub_categories WHERE category_id=${cid} AND active=1 FOR SHARE`;
       if(children.length)throw new CategoryValidationError('','اختر القسم الفرعي؛ تغيّرت فروع القسم');
-      const ad=await write(tx,{category_id:BigInt(cid),subcategory_id:null,cat_reviewed:1,priceEnabled:false,goodsEnabled:false});
-      if(edit){if(ad.id!==edit.adId)throw new CategoryValidationError('','الإعلان غير مطابق');await tx.$executeRaw`DELETE FROM ad_category_values WHERE ad_id=${ad.id}`;}
-      return ad;
+      return writeBasicCategory(cid,null);
     }
     const sid=categoryId(fd.get('subcategory_id'));
     const subs=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM sub_categories WHERE id=${sid} AND category_id=${cid} AND active=1 FOR SHARE`;
     const defs=await tx.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions WHERE subcategory_id=${sid} FOR SHARE`;
-    if(!cats.length||!subs.length||!defs.length) throw new CategoryValidationError('','القسم غير متاح');
+    if(!cats.length||!subs.length) throw new CategoryValidationError('','القسم غير متاح');
+    if(!defs.length){
+      if(fd.get('category_version')!=='0'||String(fd.get('category_values')??'{}')!=='{}')throw new CategoryValidationError('','تغيّر تعريف القسم؛ أعد تحميل الصفحة');
+      return writeBasicCategory(cid,sid);
+    }
     const def=definition(defs[0]);
     const values=parseCategorySubmission(fd,{...def,id:sid,categoryId:cid});
     const ad=await write(tx,{category_id:BigInt(cid),subcategory_id:sid,cat_reviewed:1,priceEnabled:def.priceEnabled,goodsEnabled:def.goodsEnabled});

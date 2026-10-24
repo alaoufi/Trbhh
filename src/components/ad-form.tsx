@@ -17,7 +17,7 @@ import { adPublishRejection, type AdPublishRejectionCode } from '@/lib/ad-publis
 import { AdCategoryFields } from '@/components/ad-category-fields';
 import { AdCategorySummary } from '@/components/ad-category-summary';
 import { visibleCategoryValues } from '@/lib/ad-categories/validation';
-import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
+import { categoryFormChoices, type CategoryFormConfig } from '@/lib/ad-categories/contracts';
 import type { CategoryValues } from '@/lib/ad-categories/validation';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
@@ -92,12 +92,11 @@ export function AdForm({
   const [categoryId, setCategoryId] = useState(String(initial?.categoryId || ''));
   const [subcategoryId, setSubcategoryId] = useState(String(initial?.subcategoryId || ''));
   const [categoryValues, setCategoryValues] = useState<CategoryValues>(initial?.categoryValues || {});
-  const eligibleSubs = categoryConfig?.subcategories.filter(s => s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active)) || [];
-  const eligibleCategories = categoryConfig?.categories.filter(c => c.active && (eligibleSubs.some(s => s.categoryId === c.id) || !(c.hasActiveChildren ?? categoryConfig.subcategories.some(s=>s.categoryId===c.id&&s.active)))) || [];
+  const {categories:eligibleCategories,subcategories:eligibleSubs}=categoryConfig?categoryFormChoices(categoryConfig):{categories:[],subcategories:[]};
   const categorySubs = eligibleSubs.filter(s => String(s.categoryId) === categoryId);
   const selectedSub = eligibleSubs.find(s => String(s.id) === subcategoryId && String(s.categoryId) === categoryId);
   const categoryOn = categoryConfig?.enabled === true;
-  const canPreserveCategory = !!initial?.id && !categoryConfig?.subcategories.some(s => s.id === initial.subcategoryId && s.categoryId === initial.categoryId && s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active));
+  const canPreserveCategory = !!initial?.id && !categoryConfig?.subcategories.some(s => s.id === initial.subcategoryId && s.categoryId === initial.categoryId && s.active && categoryConfig.categories.some(c => c.id === s.categoryId && c.active));
   const [categoryMode, setCategoryMode] = useState(canPreserveCategory ? 'preserve' : 'select');
   const preservingCategory = categoryOn && canPreserveCategory && categoryMode === 'preserve';
   const priceEnabled = !categoryOn || (!preservingCategory && selectedSub?.priceEnabled === true);
@@ -325,10 +324,10 @@ export function AdForm({
               <option value="">{categoryConfig.labels.choose}</option>{eligibleCategories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select></label>
             {categorySubs.length > 0 && <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{setSubcategoryId(e.target.value);setCategoryValues({});}}>
-              <option value="">{categoryConfig.labels.choose}</option>{categorySubs.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="">{categoryConfig.labels.choose}</option>{categorySubs.map(s=><option key={s.id} value={s.id} disabled={s.definitionStatus==='invalid'}>{s.name}{s.definitionStatus==='invalid'?' — تعريف الحقول يحتاج مراجعة':''}</option>)}
             </select></label>}
           </div>
-          <input type="hidden" name="category_version" value={selectedSub?.version || (categoryId && eligibleCategories.some(c=>String(c.id)===categoryId) && categorySubs.length===0 ? 'parent' : '')}/>
+          <input type="hidden" name="category_version" value={selectedSub ? selectedSub.version : (categoryId && eligibleCategories.some(c=>String(c.id)===categoryId) && categorySubs.length===0 ? 'parent' : '')}/>
           {selectedSub && <AdCategoryFields key={selectedSub.id} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
           </>}
         </fieldset>}

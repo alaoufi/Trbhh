@@ -2,6 +2,7 @@
 import {redirect} from 'next/navigation';
 import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
+import {cacheDel} from '@/lib/redis';
 import {requireAccess} from '@/lib/access-control/guards';
 import {setSetting} from '@/lib/settings';
 import {bustAdCaches} from '@/lib/data';
@@ -12,7 +13,7 @@ import {validateDefinition} from '@/lib/ad-categories/validation';
 import {planCategoryFieldChanges,type FieldChange} from '@/lib/ad-categories/shared-fields';
 import type {SubcategoryOption} from '@/lib/ad-categories/contracts';
 
-async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
+async function refresh(){await cacheDel('categories:active');await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 /** يعيد التوجيه إلى الصفحة/التبويب الذي جاء منه الحفظ (return_to) أو الصفحة الرئيسية. */
 function back(fd:FormData,status:'saved'|'error',code='1'){const r=String(fd.get('return_to')||'');const base=/^\/admin\/categories(\?|$)/.test(r)?r:'/admin/categories';return `${base}${base.includes('?')?'&':'?'}${status}=${code}`;}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
@@ -28,8 +29,8 @@ export async function saveCategory(fd:FormData){
   try{
     const {name,order}=nameAndOrder(fd);
     await prisma.$transaction(async tx=>{
-      const c=id?await tx.categories.update({where:{id:BigInt(id)},data:{name,ordered:order}}):await tx.categories.create({data:{name,ordered:order,photo_path:'',is_active:'no'}});
-      await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_category',${JSON.stringify({id:Number(c.id),name,order})})`;
+      const c=id?await tx.categories.update({where:{id:BigInt(id)},data:{name,...(fd.has('initial_order')&&Number(fd.get('initial_order'))===order?{}:{ordered:order})}}):await tx.categories.create({data:{name,ordered:order,photo_path:'',is_active:'no'}});
+      await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_category',${JSON.stringify({id:Number(c.id),name,order:c.ordered})})`;
     });
   }catch(e){if(e instanceof CategoryValidationError)redirect(back(fd,'error','input'));throw e;}
   await refresh();redirect(back(fd,'saved'));
@@ -56,7 +57,7 @@ export async function saveSubcategory(fd:FormData){
         if(!subs.length||subs[0].category_id!==cid)throw new CategoryValidationError('','لا يمكن نقل القسم الفرعي');
         const defs=await tx.$queryRaw<{version:number}[]>`SELECT version FROM ad_category_definitions WHERE subcategory_id=${id} FOR UPDATE`;
         if(Number(fd.get('version'))!==(defs[0]?.version??0))throw new CategoryValidationError('','تغيّر التعريف');
-        sid=BigInt(id);await tx.sub_categories.update({where:{id:sid},data:{name,order}});
+        sid=BigInt(id);await tx.sub_categories.update({where:{id:sid},data:{name,...(fd.has('initial_order')&&Number(fd.get('initial_order'))===order?{}:{order})}});
       }else sid=(await tx.sub_categories.create({data:{name,order,category_id:cid,active:0}})).id;
       await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(def.fields)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json)`;
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_subcategory',${JSON.stringify({id:Number(sid),categoryId:cid,name,...def})})`;

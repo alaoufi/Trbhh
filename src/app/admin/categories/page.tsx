@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import {CategoryOrderBoard} from '@/components/category-order-board';
+import {saveCategoryOrderAction,loadCategoryOrderAction} from './order-actions';
 import {previewCategoryMergeAction,applyCategoryMergeAction} from './merge-actions';
 import {CategoryAdminTree} from '@/components/category-admin-tree';
 import {categoryTree} from '@/lib/ad-categories/tree';
@@ -99,6 +101,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
     );
   }
 
+  if(view==='order')return <div dir="rtl" className="min-w-0 space-y-4"><h1 className="text-xl font-bold">ترتيب الأقسام بالسحب والإفلات</h1><CategoryAdminNavigation current="order"/><CategoryOrderBoard categories={cfg.categories} subcategories={cfg.subcategories} initialCategory={filter.category} canEdit={keys.has('categories:edit')} save={saveCategoryOrderAction} load={loadCategoryOrderAction}/></div>;
   if(view==='tree'){
     const buckets=await prisma.ads.groupBy({by:['category_id','subcategory_id'],_count:{_all:true}});
     const nodes=categoryTree(cfg.categories,cfg.subcategories,buckets.map(b=>({categoryId:Number(b.category_id),subcategoryId:b.subcategory_id,count:b._count._all})));
@@ -146,6 +149,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
 
       {view === 'manage' && (
         <>
+          <Link href="/admin/categories?view=order" className={button}>ترتيب الأقسام بالسحب والإفلات</Link>
           <details className="rounded-xl border p-3"><summary className="cursor-pointer font-bold">إضافة قسم رئيسي جديد</summary>
           <AccessBoundary module="categories" action="create">
             <form action={saveCategory} className="flex flex-wrap items-end gap-2 rounded-xl border p-3">
@@ -179,7 +183,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
             <details key={c.id} open={filter.category === c.id} className="space-y-3 rounded-xl border p-3">
               <summary className="flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 font-bold hover:bg-secondary"><span>{c.name} — {c.active ? 'ظاهر' : 'مخفي'} (#{c.id})</span><span className="text-xs font-normal text-muted-foreground">اضغط ▾</span></summary>
               <AccessBoundary module="categories" action="edit">
-                <form action={saveCategory} className="flex flex-wrap items-end gap-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="return_to" value={`/admin/categories?view=manage&category=${c.id}`} /><label className="min-w-0 flex-1">اسم القسم<input className={input} name="name" required defaultValue={c.name} /></label><label>الترتيب<input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order} /></label><button className={button}>حفظ القسم</button></form>
+                <form action={saveCategory} className="flex flex-wrap items-end gap-2"><input type="hidden" name="id" value={c.id} /><input type="hidden" name="initial_order" value={c.order}/><input type="hidden" name="return_to" value={`/admin/categories?view=manage&category=${c.id}`} /><label className="min-w-0 flex-1">اسم القسم<input className={input} name="name" required defaultValue={c.name} /></label><label>الترتيب<input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order} /></label><button className={button}>حفظ القسم</button></form>
               </AccessBoundary>
               <AccessBoundary module="categories" action="suspend">
                 <form action={toggleCategory}><input type="hidden" name="id" value={c.id} /><input type="hidden" name="active" value={c.active ? '0' : '1'} /><input type="hidden" name="return_to" value={`/admin/categories?view=manage&category=${c.id}`} /><button className={button}>{c.active ? 'إخفاء القسم' : 'إظهار القسم'}</button></form>

@@ -229,7 +229,7 @@ export async function getFallbackCategoryId(): Promise<number> {
 
 export async function getCategories() {
   return cached('categories:active', 300, async () => {
-    const cats = await prisma.categories.findMany({ where: { is_active: 'yes' }, orderBy: { ordered: 'desc' } });
+    const cats = await prisma.categories.findMany({ where: { is_active: 'yes' }, orderBy: [{ ordered: 'asc' }, { id: 'asc' }] });
     const uploadIds = cats.map((c) => BigInt(parseInt(c.photo_path, 10) || 0)).filter((n) => n > 0n);
     const uploads = uploadIds.length ? await prisma.uploads.findMany({ where: { id: { in: uploadIds } } }) : [];
     const fileById = new Map(uploads.map((u) => [toInt(u.id), u.file_name]));
@@ -712,7 +712,7 @@ export async function getCountries() {
 }
 
 export async function getSubCategories() {
-  const rows = await prisma.sub_categories.findMany({ where: { active: 1 }, orderBy: { order: 'desc' } });
+  const rows = await prisma.sub_categories.findMany({ where: { active: 1 }, orderBy: [{ order: 'asc' }, { id: 'asc' }] });
   return rows.map((s) => ({ id: toInt(s.id), name: s.name, categoryId: s.category_id }));
 }
 

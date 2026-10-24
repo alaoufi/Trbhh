@@ -23,7 +23,7 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   const labels={...CATEGORY_LABELS};
   for(const k of Object.keys(labels) as (keyof typeof labels)[]) labels[k]=await getSetting(`categories_v2_label_${k}`,labels[k]);
   if(!enabled&&!admin) return {enabled,labels,categories:[],subcategories:[]};
-  const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:{ordered:'asc'}}),prisma.sub_categories.findMany({orderBy:{order:'asc'}}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
+  const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:[{ordered:'asc'},{id:'asc'}]}),prisma.sub_categories.findMany({orderBy:[{order:'asc'},{id:'asc'}]}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
   return {enabled,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered,hasActiveChildren:subs.some(s=>s.category_id===Number(c.id)&&s.active===1)})),subcategories:subs.filter(s=>admin||(s.active===1&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?safeDefinition(dm.get(Number(s.id))!):{version:0,kind:'other' as const,priceEnabled:false,goodsEnabled:false,fields:[],definitionStatus:'missing' as const})}))};
 }

@@ -25,7 +25,7 @@ export function AdCategoryEditor({initial,categoryId,action,section,returnTo}:{i
   const [template,setTemplate]=useState('');
   const update=(i:number,patch:Partial<CategoryField>)=>setFields(fields.map((f,n)=>n===i?{...f,...patch}:f));
   const common=<>
-    {initial&&<input type="hidden" name="id" value={initial.id}/>}
+    {initial&&<><input type="hidden" name="id" value={initial.id}/><input type="hidden" name="initial_order" value={initial.order}/></>}
     <input type="hidden" name="category_id" value={categoryId}/><input type="hidden" name="version" value={initial?.version??0}/><input type="hidden" name="fields_json" value={JSON.stringify(fields)}/>
     {returnTo&&<input type="hidden" name="return_to" value={returnTo}/>}
   </>;

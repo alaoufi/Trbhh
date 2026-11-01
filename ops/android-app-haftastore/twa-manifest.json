@@ -1,0 +1,43 @@
+{
+  "packageId": "app.haftastore.com",
+  "host": "trbhh.sa",
+  "name": "تربح",
+  "launcherName": "تربح",
+  "display": "standalone",
+  "themeColor": "#111a29",
+  "themeColorDark": "#111a29",
+  "navigationColor": "#111a29",
+  "navigationColorDark": "#111a29",
+  "navigationDividerColor": "#111a29",
+  "navigationDividerColorDark": "#111a29",
+  "backgroundColor": "#111a29",
+  "enableNotifications": true,
+  "startUrl": "/?app=android&v=50",
+  "iconUrl": "http://127.0.0.1:8099/icon-512.png",
+  "maskableIconUrl": "http://127.0.0.1:8099/maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "/keys/upload.jks",
+    "alias": "trbhh-upload"
+  },
+  "appVersionName": "8.1.0",
+  "appVersionCode": 50,
+  "appVersion": "8.1.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://trbhh.sa/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://trbhh.sa/",
+  "minSdkVersion": 24,
+  "orientation": "portrait",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}

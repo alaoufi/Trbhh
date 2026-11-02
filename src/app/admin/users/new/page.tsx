@@ -24,7 +24,7 @@ export default async function AdminNewUser({ searchParams }: { searchParams: Pro
           <p className="text-xs text-muted-foreground">ينشئ حساب عضو مباشرةً (بجواله السعودي كاسم دخول). يمكنه الدخول بكلمة المرور التي تحددها، وتعديل بياناته لاحقاً من حسابه.</p>
           <label className="block space-y-1"><span className={label}>اسم العضو</span><input className={input} name="name" required maxLength={120} placeholder="الاسم الكامل" /></label>
           <label className="block space-y-1"><span className={label}>الجوال (اسم الدخول)</span><input className={input} name="phone" required inputMode="numeric" dir="ltr" placeholder="05XXXXXXXX" /></label>
-          <label className="block space-y-1"><span className={label}>كلمة المرور</span><input className={input} name="password" required type="password" minLength={8} placeholder="كلمة مرور قوية" autoComplete="new-password" /></label>
+          <label className="block space-y-1"><span className={label}>كلمة المرور</span><input className={input} name="password" required type="password" minLength={4} placeholder="4 خانات على الأقل" autoComplete="new-password" /></label>
           <button className="min-h-11 w-full rounded-lg bg-primary px-4 text-sm font-extrabold text-white">إنشاء العضو</button>
         </form>
       </AccessBoundary>

@@ -85,7 +85,7 @@ export async function saveAuthPolicyAction(_previous: SecurityState, form: FormD
   if (!user?.password || !(await verifyPassword(value(form, 'currentPassword'), user.password))) return { error: 'كلمة المرور الحالية غير صحيحة.' };
   const enabled = !!form.get('requireAdminMfa');
   const min = Number(value(form, 'passwordMinimum'));
-  if (!Number.isInteger(min) || min < 12 || min > 64) return { error: 'الحد الأدنى بين 12 و64 حرفاً.' };
+  if (!Number.isInteger(min) || min < 4 || min > 64) return { error: 'الحد الأدنى بين 4 و64 خانة.' };
   // Policy changes require a fresh factor even when general enforcement is currently off.
   if (!(await consumeMfa(session.uid, value(form, 'factorCode')))) return { error: 'اربط تطبيق التحقق أولاً، ثم أدخل رمزاً جديداً أو رمز استرداد لتعديل السياسة.' };
   const saved = await prisma.$transaction(async (tx) => {

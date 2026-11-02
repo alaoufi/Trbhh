@@ -849,14 +849,16 @@ export async function getAppConfig(): Promise<AppConfig> {
 /* Authentication policy: read directly, never use the best-effort presentation cache.
    A database error must not silently disable an enforced security policy. */
 import { AUTH_REQUIRE_ADMIN_MFA } from './auth-policy-lock';
+import { PASSWORD_MIN_LENGTH } from './password-policy';
 export { AUTH_REQUIRE_ADMIN_MFA } from './auth-policy-lock';
-export const AUTH_PASSWORD_MIN = 'auth_password_min';
+// v2 (2026-11-02): الحد الافتراضي 4 خانات؛ القيمة القديمة المحفوظة (12) لم تعد تُقرأ.
+export const AUTH_PASSWORD_MIN = 'auth_password_min_v2';
 export async function getAuthSecuritySettings(): Promise<{ requireAdminMfa: boolean; passwordMinimum: number }> {
   await ensure();
   const rows = await prisma.site_settings.findMany({ where: { k: { in: [AUTH_REQUIRE_ADMIN_MFA, AUTH_PASSWORD_MIN] } } });
   const values = new Map(rows.map((r) => [r.k, r.v]));
-  const minimum = Number(values.get(AUTH_PASSWORD_MIN) || 12);
-  return { requireAdminMfa: values.get(AUTH_REQUIRE_ADMIN_MFA) === '1', passwordMinimum: Math.max(12, Math.min(64, Number.isFinite(minimum) ? Math.floor(minimum) : 12)) };
+  const minimum = Number(values.get(AUTH_PASSWORD_MIN) || PASSWORD_MIN_LENGTH);
+  return { requireAdminMfa: values.get(AUTH_REQUIRE_ADMIN_MFA) === '1', passwordMinimum: Math.max(PASSWORD_MIN_LENGTH, Math.min(64, Number.isFinite(minimum) ? Math.floor(minimum) : PASSWORD_MIN_LENGTH)) };
 }
 
 

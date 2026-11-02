@@ -83,7 +83,7 @@ async function seed() {
         store_landing_intro: 'هذه أسعار تجريبية لعرض تصميم صفحة المتجر، وليست تسعيرة الموقع الأساسي.',
         sub_store_enabled: '1', sub_store_monthly: '29', sub_store_6mo: '149', sub_store_yearly: '249',
         sub_trial_days: '14', sub_grace_days: '0',
-        auth_require_admin_mfa: '0', auth_password_min: '12',
+        auth_require_admin_mfa: '0', auth_password_min_v2: '4',
         otp_enabled: '0', sms_username: '', sms_password: '', sms_sender: '', wa_instance: '', wa_token: '',
         push_on: '0', vapid_public: '', vapid_private: '',
         pay_online_on: '0', payment_electronic_enabled: '0', payment_transfer_enabled: '0',

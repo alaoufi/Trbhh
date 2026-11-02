@@ -44,7 +44,7 @@ export async function setStoreCredentialsAction(formData: FormData) {
   }
   if (pw) {
     const okPw = await setStorePassword(session.uid, pw); // blank = keep current password
-    if (!okPw) redirect(`/store?crederr=${encodeURIComponent('كلمة المرور لا تستوفي سياسة الأمان: استخدم عبارة طويلة وغير شائعة، 12 حرفاً على الأقل وبحد أقصى 72 بايت.')}`);
+    if (!okPw) redirect(`/store?crederr=${encodeURIComponent('كلمة المرور 4 خانات على الأقل (أحرف أو أرقام أو رموز).')}`);
   }
   revalidatePath('/store');
   redirect('/store?cred=ok');

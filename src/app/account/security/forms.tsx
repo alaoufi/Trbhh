@@ -47,7 +47,7 @@ export function SecurityForms({ enrolled, manager, required, minimum }: { enroll
       <p className="text-sm">الإلزام العام يبدأ بعد تجهيز جميع الإداريين. الحساب الذي ربط تطبيقه يطلب الرمز دائماً، حتى إذا أوقفت الإلزام العام.</p>
       <form action={save} className="space-y-3">
         <label className="flex gap-2"><input type="checkbox" name="requireAdminMfa" defaultChecked={required} /> إلزام جميع حسابات الإدارة بالتحقق الإضافي</label>
-        <label className="block">الحد الأدنى لكلمات المرور الجديدة<input name="passwordMinimum" type="number" min={12} max={64} required defaultValue={minimum} className={field} /></label>
+        <label className="block">الحد الأدنى لكلمات المرور الجديدة<input name="passwordMinimum" type="number" min={4} max={64} required defaultValue={minimum} className={field} /></label>
         <label className="block">كلمة المرور الحالية<input name="currentPassword" type="password" required autoComplete="current-password" className={field} /></label>
         <label className="block">رمز تحقق جديد أو رمز استرداد<input name="factorCode" required autoComplete="one-time-code" className={field} /></label>
         <button disabled={saving} className={button}>حفظ سياسة الأمان</button><Status state={policy} />

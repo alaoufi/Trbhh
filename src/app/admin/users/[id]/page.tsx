@@ -59,8 +59,10 @@ export default async function AdminUserDetail({ params, searchParams }: { params
   ]);
   const adminLog = redactAdminLog(rawAdminLog, keys);
   if (!u) notFound();
-  // باقة الإعلانات الفعّالة للعضو (اشتراكه المدفوع إن وُجد، وإلا الباقة الافتراضية).
+  // باقة الإعلانات الفعّالة للعضو (اشتراكه المدفوع إن وُجد، وإلا الباقة الافتراضية)،
+  // واشتراك متجره إن كان يملك متجراً — ليرى الإداري كل باقاته في مكان واحد.
   const pkg = keys.has('ads:view') ? await getUserPackage(uid).catch(() => null) : null;
+  const store = keys.has('ads:view') ? await prisma.stores.findFirst({ where: { user_id: uid }, select: { store_name: true, sub_until: true, on_trial: true, sub_plan: true } }).catch(() => null) : null;
   // تأمين البيع المباشر: المسجَّل + المستخدَم (قيمة السلع المعروضة) — لعرضه في قسم البيع المباشر.
   const depositMinor = Number(u.sale_deposit_minor ?? 0n);
   const exposureMinor = await memberSaleExposure(uid).catch(() => 0);
@@ -147,19 +149,31 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         </div>
       </div>
 
-      {/* باقة الإعلانات الفعّالة للعضو — حدوده اليومية والفاصل ومدة البقاء، ونوع الباقة */}
-      {pkg && <section className="space-y-2 rounded-2xl border-2 border-primary/15 bg-card p-4">
-        <div className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-primary"><Megaphone className="h-4 w-4" /> باقة الإعلانات الحالية
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{pkg.name}</span>
-          {pkg.isDefault ? <Badge variant="muted">افتراضية (بلا اشتراك)</Badge> : pkg.price > 0 ? <Badge variant="special">مشترك مدفوع</Badge> : <Badge variant="muted">مجانية</Badge>}
-          {pkg.tier && <Badge variant="special">{pkg.tier === 'gold' ? 'تميّز ذهبي' : 'تميّز فضي'}</Badge>}
+      {/* كل باقات واشتراكات العضو: باقة عدد الإعلانات (وحدودها) + اشتراك المتجر إن وُجد */}
+      {pkg && <section className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+        <div className="text-sm font-extrabold text-primary">الباقات والاشتراكات</div>
+        {/* باقة عدد الإعلانات */}
+        <div className="space-y-2 rounded-xl border border-primary/10 bg-primary/5 p-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-extrabold text-primary"><Megaphone className="h-4 w-4" /> باقة عدد الإعلانات
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-bold text-primary">{pkg.name}</span>
+            {pkg.isDefault ? <Badge variant="muted">افتراضية (بلا اشتراك)</Badge> : pkg.price > 0 ? <Badge variant="special">مشترك مدفوع</Badge> : <Badge variant="muted">مجانية</Badge>}
+            {pkg.tier && <Badge variant="special">{pkg.tier === 'gold' ? 'تميّز ذهبي' : 'تميّز فضي'}</Badge>}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Fact icon={Megaphone} label="إعلانات/اليوم" value={pkg.adsPerDay > 0 ? String(pkg.adsPerDay) : 'بلا حد'} />
+            <Fact icon={Calendar} label="فارق بين الإعلانات" value={pkg.gapHours > 0 ? `${pkg.gapHours} ساعة` : 'بلا'} />
+            <Fact icon={Calendar} label="مدة بقاء الإعلان" value={pkg.adDays > 0 ? `${pkg.adDays} يوم` : 'دائم'} />
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Fact icon={Megaphone} label="إعلانات/اليوم" value={pkg.adsPerDay > 0 ? String(pkg.adsPerDay) : 'بلا حد'} />
-          <Fact icon={Calendar} label="فارق بين الإعلانات" value={pkg.gapHours > 0 ? `${pkg.gapHours} ساعة` : 'بلا'} />
-          <Fact icon={Calendar} label="مدة بقاء الإعلان" value={pkg.adDays > 0 ? `${pkg.adDays} يوم` : 'دائم'} />
-        </div>
-        <p className="text-xs text-muted-foreground">لتغيير باقة العضو أو إسناد اشتراك مدفوع: صفحة «الأعضاء» ← صفّ هذا العضو ← قائمة «الباقة» والمدة.</p>
+        {/* اشتراك المتجر — إن كان العضو يملك متجراً */}
+        {store && <div className="flex flex-wrap items-center gap-2 rounded-xl border border-teal-200 bg-teal-50/60 p-3 text-xs font-bold text-teal-900">
+          <ShieldCheck className="h-4 w-4" /> اشتراك المتجر
+          <span className="rounded-full bg-teal-100 px-2 py-0.5 font-extrabold">{store.store_name || 'متجر'}</span>
+          {store.on_trial === 1 && <Badge variant="muted">تجربة</Badge>}
+          {store.sub_plan && <span className="rounded-full bg-white px-2 py-0.5">{store.sub_plan === 'monthly' ? 'شهري' : store.sub_plan === 'yearly' ? 'سنوي' : store.sub_plan === '6m' ? '٦ أشهر' : store.sub_plan}</span>}
+          <span>{store.sub_until ? `حتى ${fmtDate(store.sub_until.toISOString())}` : 'بلا اشتراك مدفوع'}</span>
+        </div>}
+        <p className="text-xs text-muted-foreground">لتغيير باقة عدد الإعلانات أو إسناد اشتراك: صفحة «الأعضاء» ← صفّ هذا العضو ← قائمة «الباقة» والمدة. واشتراك المتجر يُدار من «إدارة المتاجر».</p>
       </section>}
 
       {/* تفعيل البيع المباشر لعضو موثوق — بضاعته تُنشر في الرئيسي بعد اعتماد سلعها */}

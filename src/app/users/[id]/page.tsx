@@ -8,6 +8,8 @@ import { getMyAds } from '@/lib/account';
 import { getSellerRating, getUserReviews, canReview } from '@/lib/reviews';
 import { getEmptyText } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
+import { hasAccess } from '@/lib/access-control/guards';
+import { getUserPackage } from '@/lib/packages';
 import { AdGrid } from '@/components/ad-card';
 import { Stars } from '@/components/stars';
 import { ReviewForm } from '@/components/review-form';
@@ -50,6 +52,9 @@ export default async function UserProfilePage({ params, searchParams }: { params
     await markSeen(uid, 'reviews').catch(() => {});
   }
   const active = myAds.filter((a) => a.status === 1);
+  // للإداري فقط: باقة العضو ورابط صفحته الإدارية — تظهر داخل ملف العضو العام لمن يملك صلاحية.
+  const isAdmin = session ? await hasAccess(session.uid, 'users', 'view').catch(() => false) : false;
+  const adminPkg = isAdmin ? await getUserPackage(uid).catch(() => null) : null;
   // مجموع مشاهدات إعلانات العضو المعروضة في تربح
   const viewsSum = active.length
     ? await prisma.ads_views.count({ where: { ads_id: { in: active.map((a) => BigInt(a.id)) } } }).catch(() => 0)
@@ -160,6 +165,22 @@ export default async function UserProfilePage({ params, searchParams }: { params
         )}
         {iBlocked && <p className="mt-1 text-center text-[11px] text-muted-foreground">أنت حظرت هذا العضو — لا يمكنكما تبادل الرسائل.</p>}
       </div>
+
+      {isAdmin && adminPkg && (
+        <section className="space-y-2 rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-amber-900">
+            <Megaphone className="h-4 w-4" /> باقة عدد الإعلانات (عرض إداري)
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">{adminPkg.name}</span>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold">{adminPkg.isDefault ? 'افتراضية (بلا اشتراك)' : adminPkg.price > 0 ? 'مشترك مدفوع' : 'مجانية'}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-amber-900">
+            <span>إعلانات/اليوم: {adminPkg.adsPerDay > 0 ? adminPkg.adsPerDay : 'بلا حد'}</span>
+            <span>فارق: {adminPkg.gapHours > 0 ? `${adminPkg.gapHours} ساعة` : 'بلا'}</span>
+            <span>مدة بقاء الإعلان: {adminPkg.adDays > 0 ? `${adminPkg.adDays} يوم` : 'دائم'}</span>
+          </div>
+          <Link href={`/admin/users/${uid}`} className="inline-block rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-extrabold text-white">فتح صفحة العضو في الإدارة (كل الباقات والاشتراكات) ←</Link>
+        </section>
+      )}
 
       <h2 className="text-lg font-bold">إعلانات العضو</h2>
       <AdGrid ads={ads} />

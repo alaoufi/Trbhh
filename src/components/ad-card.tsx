@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store, ShoppingBag } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
-import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
+import { adCardPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
 import { PriceText } from '@/components/price-text';
@@ -159,8 +159,11 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
 }
 
 function CardPrice({ ad }: { ad: AdCardType }) {
+  // السعر غير المحدّد لا يظهر في البطاقة العامة (يظهر في التفاصيل فقط).
+  const label = adCardPriceLabel(ad);
+  if (!label) return null;
   return <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
-    <PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText>
+    <PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{label}</PriceText>
     <OldPrice ad={ad} /><DiscountChip ad={ad} /><DirectBuyChip ad={ad} />
   </div>;
 }
@@ -282,7 +285,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
       </div>
     </div>
     <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-      <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText><OldPrice ad={ad} /><DiscountChip ad={ad} /><DirectBuyChip ad={ad} /></div>
+      {adCardPriceLabel(ad) && <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adCardPriceLabel(ad)}</PriceText><OldPrice ad={ad} /><DiscountChip ad={ad} /><DirectBuyChip ad={ad} /></div>}
       <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(ad.title)}</h3>
       {ad.storeName && <StoreTag name={ad.storeName} />}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">

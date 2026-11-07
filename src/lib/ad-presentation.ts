@@ -12,6 +12,16 @@ export function adPriceLabel(ad: PriceData): string {
   return ad.priceType === 'rent' ? `${amount} / ${period[ad.rentPeriod || ''] || ad.rentPeriod?.trim() || 'تأجير'}` : amount;
 }
 
+/**
+ * تسمية السعر في العرض العام (البطاقات والقوائم): تُخفى عبارات «غير محدد» فلا يظهر
+ * السعر إلا إذا كان مفيداً (مبلغ/على السوم/قابل للتفاوض). صفحة التفاصيل تبقى تعرض
+ * «السعر غير محدد» عبر adPriceLabel. فارغة = لا تعرض سطر السعر إطلاقاً في البطاقة.
+ */
+export function adCardPriceLabel(ad: PriceData): string {
+  const label = adPriceLabel(ad);
+  return label === 'السعر غير محدد' || label === 'الميزانية غير محددة' ? '' : label;
+}
+
 /** Remove only an exact repeated title, preserving repeated words in normal titles. */
 export function compactAdTitle(raw: string): string {
   const title = raw.replace(/\s+/g, ' ').trim();

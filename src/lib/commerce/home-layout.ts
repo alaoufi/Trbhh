@@ -39,6 +39,20 @@ export function pickHomeLayout(count: number): HomeLayout {
   return { hidden: false, columns: 4, mobileColumns: 2, variant: 'grid', limit: Math.min(n, HOME_SECTION_CAP) };
 }
 
+/**
+ * يقصّ شبكة تغذية السوق إلى صفوف كاملة فقط فلا يبقى فراغ في آخر صفّ حين لا يقبل
+ * العدد القسمة على أعمدة الشبكة. يُطبَّق على شبكات «اكتشف السوق» حيث الإعلانات كثيرة
+ * (الباقي يظهر في «عرض الكل»). أعمدة الشبكة: الجوال ٢ وسطح المكتب ٤ للأعداد ٧ فأكثر —
+ * فالقصّ لمضاعف ٤ يملأ الصفّ في الحالتين. الأعداد الأصغر تملأ تخطيطها أصلاً فتبقى كما هي.
+ */
+export function fullRows<T>(ads: readonly T[]): T[] {
+  const { columns, variant } = pickHomeLayout(ads.length);
+  if (variant !== 'grid' || columns < 4) return [...ads];
+  const step = 4;
+  const full = Math.floor(ads.length / step) * step;
+  return ads.slice(0, Math.max(step, full));
+}
+
 export type HomeSectionKind = 'products' | 'stores' | 'ads' | 'campaign';
 
 /**

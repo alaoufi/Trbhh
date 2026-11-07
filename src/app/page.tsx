@@ -18,6 +18,7 @@ import { AdGrid } from '@/components/ad-card';
 import { HomeCompactStrip } from '@/components/home-compact-strip';
 import feedStyles from '@/components/home-dense-feed.module.css';
 import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
+import { fullRows } from '@/lib/commerce/home-layout';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -102,8 +103,9 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   // كي يبقى ممتلئاً دائماً دون أن يستهلك تغذية الشبكات. التخطيط المطلوب:
   //   صفّ «اكتشف السوق» فوق الشريط  →  شريط «لمحة من السوق»  →  عدّة صفوف تحته.
   const stripAds = selectedCategory ? [] : mergeHomeAds(mostViewed, topRated, featured, latest).slice(0, 16);
-  const feedBefore = selectedCategory ? feedAds : feedAds.slice(0, 8);
-  const feedAfter = selectedCategory ? [] : feedAds.slice(8);
+  // شبكات السوق تُقصّ إلى صفوف كاملة فلا يبقى فراغ في آخر صفّ (الإعلانات كثيرة والباقي في «عرض الكل»).
+  const feedBefore = fullRows(selectedCategory ? feedAds : feedAds.slice(0, 8));
+  const feedAfter = selectedCategory ? [] : fullRows(feedAds.slice(8));
   const [compactStripTitle, compactStripHint] = await Promise.all([
     getSetting('home_compact_strip_title', 'لمحة من السوق'),
     getSetting('home_compact_strip_hint', 'تصفّح المزيد بالسحب أو التمرير'),
@@ -199,7 +201,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
                 <HomeCompactStrip ads={stripAds} title={compactStripTitle} hint={compactStripHint} autoPlay={stripMotion} />
                 {feedAfter.length > 0 && <AdGrid ads={feedAfter} appearance="marketplace" />}
               </>
-            ) : <AdGrid ads={feedAds} appearance="marketplace" />}
+            ) : <AdGrid ads={fullRows(feedAds)} appearance="marketplace" />}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}

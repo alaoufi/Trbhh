@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction, unlinkMemberAccountAction, disposeMemberAccountAction, toggleDirectSaleApprovalAction, adjustMemberDepositAction } from '../../actions';
 import { memberSaleExposure } from '@/lib/commerce/deposit';
+import { getUserPackage } from '@/lib/packages';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { linkedAccounts } from '@/lib/account-links';
 import { dispositionFor, inspectMemberDependencies } from '@/lib/member-disposition';
@@ -58,6 +59,8 @@ export default async function AdminUserDetail({ params, searchParams }: { params
   ]);
   const adminLog = redactAdminLog(rawAdminLog, keys);
   if (!u) notFound();
+  // باقة الإعلانات الفعّالة للعضو (اشتراكه المدفوع إن وُجد، وإلا الباقة الافتراضية).
+  const pkg = keys.has('ads:view') ? await getUserPackage(uid).catch(() => null) : null;
   // تأمين البيع المباشر: المسجَّل + المستخدَم (قيمة السلع المعروضة) — لعرضه في قسم البيع المباشر.
   const depositMinor = Number(u.sale_deposit_minor ?? 0n);
   const exposureMinor = await memberSaleExposure(uid).catch(() => 0);
@@ -143,6 +146,21 @@ export default async function AdminUserDetail({ params, searchParams }: { params
           {u.direct_sale_approved === 1 && <Badge variant="special">بيع مباشر مفعّل</Badge>}
         </div>
       </div>
+
+      {/* باقة الإعلانات الفعّالة للعضو — حدوده اليومية والفاصل ومدة البقاء، ونوع الباقة */}
+      {pkg && <section className="space-y-2 rounded-2xl border-2 border-primary/15 bg-card p-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-primary"><Megaphone className="h-4 w-4" /> باقة الإعلانات الحالية
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{pkg.name}</span>
+          {pkg.isDefault ? <Badge variant="muted">افتراضية (بلا اشتراك)</Badge> : pkg.price > 0 ? <Badge variant="special">مشترك مدفوع</Badge> : <Badge variant="muted">مجانية</Badge>}
+          {pkg.tier && <Badge variant="special">{pkg.tier === 'gold' ? 'تميّز ذهبي' : 'تميّز فضي'}</Badge>}
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Fact icon={Megaphone} label="إعلانات/اليوم" value={pkg.adsPerDay > 0 ? String(pkg.adsPerDay) : 'بلا حد'} />
+          <Fact icon={Calendar} label="فارق بين الإعلانات" value={pkg.gapHours > 0 ? `${pkg.gapHours} ساعة` : 'بلا'} />
+          <Fact icon={Calendar} label="مدة بقاء الإعلان" value={pkg.adDays > 0 ? `${pkg.adDays} يوم` : 'دائم'} />
+        </div>
+        <p className="text-xs text-muted-foreground">لتغيير باقة العضو أو إسناد اشتراك مدفوع: صفحة «الأعضاء» ← صفّ هذا العضو ← قائمة «الباقة» والمدة.</p>
+      </section>}
 
       {/* تفعيل البيع المباشر لعضو موثوق — بضاعته تُنشر في الرئيسي بعد اعتماد سلعها */}
       <AccessBoundary module={'verifications'} action={'approve'}>

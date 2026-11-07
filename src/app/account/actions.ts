@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL, DUP_PACK_COUNT, isDur, getAdRestoreFee } from '@/lib/settings';
 import { charge, buyDupPack } from '@/lib/wallet';
-import { buyMemberPackage } from '@/lib/packages';
+import { buyMemberPackage, getUserPackage } from '@/lib/packages';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
@@ -406,6 +406,24 @@ export async function bumpAdAction(formData: FormData) {
   if (ad.bumped_at && (Date.now() - ad.bumped_at.getTime()) < 120_000) redirect(back ? `${back}?bumped=1#paid-result` : '/account/ads?bumped=1');
   const [{ getAdExtras, getSettingBool }] = await Promise.all([import('@/lib/settings')]);
   if (!(await getSettingBool('bump_on', false))) redirect(back || '/account/ads');
+  // تطبيق حدود الباقة على التحديث تماماً كالإنشاء: لا يستطيع العضو رفع أكثر من
+  // «إعلانات/اليوم» تحديثاً يومياً، ولا أكثر من واحد خلال «الفارق الزمني» — فلا يرفع
+  // كل إعلاناته دفعةً واحدة ويحتكر الواجهة. تُحسب من تواريخ تحديث إعلاناته نفسها.
+  const pkg = await getUserPackage(session.uid);
+  if (pkg.adsPerDay > 0 || pkg.gapHours > 0) {
+    const recentBumps = await prisma.ads.findMany({
+      where: { user_id: BigInt(session.uid), id: { not: adId }, bumped_at: { not: null } },
+      select: { bumped_at: true }, orderBy: { bumped_at: 'desc' }, take: 50,
+    }).catch(() => [] as { bumped_at: Date | null }[]);
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const bumpsToday = recentBumps.filter((r) => r.bumped_at && r.bumped_at >= dayStart).length;
+    const lastBump = recentBumps[0]?.bumped_at ?? null;
+    if (pkg.adsPerDay > 0 && bumpsToday >= pkg.adsPerDay) redirect(back ? `${back}?bumplimit=${pkg.adsPerDay}#paid-result` : `/account/ads?bumplimit=${pkg.adsPerDay}`);
+    if (pkg.gapHours > 0 && lastBump) {
+      const hoursSinceBump = (Date.now() - lastBump.getTime()) / 3600_000;
+      if (hoursSinceBump < pkg.gapHours) redirect(back ? `${back}?bumpgap=${pkg.gapHours}#paid-result` : `/account/ads?bumpgap=${pkg.gapHours}`);
+    }
+  }
   const x = await getAdExtras();
   const last = ad.bumped_at || ad.created_at || new Date(0);
   const daysSince = (Date.now() - last.getTime()) / 86400_000;

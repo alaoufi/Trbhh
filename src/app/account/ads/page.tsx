@@ -19,7 +19,7 @@ import { memberDepositSummary } from '@/lib/commerce/deposit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string; sale?: string; salestopped?: string; depositok?: string; depositerr?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumplimit?: string; bumpgap?: string; scheduled?: string; restored?: string; censored?: string; sale?: string; salestopped?: string; depositok?: string; depositerr?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active, lifecycleOn] = await Promise.all([
@@ -61,6 +61,8 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.urgent === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» وخُصمت الرسوم من رصيدك.</div>}
       {sp.bumped === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم.</div>}
       {sp.bumpwait && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {sp.bumpwait} يوم — أو فعّل التحديث المدفوع إن وُفّر.</div>}
+      {sp.bumplimit && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ بلغت حدّ باقتك من التحديث اليوم ({sp.bumplimit}/يوم). جرّب غداً أو رقِّ باقتك.</div>}
+      {sp.bumpgap && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ حسب باقتك يلزم الانتظار {sp.bumpgap} ساعة بين تحديث وآخر — فلا تُرفع كل الإعلانات دفعةً واحدة.</div>}
       {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
       {sp.censored === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">✳️ نُشر إعلانك للعامة بعد حجب كلمات مخالفة بنجمات. إن رأيت المنع خطأً راسل الإدارة.</div>}
       {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}

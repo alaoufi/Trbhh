@@ -102,7 +102,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string; reminded?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; bumplimit?: string; bumpgap?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string; reminded?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -506,6 +506,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       {/* نتيجة تحديث الإعلان ⬆ */}
       {spx.bumped === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم الآن.</div>}
       {spx.bumpwait && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {spx.bumpwait} يوم.</div>}
+      {spx.bumplimit && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ بلغت حدّ باقتك من التحديث اليوم ({spx.bumplimit}/يوم). جرّب غداً أو رقِّ باقتك.</div>}
+      {spx.bumpgap && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ حسب باقتك يلزم الانتظار {spx.bumpgap} ساعة بين تحديث وآخر.</div>}
       {spx.bumpneed === '1' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يغطي رسوم التحديث المبكر — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
 
       {/* خدمات تسويق إضافية لصاحب الإعلان: تحديث ⬆ + مزاد 🔨 + الشرح المتحرك */}

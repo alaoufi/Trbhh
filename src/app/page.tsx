@@ -66,9 +66,11 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const selectedCategory = selectedHomeCategory(categoryConfig, sp.category);
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
+  // تنويع التغذية: حدّ أقصى لإعلانات المعلن الواحد (0 = بلا تنويع) — يُطبَّق داخل الجلب ليُكمَل من معلنين آخرين.
+  const maxPerSeller = await getSettingNum('home_max_per_seller', 3).catch(() => 3);
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     selectedCategory ? Promise.resolve([]) : getFeaturedAds(8),
-    selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(20),
+    selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(20, maxPerSeller),
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
     selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),
@@ -91,7 +93,6 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
   // تنويع التغذية: حدّ أقصى لعدد إعلانات المعلن الواحد في الرئيسية (قابل للضبط من الإعدادات،
   // 0 = بلا تنويع) فلا يحتكر من يملك مئات الإعلانات الصفوف الأولى ويظهر تنوّع المعلنين.
-  const maxPerSeller = await getSettingNum('home_max_per_seller', 3).catch(() => 3);
   const feedAds = fairFeed(selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated), maxPerSeller);
   const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
   // تنويع الرئيسية: تغذية مضغوطة أكثف + شريط إعلانات صغيرة بين البطاقات — كلها قابلة

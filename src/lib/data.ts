@@ -326,23 +326,45 @@ export async function getLatestAds(take = 12) {
   });
 }
 
-/** أحدث الإعلانات للرئيسية: الأحدث نشاطاً بلا أي قيد زمني — العرض العام مفتوح.
- *  (كان يقتصر على آخر ٣٠ يوماً، فإن وُجدت فيها إعلانات قليلة عُرضت وحدها واختفى الباقي.) */
-export async function getHomeLatestAds(take = 20) {
+/** أحدث الإعلانات للرئيسية: الأحدث نشاطاً بلا قيد زمني، مع تنويع المعلنين **قبل** القصّ.
+ *  maxPerSeller>0: لا يأخذ المعلن الواحد أكثر من هذا العدد، ويُكمَل الباقي من معلنين آخرين
+ *  (سابقاً كان التنويع يُطبَّق بعد جلب ٢٠ فقط؛ فإن كانت كلها لمعلن واحد بقي ٣ وفرغت الرئيسية). */
+export async function getHomeLatestAds(take = 20, maxPerSeller = 0) {
   const safeTake = Math.min(Math.max(Math.floor(take) || 20, 1), 60);
-  return cached(`ads:home-latest:all:${safeTake}`, 60, async () => {
+  const cap = Number.isFinite(maxPerSeller) && maxPerSeller > 0 ? Math.floor(maxPerSeller) : 0;
+  return cached(`ads:home-latest:div:${safeTake}:${cap}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
     sweepOldAdsToArchive().catch(() => {});
-    // المُحدَّثة (bumped) أولاً ثم الأحدث نشراً — هامش صغير لإعادة الترتيب بآخر نشاط.
-    const [bumped, newest] = await Promise.all([
-      prisma.ads.findMany({ where: { ...(await activeAdWhere()), bumped_at: { not: null } }, orderBy: { bumped_at: 'desc' }, take: safeTake, select: adSelect }),
-      prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ created_at: 'desc' }, { id: 'desc' }], take: safeTake * 3, select: adSelect }),
-    ]);
+    const where = await activeAdWhere();
+    const light = { id: true, user_id: true, bumped_at: true, created_at: true } as const;
+    const picked: bigint[] = [];
     const seen = new Set<bigint>();
-    const rows = [...bumped, ...newest].filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
-    rows.sort((a, b) => activityMs(b) - activityMs(a));
-    return toCards(rows.slice(0, safeTake));
+    const perSeller = new Map<bigint, number>();
+    const consider = (rows: { id: bigint; user_id: bigint }[]) => {
+      for (const r of rows) {
+        if (picked.length >= safeTake) return;
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        const n = perSeller.get(r.user_id) ?? 0;
+        if (cap && n >= cap) continue;
+        perSeller.set(r.user_id, n + 1);
+        picked.push(r.id);
+      }
+    };
+    // المُحدَّثة (bump) أولاً ثم الأحدث نشراً، على صفحات حتى يكتمل العدد من معلنين متنوّعين.
+    const bumped = await prisma.ads.findMany({ where: { ...where, bumped_at: { not: null } }, orderBy: { bumped_at: 'desc' }, take: 200, select: light });
+    consider(bumped);
+    const PAGE = 300;
+    for (let page = 0; page < 10 && picked.length < safeTake; page++) {
+      const rows = await prisma.ads.findMany({ where, orderBy: [{ created_at: 'desc' }, { id: 'desc' }], skip: page * PAGE, take: PAGE, select: light });
+      consider(rows);
+      if (rows.length < PAGE) break;
+    }
+    if (!picked.length) return [];
+    const full = await prisma.ads.findMany({ where: { id: { in: picked } }, select: adSelect });
+    full.sort((a, b) => activityMs(b) - activityMs(a));
+    return toCards(full);
   });
 }
 

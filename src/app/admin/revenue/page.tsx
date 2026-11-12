@@ -593,6 +593,13 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
 }
 
 async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; canPromos: boolean }) {
+  // أثر خيار «رسوم ظهور الإعلانات» على الإعلانات الحالية — يُعرض تنبيهاً بجوار الخيار.
+  const lifecycleNow = new Date();
+  const [lifecycleOpen, lifecyclePaid] = await Promise.all([
+    prisma.ads.count({ where: { status: 1, state: 'active' } }).catch(() => 0),
+    prisma.ads.count({ where: { status: 1, state: 'active', trbhh_until: { gt: lifecycleNow } } }).catch(() => 0),
+  ]);
+  const lifecycleImpact = { open: lifecycleOpen, paid: lifecyclePaid };
   const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll, restoreFee, acctVerify, platformAds] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
@@ -682,7 +689,11 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
 
       <div className="rounded-xl border-2 border-indigo-300 bg-indigo-50/70 p-3">
         <div className="mb-1 text-sm font-extrabold text-indigo-900">نشر الإعلانات في تربح</div>
-        <p className="mb-3 text-[11px] leading-5 text-muted-foreground">لا يؤثر التفعيل على الإعلانات الحالية فوراً. عند التفعيل يصبح ظهور الإعلانات الجديدة حسب الحد المجاني والمدد أدناه، ثم يتطلب تجديداً مدفوعاً من المحفظة.</p>
+        <p className="mb-2 text-[11px] leading-5 text-muted-foreground">عند التفعيل لا يظهر في الرئيسية والبحث إلا الإعلان الذي له ظهور ساري (مجاني ضمن المدة أدناه أو مدفوع من المحفظة).</p>
+        <p className={`mb-3 rounded-lg border-2 p-2 text-xs font-extrabold leading-5 ${platformAds.enabled ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+          ⚠️ تنبيه: يسري التفعيل فوراً على الإعلانات الحالية أيضاً. الآن {lifecycleImpact.open} إعلاناً نشطاً، منها {lifecycleImpact.paid} فقط بظهور ساري —
+          {platformAds.enabled ? ` الخيار مفعّل، فـ${lifecycleImpact.open - lifecycleImpact.paid} إعلاناً مخفيّ عن الزوار حالياً.` : ` لو فعّلته الآن سيختفي ${lifecycleImpact.open - lifecycleImpact.paid} إعلاناً من الرئيسية والبحث.`}
+        </p>
         <label className="flex items-center gap-2 text-sm font-bold"><input name="platformAdLifecycleEnabled" type="checkbox" defaultChecked={platformAds.enabled} /> تفعيل رسوم ظهور الإعلانات في تربح</label>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">إعلانات مجانية جديدة يومياً</span><input name="platformAdMemberFreeDailyLimit" type="number" min={0} defaultValue={platformAds.memberFreeDailyLimit} className={num} /></label>

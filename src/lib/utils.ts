@@ -34,3 +34,9 @@ export function toInt(v: bigint | number | null | undefined): number {
   if (v == null) return 0;
   return typeof v === 'bigint' ? Number(v) : v;
 }
+
+/** يزيل أنصاف الرموز (surrogates اليتيمة) الناتجة عن قصّ نص وسط إيموجي — وجودها يجعل
+ *  encodeURIComponent يرمي «URI malformed» فتسقط الصفحة كلها. */
+export function wellFormed(text: string): string {
+  return text.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+}

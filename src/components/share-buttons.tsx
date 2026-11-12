@@ -2,13 +2,15 @@
 import { useState } from 'react';
 import { Share2, Link2, QrCode, Check, X, MessageCircle, Facebook, Send } from 'lucide-react';
 import { ShareCardButton, type ShareCardData } from '@/components/share-card';
+import { wellFormed } from '@/lib/utils';
 
 export function ShareButtons({ url, title, text, compact, card, iconOnly }: { url: string; title: string; text?: string; compact?: boolean; card?: ShareCardData; iconOnly?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
   const [menu, setMenu] = useState(false);
   // نص المشاركة: العنوان + أول الإعلان (إن مُرّر) — والرابط يُلحق دائماً في النهاية
-  const msg = (text || title).trim();
+  // wellFormed: نص مقصوص وسط إيموجي كان يُسقط الصفحة بخطأ «URI malformed» عند الترميز.
+  const msg = wellFormed((text || title).trim());
   const wa = `https://wa.me/?text=${encodeURIComponent(msg + '\n' + url)}`;
   const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}&url=${encodeURIComponent(url)}`;
   const tg = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(msg)}`;

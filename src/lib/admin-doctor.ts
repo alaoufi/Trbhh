@@ -79,6 +79,19 @@ export async function runDoctorChecks(): Promise<{ checks: DoctorCheck[]; feed: 
     fixKey: feed.verdict.ok ? undefined : 'cache_clear',
   });
 
+  // 1ب) خيار «رسوم ظهور الإعلانات» مفعّل وأغلب الإعلانات بلا ظهور ساري ⇒ تختفي من الرئيسية والبحث
+  const lifecycleOn = String(feed.counts.find((c) => c.label.includes('دورة حياة'))?.value ?? '') === 'نعم';
+  const openAds = Number(feed.counts.find((c) => c.label.includes('منشورة ومُفعّلة معاً'))?.value ?? 0);
+  const paidAds = Number(feed.counts.find((c) => c.label.includes('trbhh_until'))?.value ?? 0);
+  checks.push({
+    id: 'paid_display_toggle',
+    title: 'خيار «تفعيل رسوم ظهور الإعلانات في تربح»',
+    severity: lifecycleOn && openAds - paidAds >= 5 ? 'crit' : 'ok',
+    detail: lifecycleOn
+      ? `الخيار مفعّل: ${openAds - paidAds} من ${openAds} إعلاناً نشطاً بلا ظهور ساري، فلا تظهر للزوار. لإظهارها: المحاسبة والمالية ← التسعير والباقات ← أزل علامة الخيار واحفظ. (قرار إداري — لا يُغيَّر من هنا.)`
+      : 'الخيار معطّل — العرض مفتوح لكل الإعلانات النشطة.',
+  });
+
   // 2) أعمدة store_only الفارغة
   const nullStore = await prisma.$queryRawUnsafe<{ n: bigint }[]>(`SELECT COUNT(*) AS n FROM ads WHERE store_only IS NULL`).catch(() => [{ n: 0n }]);
   const nullCount = Number(nullStore[0]?.n ?? 0);

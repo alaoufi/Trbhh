@@ -694,9 +694,12 @@ async function PricingTab({ canPackages, canPromos, saved }: { canPackages: bool
       <div id="platform-ads" className="scroll-mt-20 rounded-xl border-2 border-indigo-300 bg-indigo-50/70 p-3">
         <div className="mb-1 text-sm font-extrabold text-indigo-900">نشر الإعلانات في تربح</div>
         <p className="mb-2 text-[11px] leading-5 text-muted-foreground">عند التفعيل لا يظهر في الرئيسية والبحث إلا الإعلان الذي له ظهور ساري (مجاني ضمن المدة أدناه أو مدفوع من المحفظة).</p>
-        <p className={`mb-3 rounded-lg border-2 p-2 text-xs font-extrabold leading-5 ${platformAds.enabled ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
-          ⚠️ تنبيه: يسري التفعيل فوراً على الإعلانات الحالية أيضاً. الآن {lifecycleImpact.open} إعلاناً نشطاً، منها {lifecycleImpact.paid} فقط بظهور ساري —
-          {platformAds.enabled ? ` الخيار مفعّل، فـ${lifecycleImpact.open - lifecycleImpact.paid} إعلاناً مخفيّ عن الزوار حالياً.` : ` لو فعّلته الآن سيختفي ${lifecycleImpact.open - lifecycleImpact.paid} إعلاناً من الرئيسية والبحث.`}
+        <p className={`mb-3 rounded-lg border-2 p-2 text-xs font-extrabold leading-5 ${platformAds.enabled && lifecycleImpact.open - lifecycleImpact.paid > 0 ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+          ⚠️ الآن {lifecycleImpact.open} إعلاناً نشطاً، منها {lifecycleImpact.paid} بظهور ساري.
+          {platformAds.enabled
+            ? ` الخيار مفعّل، و${lifecycleImpact.open - lifecycleImpact.paid} إعلاناً مخفيّ عن الزوار حالياً لانتهاء ظهوره.`
+            : ' عند التفعيل تُمنح الإعلانات الحالية مدة الظهور المجاني أدناه (30 يوماً إن تُركت 0) فلا تختفي فوراً، ويأخذها كل إعلان جديد. بعد انتهائها يختفي الإعلان.'}
+          {' '}تنبيه: تجديد الظهور بالدفع متاح حالياً لإعلانات المتاجر فقط؛ لا توجد بعدُ صفحة يجدّد منها العضو العادي، فإعلانه يختفي عند انتهاء المدة المجانية.
         </p>
         <label className="flex items-center gap-2 text-sm font-bold"><input name="platformAdLifecycleEnabled" type="checkbox" defaultChecked={platformAds.enabled} /> تفعيل رسوم ظهور الإعلانات في تربح</label>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -708,7 +711,7 @@ async function PricingTab({ canPackages, canPromos, saved }: { canPackages: bool
         <div className="mt-3 space-y-2">{platformAds.packages.map((p) => <div key={p.key} className="grid grid-cols-3 items-center gap-2 rounded-lg bg-white p-2 text-xs"><label className="flex items-center gap-1 font-bold"><input name={`platformAdPkgActive_${p.key}`} type="checkbox" defaultChecked={p.active} /> {p.label}</label><span>{p.days} يوم · {p.price} ر.س</span><select name={`platformAdPkgAudience_${p.key}`} defaultValue={p.audience} className="rounded border p-1"><option value="both">عضو ومتجر</option><option value="member">عضو فقط</option><option value="store">متجر فقط</option></select></div>)}</div>
       </div>
 
-      <SectionSave id="platform-ads" saved={saved}>أخطر خيار في الصفحة: عند تفعيله لا يظهر في الرئيسية والبحث إلا الإعلان الذي له ظهور ساري (مجاني ضمن المدة المحددة أو مدفوع). يسري فوراً على الإعلانات الحالية أيضاً، فتختفي كل الإعلانات القديمة التي لا ظهور ساري لها. تعطيله يعيد العرض مفتوحاً لكل الإعلانات النشطة. راجع أرقام التنبيه أعلاه قبل الحفظ.</SectionSave>
+      <SectionSave id="platform-ads" saved={saved}>عند تفعيله لا يظهر في الرئيسية والبحث إلا الإعلان الذي له ظهور ساري. لحظة التفعيل تُمنح كل الإعلانات الحالية مدة الظهور المجاني (30 يوماً على الأقل)، ويأخذها كل إعلان جديد عند نشره؛ بعد انتهائها يختفي الإعلان حتى يُجدَّد. التجديد المدفوع متاح حالياً لإعلانات المتاجر فقط. تعطيل الخيار يعيد العرض مفتوحاً لكل الإعلانات النشطة فوراً.</SectionSave>
 
       {/* خدمات الإعلان الإضافية: عاجل (باقتان) + تحديث (Bump) */}
       <div id="ad-extras" className="scroll-mt-20 rounded-xl border border-red-300 bg-red-50/50 p-3">

@@ -931,7 +931,24 @@ export async function saveRevenueAction(formData: FormData) {
     await setSetting(`platform_ad_pkg_${k}_active`, formData.get(`platformAdPkgActive_${k}`) !== null ? '1' : '0');
     await setSetting(`platform_ad_pkg_${k}_audience`, ['member', 'store', 'both'].includes(audience) ? audience : 'both');
   }
-  await setSetting('platform_ad_lifecycle_enabled', formData.get('platformAdLifecycleEnabled') !== null ? '1' : '0');
+  // لحظة الانتقال من معطّل إلى مفعّل فقط: كل إعلان نشط بلا ظهور ساري يأخذ المهلة المجانية،
+  // فلا تختفي الإعلانات الحالية دفعة واحدة. لا يُمَسّ ظهور مدفوع قائم، ولا يتكرر المنح مع كل حفظ.
+  const lifecycleOn = formData.get('platformAdLifecycleEnabled') !== null;
+  if (lifecycleOn) {
+    const { freeUntil } = await import('@/lib/platform-ad-grace');
+    const now = new Date();
+    const until = freeUntil(now, parseInt(String(formData.get('platformAdMemberFreeDays') || '0')) || 0);
+    const wasOn = await import('@/lib/settings').then((m) => m.getSettingBool('platform_ad_lifecycle_enabled', false)).catch(() => false);
+    if (!wasOn) {
+      const granted = await prisma.ads.updateMany({
+        where: { status: 1, state: 'active', store_only: 0, OR: [{ trbhh_until: null }, { trbhh_until: { lte: now } }] },
+        data: { trbhh_until: until },
+      }).catch(() => ({ count: 0 }));
+      await logAdmin(session.uid, `تفعيل رسوم ظهور الإعلانات: مُنح ${granted.count} إعلاناً قائماً ظهوراً مجانياً حتى ${until.toISOString().slice(0, 10)}`);
+      await bustAdCaches().catch(() => {});
+    }
+  }
+  await setSetting('platform_ad_lifecycle_enabled', lifecycleOn ? '1' : '0');
   await setSetting('platform_ad_member_free_daily_limit', nn('platformAdMemberFreeDailyLimit'));
   await setSetting('platform_ad_member_free_days', nn('platformAdMemberFreeDays'));
   await setSetting('platform_ad_archive_after_days', nn('platformAdArchiveAfterDays'));

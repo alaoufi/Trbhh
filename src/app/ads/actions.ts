@@ -396,8 +396,14 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
+  // «رسوم ظهور الإعلانات» مفعّلة؟ الإعلان الجديد يأخذ مدة الظهور المجاني فلا يولد مخفياً.
+  const lifecycle = await import('@/lib/settings').then((m) => m.getPlatformAdLifecycleConfig()).catch(() => null);
+  const freeDisplayUntil = lifecycle?.enabled && dest !== 'store'
+    ? await import('@/lib/platform-ad-grace').then((m) => m.freeUntil(new Date(), lifecycle.memberFreeDays))
+    : null;
   const ad = await writeAdWithCategory(prisma, formData, (tx, category) => tx.ads.create({
     data: {
+      ...(freeDisplayUntil ? { trbhh_until: freeDisplayUntil } : {}),
       title: finalTitle, detail: finalDetail, price, adsType,
       category_id: catId,
       subcategory_id: null,

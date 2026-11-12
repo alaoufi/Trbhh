@@ -14,3 +14,5 @@ public/
 security/reports/
 *.min.js
 pnpm-lock.yaml
+# شيفرة الاختبارات لا تُنشر ولا تعمل في الإنتاج — تُستبعد لتقليل الضجيج.
+tests/

@@ -74,11 +74,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
     selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),
-    getHomeStats().catch(() => new Set(['ads', 'users', 'views'])),
+    getHomeStats().catch(() => new Set(['ads', 'adsTotal', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
   const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
+    { key: 'adsTotal', icon: Megaphone, value: stats.adsTotal, label: 'إجمالي الإعلانات' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
     { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
   ].filter((s) => homeStats.has(s.key));

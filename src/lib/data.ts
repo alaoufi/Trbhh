@@ -273,6 +273,48 @@ export async function sweepOldAdsToArchive() {
   }).catch(() => {});
 }
 
+/** أرشفة فعلية عند انتهاء «مدة بقاء الإعلان» في باقة صاحبه: الإعلان الذي تجاوز مدته كان
+ *  يُخفى من العرض فقط ويبقى «نشطاً» في حساب صاحبه. الآن يُنقل للأرشيف (لا يُحذف شيء)
+ *  فيراه صاحبه هناك ويعيده للظهور بفترة جديدة. يستثني المميّز/العاجل الساري وإعلانات
+ *  المتاجر والظهور المدفوع الساري — نفس قاعدة الرؤية. مُخنَّقة مرة/ساعة لكل حاوية. */
+let lastPackageExpirySweep = 0;
+export async function sweepPackageExpiredAds(force = false): Promise<number> {
+  const nowMs = Date.now();
+  if (!force && nowMs - lastPackageExpirySweep < 3600_000) return 0;
+  lastPackageExpirySweep = nowMs;
+  const now = new Date(nowMs);
+  const { getPackages, getDefaultPackage, FREE_FALLBACK } = await import('./packages');
+  const { packageExpiryGroups } = await import('./package-expiry');
+  const [plans, defaultPlan] = await Promise.all([getPackages(true).catch(() => []), getDefaultPackage().catch(() => FREE_FALLBACK)]);
+  const subs = await prisma.$queryRaw<{ user_id: bigint; package_id: number }[]>`
+    SELECT user_id, package_id FROM user_packages WHERE expires_at IS NULL OR expires_at > ${now}
+  `.catch(() => []);
+  const groups = packageExpiryGroups({
+    plans, defaultDays: defaultPlan.adDays, now,
+    subscriptions: subs.map((row) => ({ userId: Number(row.user_id), packageId: Number(row.package_id) })),
+  });
+  let archived = 0;
+  for (const g of groups) {
+    const r = await prisma.ads.updateMany({
+      where: {
+        status: 1, state: 'active', store_only: 0,
+        created_at: { lt: g.cutoff },
+        ...(g.userIn ? { user_id: { in: g.userIn } } : g.userNotIn ? { user_id: { notIn: g.userNotIn } } : {}),
+        AND: [
+          { OR: [{ data_archive: null }, { data_archive: '' }] },
+          { OR: [{ adsSpecial: { not: 'checked' } }, { expires_at: null }, { expires_at: { lte: now } }] },
+          { OR: [{ urgent_until: null }, { urgent_until: { lte: now } }] },
+          { OR: [{ trbhh_until: null }, { trbhh_until: { lte: now } }] },
+        ],
+      },
+      data: { status: 0, data_archive: now.toISOString() },
+    }).catch(() => ({ count: 0 }));
+    archived += r.count;
+  }
+  if (archived > 0) await bustAdCaches().catch(() => {});
+  return archived;
+}
+
 /** Remove the «مميّز» badge from ads whose paid featuring period ended (expires_at = featured-until).
  *  The ad stays published — only the featuring lapses. Cheap, throttled. */
 export async function sweepExpiredPaidAds() {
@@ -344,6 +386,7 @@ export async function getHomeLatestAds(take = 20, maxPerSeller = 0) {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
     sweepOldAdsToArchive().catch(() => {});
+    sweepPackageExpiredAds().catch(() => {});
     const where = await activeAdWhere();
     const light = { id: true, user_id: true, bumped_at: true, created_at: true } as const;
     const picked: bigint[] = [];
@@ -487,15 +530,30 @@ async function loadMostViewedAds(take: number) {
   return cards.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9)).slice(0, take);
 }
 
+/** إجمالي الإعلانات التي نُشرت منذ البداية — يشمل المؤرشف والمحذوف ولا ينقص أبداً.
+ *  أعلى رقم إعلان صدر هو العدّ (الأرقام تسلسلية ولا يُعاد استخدامها)، ويُحفظ كأعلى قيمة
+ *  مسجَّلة في الإعدادات حتى لا ينخفض العدد لو حُذف آخر إعلان. */
+export async function getAdsTotalEver(): Promise<number> {
+  const [{ getSettingNum, setSetting }, top] = await Promise.all([
+    import('./settings'),
+    prisma.ads.aggregate({ _max: { id: true } }).catch(() => null),
+  ]);
+  const stored = await getSettingNum('ads_total_ever', 0).catch(() => 0);
+  const current = toInt(top?._max.id ?? 0n);
+  if (current > stored) { await setSetting('ads_total_ever', String(current)).catch(() => {}); return current; }
+  return stored;
+}
+
 export async function getStats() {
   return cached('stats:home', 120, async () => {
-    const [users, ads, cats, views] = await Promise.all([
+    const [users, ads, cats, views, adsTotal] = await Promise.all([
       prisma.users.count(),
       activeAdWhere().then((where) => prisma.ads.count({ where })),
       prisma.categories.count({ where: { is_active: 'yes' } }),
       prisma.ads_views.count(),
+      getAdsTotalEver(),
     ]);
-    return { users, ads, cats, views };
+    return { users, ads, cats, views, adsTotal };
   });
 }
 

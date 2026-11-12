@@ -146,7 +146,10 @@ export async function restoreArchivedAdAction(formData: FormData) {
     const paid = await charge(session.uid, fee, 'ad_show', `إعادة إظهار إعلان مؤرشف #${toInt(adId)}`);
     if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
   }
-  await prisma.ads.update({ where: { id: adId }, data: { status: 1, data_archive: null, bumped_at: new Date() } }).catch(() => {});
+  // إعادة الإظهار = فترة نشر جديدة: مدة بقاء الإعلان في الباقة تُحسب من تاريخ النشر، فلو بقي
+  // التاريخ القديم لاختفى الإعلان وأُعيدت أرشفته فوراً بعد الدفع.
+  const republishedAt = new Date();
+  await prisma.ads.update({ where: { id: adId }, data: { status: 1, data_archive: null, bumped_at: republishedAt, created_at: republishedAt } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');

@@ -498,10 +498,10 @@ export async function getEmptyTexts(): Promise<typeof EMPTY_DEFAULTS> {
 /* Which stat cards show on the home page (CSV of keys; unset => all). */
 export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
 export const SETTING_HOME_STATS = 'home_stats';
-export const HOME_STAT_KEYS = ['ads', 'users', 'views'] as const;
+export const HOME_STAT_KEYS = ['ads', 'adsTotal', 'users', 'views'] as const;
 export type HomeStatKey = typeof HOME_STAT_KEYS[number];
 export const HOME_STAT_LABELS: Record<HomeStatKey, string> = {
-  ads: 'إعلان نشط', users: 'عضو مسجّل', views: 'مشاهدة',
+  ads: 'إعلان نشط', adsTotal: 'إجمالي الإعلانات المنشورة (يشمل المؤرشف والمحذوف)', users: 'عضو مسجّل', views: 'مشاهدة',
 };
 /** Set of enabled home-stat keys. Unset setting => all shown by default. */
 export async function getHomeStats(): Promise<Set<string>> {

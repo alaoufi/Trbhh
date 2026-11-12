@@ -76,8 +76,8 @@ jobs:
       - name: مخطط وبيانات مصطنعة (لا بيانات إنتاج)
         run: |
           pnpm prisma db push --skip-generate
+          # كلمة مرور عشوائية لحسابات مصطنعة في قاعدة مؤقتة تزول مع المشغّل — لا تُطبع.
           pw="Zx!$(openssl rand -base64 18 | tr -d '/+=')"
-          echo "::add-mask::$pw"
           echo "PREVIEW_LOGIN_PASSWORD=$pw" >> "$GITHUB_ENV"
           echo "AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
           PREVIEW_LOGIN_PASSWORD="$pw" node scripts/preview/seed.mjs

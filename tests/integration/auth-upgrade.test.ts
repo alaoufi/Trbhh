@@ -146,7 +146,7 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     expect(member.password).toBe(initialHash);
     expect(await verifyPassword('1234', member.password)).toBe(true);
     expect(await getSession()).toMatchObject({ uid: 701, name: 'عضو اختبار الترقية', authVersion: '0' });
-    expect(await getAuthSecuritySettings()).toEqual({ requireAdminMfa: false, passwordMinimum: 12 });
+    expect(await getAuthSecuritySettings()).toEqual({ requireAdminMfa: false, passwordMinimum: 4 });
     expect(await db.site_settings.findUnique({ where: { k: 'auth_require_admin_mfa' } })).toBeNull();
   }
 

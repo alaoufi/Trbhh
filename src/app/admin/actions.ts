@@ -143,6 +143,7 @@ export async function updatePromoPackageAction(formData: FormData) {
   if (id) await updatePromoPackage(id, readPromoPkgForm(formData));
   revalidatePath('/admin/revenue');
   revalidatePath('/promote');
+  if (id) redirect(`/admin/revenue?tab=${savedReturnTab(formData)}&saved=promo-${id}#promo-${id}`);
 }
 export async function deletePromoPackageAction(formData: FormData) {
   await requireAccess('promos', 'delete');
@@ -150,6 +151,12 @@ export async function deletePromoPackageAction(formData: FormData) {
   if (id) await deletePromoPackage(id);
   revalidatePath('/admin/revenue');
   revalidatePath('/promote');
+}
+
+/** تبويب العودة بعد حفظ باقة — قائمة بيضاء فقط. */
+function savedReturnTab(formData: FormData): string {
+  const tab = String(formData.get('returnTab') || '');
+  return tab === 'packages' || tab === 'promo-packages' || tab === 'pricing' ? tab : 'pricing';
 }
 
 function readPackageForm(formData: FormData) {
@@ -183,6 +190,8 @@ export async function updatePackageAction(formData: FormData) {
   if (id) await updatePackage(id, readPackageForm(formData));
   revalidatePath('/admin/revenue');
   revalidatePath('/packages');
+  // «تم الحفظ» يظهر فوق زر حفظ الباقة نفسها بعد العودة لنفس التبويب.
+  if (id) redirect(`/admin/revenue?tab=${savedReturnTab(formData)}&saved=pkg-${id}#pkg-${id}`);
 }
 
 export async function deletePackageAction(formData: FormData) {
@@ -939,6 +948,9 @@ export async function saveRevenueAction(formData: FormData) {
   await logAdmin(session.uid, 'تعديل التسعيرات والعروض');
   revalidatePath('/admin/revenue');
   revalidatePath('/store');
+  // زر الحفظ تحت كل قسم يرسل اسم قسمه؛ نعود إليه ونُظهر «تم الحفظ» فوق زرّه.
+  const section = String(formData.get('savedSection') || '');
+  if (/^[a-z][a-z-]{1,30}$/.test(section)) redirect(`/admin/revenue?tab=pricing&saved=${section}#${section}`);
   redirect('/admin/revenue?saved=1');
 }
 

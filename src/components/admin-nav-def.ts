@@ -111,5 +111,24 @@ export const ADMIN_GROUPS: AdminNavGroup[] = DEPARTMENTS.map((department,index)=
  key:department.id,title:department.name,icon:department.id==='technical'?Settings:department.id==='finance'?Coins:department.id==='audit'?Shield:Store,color:colors[index],
  items:items.filter(item=>MODULES.find(module=>module.key===pagePermission(item.href)?.split(':')[0])?.departmentId===department.id),
 }));
+/**
+ * تبويب رئيسي «الباقات»: يجمع كل أنواع الباقات والتسعير في مكان واحد بدل توزيعها بين
+ * الأقسام. تجميع للعرض فقط — صلاحية كل رابط ما زالت تُحسب من وحدته في كتالوج الصلاحيات.
+ */
+const PACKAGE_ITEMS: AdminNavItem[] = [
+ {href:'/admin/revenue?tab=packages',label:'باقات عدد الإعلانات (الأعضاء)',icon:Crown,perm:'packages',description:'حدّ النشر اليومي ومدة بقاء الإعلان والتميّز لكل باقة',keywords:['باقة','عدد الإعلانات','حد النشر','مدة بقاء']},
+ {href:'/admin/revenue?tab=promo-packages',label:'باقات الإعلانات الترويجية',icon:MonitorPlay,perm:'promos',description:'مدد وأسعار البانرات الترويجية',keywords:['ترويج','بانر','باقة ترويج']},
+ {href:'/admin/revenue?tab=pricing#store-sub',label:'اشتراك المتاجر',icon:Store,perm:'users',description:'أسعار اشتراك المتجر والتجربة والمهلة',keywords:['اشتراك متجر','تجربة']},
+ {href:'/admin/revenue?tab=pricing#store-show',label:'ظهور المتجر وإعلاناته في تربح',icon:Store,perm:'users',description:'باقات عرض المتجر ومنتجاته في القوائم العامة',keywords:['ظهور المتجر','عرض المتجر']},
+ {href:'/admin/revenue?tab=pricing#platform-ads',label:'رسوم ظهور الإعلانات',icon:AlertTriangle,perm:'users',description:'تفعيلها يُخفي كل إعلان بلا ظهور ساري',keywords:['رسوم ظهور','اختفاء الإعلانات','ظهور مدفوع']},
+ {href:'/admin/revenue?tab=pricing#ad-extras',label:'عاجل وتحديث الإعلان',icon:Sparkles,perm:'users',description:'شارة عاجل ورفع الإعلان للأعلى',keywords:['عاجل','تحديث','رفع']},
+ {href:'/admin/revenue?tab=pricing#services-matrix',label:'تمييز ومبوّب وتكرار',icon:Megaphone,perm:'users',description:'أسعار التمييز والمبوّب ورفع حظر التكرار',keywords:['تمييز','مبوب','تكرار']},
+ {href:'/admin/revenue?tab=pricing#verify',label:'باقات التوثيق',icon:ShieldCheck,perm:'users',description:'توثيق المتجر المدفوع وتجديد توثيق الحساب',keywords:['توثيق','شارة موثق']},
+ {href:'/admin/revenue?tab=pricing#plus-lead',label:'متجر Plus وعمولة العميل',icon:Crown,perm:'users',description:'باقة Plus الشاملة وعمولة توصيل العميل',keywords:['plus','بلس','عمولة']},
+ {href:'/admin/revenue?tab=pricing',label:'كل التسعير والخدمات',icon:Coins,perm:'users',description:'الصفحة الكاملة لكل الأسعار والمكافآت',keywords:['سعر','تسعير','رسوم خدمة','باقة']},
+];
+const PACKAGE_PATHS = new Set(['/admin/revenue?tab=packages','/admin/revenue?tab=promo-packages','/admin/revenue?tab=pricing']);
+for (const group of ADMIN_GROUPS) group.items = group.items.filter(item => !PACKAGE_PATHS.has(item.href));
+ADMIN_GROUPS.splice(1, 0, { key: 'packages', title: 'الباقات', icon: Crown, color: '#B45309', items: PACKAGE_ITEMS });
 /** Registered navigation; legacy perm metadata never authorizes access. */
 export const ADMIN_NAV: AdminNavItem[] = ADMIN_GROUPS.flatMap(group => group.items);

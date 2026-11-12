@@ -76,8 +76,8 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
         ))}
       </div>
 
-      {active === 'packages' && <PackagesSection />}
-      {active === 'promo-packages' && <PromoPackagesSection />}
+      {active === 'packages' && <PackagesSection saved={saved} tab="packages" />}
+      {active === 'promo-packages' && <PromoPackagesSection saved={saved} tab="promo-packages" />}
       {active === 'overview' && <OverviewTab />}
       {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
       {active === 'wallets' && <MemberWalletsTab userId={userId} query={q || ''} notice={wallet || ''} />}
@@ -85,7 +85,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'accounts' && <AccountsTab />}
       {active === 'campaigns' && <CampaignsTab camp={camp} />}
       {active === 'payments' && <PaymentsTab cat={cat} page={Math.max(1, parseInt(ppage || '1') || 1)} />}
-      {active === 'pricing' && <PricingTab canPackages={perms.has('packages:view')} canPromos={perms.has('promos:view')} />}
+      {active === 'pricing' && <PricingTab canPackages={perms.has('packages:view')} canPromos={perms.has('promos:view')} saved={saved} />}
     </div>
   );
 }
@@ -592,7 +592,7 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
   );
 }
 
-async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; canPromos: boolean }) {
+async function PricingTab({ canPackages, canPromos, saved }: { canPackages: boolean; canPromos: boolean; saved?: string }) {
   // أثر خيار «رسوم ظهور الإعلانات» على الإعلانات الحالية — يُعرض تنبيهاً بجوار الخيار.
   const lifecycleNow = new Date();
   const [lifecycleOpen, lifecyclePaid] = await Promise.all([
@@ -626,7 +626,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
   return (
     <>
 
-    <p className="text-xs text-muted-foreground">كل تسعير في تربح — مهما كان نوعه — مجمَّع هنا في تبويب واحد بأقسامه؛ وأي تسعير جديد يُضاف مستقبلاً يُلحَق بنفس التبويب.</p>
+    <p className="text-xs text-muted-foreground">كل تسعير في تربح مجمَّع هنا بأقسامه. تحت كل قسم: شرح ⓘ لأثره على الموقع، ثم زر «حفظ». أي زر حفظ يحفظ كل ما عدّلته في هذه الصفحة، وتظهر «تم الحفظ» فوق الزر الذي ضغطته.</p>
     {/* قفزة سريعة بين الأقسام — الصفحة طويلة لأنها تجمع كل تسعير في تربح */}
     <div className="flex flex-wrap gap-1.5 rounded-xl border border-primary/15 bg-primary/5 p-2 text-xs font-bold">
       {canPackages && <a href="#packages" className="rounded-lg px-2 py-1 text-primary hover:bg-white">باقات عدد الإعلانات</a>}
@@ -637,7 +637,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
       {canPromos && <a href="#promo-packages" className="rounded-lg px-2 py-1 text-primary hover:bg-white">باقات الإعلانات الترويجية</a>}
     </div>
 
-    {canPackages && <PackagesSection />}
+    {canPackages && <PackagesSection saved={saved} tab="pricing" />}
 
     <AccessBoundary module={'pricing'} action={'manage_settings'}><form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
       <div id="store-sub" className="flex items-center gap-2 font-bold text-primary scroll-mt-20"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
@@ -665,8 +665,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
+      <SectionSave id="store-sub" saved={saved}>عند التفعيل لا يظهر أي متجر للزوار إلا باشتراك ساري (أو ضمن أيام التجربة). بعد انتهاء الاشتراك ومهلة السماح يُخفى المتجر ومنتجاته من الموقع ويبقى محفوظاً لصاحبه. الأسعار تُخصم من رصيد التاجر. تعطيل الخيار يجعل كل المتاجر المعتمدة ظاهرة بلا اشتراك.</SectionSave>
+
       {/* الظهور المدفوع في تربح — عرض المتجر بالمدد + باقات عرض الإعلان (سعر ومدة لكل باقة) */}
-      <div className="rounded-xl border border-sky-300 bg-sky-50/60 p-3">
+      <div id="store-show" className="scroll-mt-20 rounded-xl border border-sky-300 bg-sky-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-sky-800">🏪 الظهور في تربح (للمتاجر) — اكتب 0 في السعر لتعطيل الخيار</div>
         <p className="mb-2 text-[11px] text-muted-foreground">يشتريها التاجر من لوحة متجره وتُخصم من رصيده. عرض المتجر يُظهر المتجر ومنتجاته بقسم المتاجر في الرئيسية، وباقة الإعلان تُظهر إعلاناً محدداً في كل قوائم تربح للمدة المحددة.</p>
         <div className="mb-1 text-xs font-bold">عرض المتجر في تربح (السعر لكل مدة)</div>
@@ -687,7 +689,9 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
-      <div className="rounded-xl border-2 border-indigo-300 bg-indigo-50/70 p-3">
+      <SectionSave id="store-show" saved={saved}>باقات يشتريها التاجر ليظهر متجره في قسم المتاجر بالرئيسية، أو ليظهر إعلان محدد من متجره في قوائم تربح العامة طوال المدة. بدونها تبقى منتجات المتجر داخل صفحة المتجر فقط. السعر 0 يُخفي الخيار عن التاجر.</SectionSave>
+
+      <div id="platform-ads" className="scroll-mt-20 rounded-xl border-2 border-indigo-300 bg-indigo-50/70 p-3">
         <div className="mb-1 text-sm font-extrabold text-indigo-900">نشر الإعلانات في تربح</div>
         <p className="mb-2 text-[11px] leading-5 text-muted-foreground">عند التفعيل لا يظهر في الرئيسية والبحث إلا الإعلان الذي له ظهور ساري (مجاني ضمن المدة أدناه أو مدفوع من المحفظة).</p>
         <p className={`mb-3 rounded-lg border-2 p-2 text-xs font-extrabold leading-5 ${platformAds.enabled ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
@@ -704,6 +708,8 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         <div className="mt-3 space-y-2">{platformAds.packages.map((p) => <div key={p.key} className="grid grid-cols-3 items-center gap-2 rounded-lg bg-white p-2 text-xs"><label className="flex items-center gap-1 font-bold"><input name={`platformAdPkgActive_${p.key}`} type="checkbox" defaultChecked={p.active} /> {p.label}</label><span>{p.days} يوم · {p.price} ر.س</span><select name={`platformAdPkgAudience_${p.key}`} defaultValue={p.audience} className="rounded border p-1"><option value="both">عضو ومتجر</option><option value="member">عضو فقط</option><option value="store">متجر فقط</option></select></div>)}</div>
       </div>
 
+      <SectionSave id="platform-ads" saved={saved}>أخطر خيار في الصفحة: عند تفعيله لا يظهر في الرئيسية والبحث إلا الإعلان الذي له ظهور ساري (مجاني ضمن المدة المحددة أو مدفوع). يسري فوراً على الإعلانات الحالية أيضاً، فتختفي كل الإعلانات القديمة التي لا ظهور ساري لها. تعطيله يعيد العرض مفتوحاً لكل الإعلانات النشطة. راجع أرقام التنبيه أعلاه قبل الحفظ.</SectionSave>
+
       {/* خدمات الإعلان الإضافية: عاجل (باقتان) + تحديث (Bump) */}
       <div id="ad-extras" className="scroll-mt-20 rounded-xl border border-red-300 bg-red-50/50 p-3">
         <div className="mb-1 text-xs font-bold text-red-700">🔥 شارة «عاجل» — باقتان (سعر 0 = تعطيل الباقة) — و«تحديث الإعلان»</div>
@@ -716,6 +722,8 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         <p className="mt-1 text-[11px] text-muted-foreground">يختار المعلن باقة 24 أو 48 ساعة عند النشر أو من صفحة إعلانه. «تحديث» يرفع الإعلان لأعلى القوائم — مجاني كل عدد الأيام المحدد، وقبله يُخصم السعر من الرصيد (تفعيل زر التحديث نفسه من الإعدادات ← الميزات).</p>
       </div>
 
+      <SectionSave id="ad-extras" saved={saved}>«عاجل» شارة مدفوعة تُبرز الإعلان في القوائم للمدة المشتراة. «تحديث» يرفع الإعلان لأعلى القوائم: مجاني مرة كل عدد الأيام المحدد، وقبل ذلك بالسعر المحدد من رصيد العضو. السعر 0 يعطّل الباقة.</SectionSave>
+
       {/* رسوم إعادة إظهار الإعلان المؤرشف — كانت مبعثرة داخل الإعدادات العامة */}
       <div id="restore-fee" className="scroll-mt-20 rounded-xl border border-orange-300 bg-orange-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-orange-800">🗄️ رسوم إعادة إظهار الإعلان المؤرشف (0 = مجانية)</div>
@@ -723,8 +731,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         <label className="block max-w-[220px] space-y-1"><span className="text-xs font-bold">الرسوم (ر.س)</span><input name="adRestoreFee" type="number" min={0} defaultValue={restoreFee} className={num} /></label>
       </div>
 
+      <SectionSave id="restore-fee" saved={saved}>المبلغ الذي يُخصم من رصيد العضو حين يعيد إعلاناً مؤرشفاً للظهور. 0 يجعل الاستعادة مجانية. لا يؤثر على الإعلانات الظاهرة حالياً.</SectionSave>
+
       {/* مكافآت الشحن الثابتة — حملات الشحن المجدولة لها جدول مستقل أعلى هذا النموذج */}
-      <div className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
+      <div id="topup-bonus" className="scroll-mt-20 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-emerald-800">🎁 مكافآت الشحن الثابتة (اكتب 0 للتعطيل)</div>
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
@@ -732,8 +742,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
+      <SectionSave id="topup-bonus" saved={saved}>رصيد إضافي يُمنح تلقائياً للعضو: مرة عند أول شحن، ومرة عند توثيق حسابه. يزيد أرصدة الأعضاء من حساب المنصة. 0 يعطّل المكافأة.</SectionSave>
+
       {/* ⭐ التوثيق المدفوع: ثلاث باقات (سعر + مدة) — يطلبها صاحب المتجر وتُخصم عند موافقة إدارة المتاجر */}
-      <div className="rounded-xl border border-sky-300 bg-sky-50/60 p-3">
+      <div id="verify" className="scroll-mt-20 rounded-xl border border-sky-300 bg-sky-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-sky-800">⭐ توثيق المتجر المدفوع — ثلاث باقات (رسوم الباقة 0 = لا تظهر؛ الكل 0 = الخدمة معطلة)</div>
         <p className="mb-2 text-[11px] text-muted-foreground">يختار صاحب المتجر باقة ويتعهد بالالتزام بلوائح الموقع، وتُخصم الرسوم من رصيده عند موافقة إدارة المتاجر فقط — وأي إلغاء يعيد لرصيده قيمة الأيام غير المستخدمة تلقائياً.</p>
         <div className="grid grid-cols-2 gap-2">
@@ -756,8 +768,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
+      <SectionSave id="verify" saved={saved}>باقات شارة التوثيق: يطلبها صاحب المتجر وتُخصم رسومها عند موافقة الإدارة، وتظهر شارة «موثّق» على المتجر وإعلاناته حتى نهاية المدة. توثيق الحساب العادي: المدة 0 تجعله دائماً، وأي مدة أخرى تتطلب تجديداً يُخصم تلقائياً.</SectionSave>
+
       {/* باقة متجر Plus + عمولة توصيل عميل */}
-      <div className="rounded-xl border border-amber-400 bg-amber-50/60 p-3">
+      <div id="plus-lead" className="scroll-mt-20 rounded-xl border border-amber-400 bg-amber-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-amber-800">⭐ باقة متجر Plus + عمولة توصيل عميل</div>
         <p className="mb-2 text-[11px] text-muted-foreground">باقة Plus صفقة واحدة للتاجر: اشتراك المتجر + عرضه في رئيسية تربح + شارة ⭐ طوال المدة. العمولة رسم صغير يُخصم من رصيد المتجر عن كل عميل جديد يضغط واتساب/اتصال (بسقف يومي) — ولا تمنع التواصل أبداً حتى مع رصيد غير كافٍ.</p>
         <label className="flex items-center gap-2 text-sm font-bold">
@@ -779,8 +793,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
+      <SectionSave id="plus-lead" saved={saved}>Plus باقة شاملة للتاجر: اشتراك المتجر + ظهوره في الرئيسية + شارة ⭐. عمولة العميل: مبلغ يُخصم من رصيد المتجر عن كل عميل جديد يتواصل معه عبر تربح، حتى السقف اليومي.</SectionSave>
+
       {/* المزادات: رسم الفتح + أقصى مدة (التفعيل من الإعدادات ← الميزات) */}
-      <div className="rounded-xl border border-violet-300 bg-violet-50/60 p-3">
+      <div id="auction" className="scroll-mt-20 rounded-xl border border-violet-300 bg-violet-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-violet-800">🔨 المزادات (التفعيل من الإعدادات ← الميزات التفاعلية)</div>
         <p className="mb-2 text-[11px] text-muted-foreground">رسم يُخصم من رصيد العضو عند فتح مزاد على إعلانه (0 = فتح مجاني). المزايدات نفسها مجانية، والصفقة تُتم بين الفائز والبائع مباشرة.</p>
         <div className="grid grid-cols-2 gap-2">
@@ -789,8 +805,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
+      <SectionSave id="auction" saved={saved}>رسم يُخصم من رصيد العضو عند فتح مزاد على إعلانه، وأقصى مدة مسموحة للمزاد. المزايدة نفسها مجانية. تشغيل ميزة المزادات نفسها من الإعدادات.</SectionSave>
+
       {/* النمو والمكافآت: رصيد ترحيبي + دعوة صديق + نظام النقاط */}
-      <div className="rounded-xl border border-lime-400 bg-lime-50/60 p-3">
+      <div id="growth" className="scroll-mt-20 rounded-xl border border-lime-400 bg-lime-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-lime-800">🌱 النمو والمكافآت (اكتب 0 للتعطيل)</div>
         <p className="mb-2 text-[11px] text-muted-foreground">رصيد ترحيبي يُضاف تلقائياً لكل عضو جديد فور تسجيله. دعوة صديق: يشارك العضو رابطه، وعند أول إعلان أو توثيق للمدعو يحصل الطرفان على المكافأة. النقاط تُمنح على الزيارة اليومية وأول إعلان والتوثيق، ويحوّلها العضو لرصيد بالمعدّل المحدد.</p>
         <div className="grid grid-cols-2 gap-2">
@@ -813,6 +831,8 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
           <label className="space-y-1"><span className="text-xs font-bold">أدنى نقاط للتحويل</span><input name="ptsMinConvert" type="number" min={1} defaultValue={ptsCfg.minConvert} className={num} /></label>
         </div>
       </div>
+
+      <SectionSave id="growth" saved={saved}>مكافآت تُضاف لأرصدة الأعضاء من حساب المنصة: رصيد ترحيبي لكل مسجّل جديد، ومكافأة للطرفين عند دعوة صديق، ونقاط تتحوّل إلى رصيد. تعطيلها يوقف منح مكافآت جديدة ولا يسحب ما مُنح سابقاً.</SectionSave>
 
       <div id="services-matrix" className="flex scroll-mt-20 items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الخدمات (السعر لكل مدّة)</div>
       <p className="text-[11px] text-muted-foreground">المدّة اختيار فقط بلا سعر مستقل؛ كل خدمة لها سعر لكل مدّة. اترك 0 لتعطيل الخدمة/المدّة.</p>
@@ -839,10 +859,10 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
           </tbody>
         </table>
       </div>
-      <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
+      <SectionSave id="services-matrix" saved={saved}>أسعار الخدمات المدفوعة لكل مدة: «تمييز» يضع الإعلان ضمن المميّزة أعلى القوائم، «مبوّب» ينشر إعلاناً مبوّباً، و«تكرار» يسمح بنشر إعلانات متشابهة دون حظر التكرار. السعر 0 يُخفي الخدمة أو المدة عن الأعضاء.</SectionSave>
     </form></AccessBoundary>
 
-    {canPromos && <PromoPackagesSection />}
+    {canPromos && <PromoPackagesSection saved={saved} tab="pricing" />}
     </>
   );
 }
@@ -850,6 +870,27 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
 /* ===== باقات عدد الإعلانات (تُدار سابقاً في /admin/packages المستقلة) ===== */
 const pkgInputCls = 'h-9 w-full rounded-lg border border-primary/30 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 const pkgLabelCls = 'text-[11px] font-medium text-muted-foreground';
+
+/** (i) شرح قابل للطيّ: أثر الباقة/القسم على الموقع — بلا JavaScript. */
+function InfoTip({ children }: { children: React.ReactNode }) {
+  return (
+    <details className="rounded-lg border border-sky-200 bg-sky-50/70 px-2 py-1 text-[11px] leading-5 text-slate-700">
+      <summary className="cursor-pointer list-none font-bold text-sky-800 [&::-webkit-details-marker]:hidden">ⓘ أثرها على الموقع — اضغط للشرح</summary>
+      <div className="pt-1">{children}</div>
+    </details>
+  );
+}
+
+/** تذييل كل قسم تسعير: شرح الأثر، ثم «تم الحفظ» فوق الزر، ثم زر الحفظ تحت القسم مباشرة. */
+function SectionSave({ id, saved, children }: { id: string; saved?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2 border-b-2 border-dashed border-primary/20 pb-4">
+      <InfoTip>{children}</InfoTip>
+      {saved === id && <p role="status" className="flex items-center gap-1.5 rounded-lg border-2 border-green-300 bg-green-50 px-3 py-1.5 text-sm font-extrabold text-green-800"><Check className="h-4 w-4" /> تم الحفظ</p>}
+      <button type="submit" name="savedSection" value={id} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ</button>
+    </div>
+  );
+}
 
 function PkgField({ label, name, defaultValue, type = 'number', min = 0, placeholder }: { label: string; name: string; defaultValue?: string | number; type?: string; min?: number; placeholder?: string }) {
   return (
@@ -896,7 +937,7 @@ function PackageFields({ p }: { p?: Package }) {
   );
 }
 
-async function PackagesSection() {
+async function PackagesSection({ saved, tab }: { saved?: string; tab: string }) {
   const packages = await getPackages();
   return (
     <div id="packages" className="card-3d scroll-mt-20 space-y-4 rounded-2xl p-4">
@@ -914,6 +955,7 @@ async function PackagesSection() {
         {packages.map((p) => (
           <Collapse
             key={p.id}
+            open={saved === `pkg-${p.id}`}
             className="bg-white"
             summary={<>
               {p.tier === 'gold' && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
@@ -926,7 +968,13 @@ async function PackagesSection() {
           >
             <AccessBoundary module={'packages'} action={'edit'}><form action={updatePackageAction} className="space-y-2">
               <input type="hidden" name="id" value={p.id} />
+              <input type="hidden" name="returnTab" value={tab} />
+              <span id={`pkg-${p.id}`} className="block scroll-mt-24" />
               <PackageFields p={p} />
+              <InfoTip>
+                <b>إعلانات/اليوم</b>: أقصى ما ينشره العضو يومياً (0 بلا حد). <b>الفارق بالساعات</b>: انتظار إلزامي بين إعلان وآخر. <b>إعلانات التميّز وأيامها</b>: عدد الإعلانات التي تظهر أعلى القوائم ومدة بقائها هناك. <b>مدة بقاء الإعلان</b>: بعدها يُخفى إعلان العضو من الرئيسية والبحث (0 = دائم) — رقم صغير هنا يُخفي الإعلانات القديمة. <b>مدة الاشتراك</b>: صلاحية الباقة بعد الشراء. <b>الافتراضية</b>: تُطبَّق على كل عضو بلا اشتراك، فأي تغيير فيها يمس أغلب الأعضاء فوراً. <b>مُفعّلة</b>: إلغاؤها يُخفي الباقة من صفحة الباقات.
+              </InfoTip>
+              {saved === `pkg-${p.id}` && <p role="status" className="flex items-center gap-1.5 rounded-lg border-2 border-green-300 bg-green-50 px-3 py-1.5 text-sm font-extrabold text-green-800"><Check className="h-4 w-4" /> تم الحفظ</p>}
               <div className="flex items-center gap-2">
                 <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
 
@@ -954,7 +1002,7 @@ function PromoFields({ p }: { p?: PromoPackage }) {
   );
 }
 
-async function PromoPackagesSection() {
+async function PromoPackagesSection({ saved, tab }: { saved?: string; tab: string }) {
   const packages = await getPromoPackages();
   return (
     <div id="promo-packages" className="card-3d scroll-mt-20 space-y-4 rounded-2xl p-4">
@@ -973,6 +1021,7 @@ async function PromoPackagesSection() {
         {packages.map((p) => (
           <Collapse
             key={p.id}
+            open={saved === `promo-${p.id}`}
             className="bg-white"
             summary={<>
               <span className="truncate">{p.name} — {p.days} يوم — {p.price === 0 ? 'مجاني' : `${p.price} ﷼`}</span>
@@ -983,6 +1032,10 @@ async function PromoPackagesSection() {
               <input type="hidden" name="id" value={p.id} />
               <PromoFields p={p} />
               <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked={p.active} /> مُفعّلة</label>
+              <input type="hidden" name="returnTab" value={tab} />
+              <span id={`promo-${p.id}`} className="block scroll-mt-24" />
+              <InfoTip>مدة وسعر يختارهما المعلن عند طلب إعلان ترويجي (بانر). بعد موافقة الإدارة يظهر البانر في مواضع الترويج بالموقع طوال المدة ثم يتوقف تلقائياً. السعر يُخصم من رصيد المعلن. إلغاء «مُفعّلة» يُخفي المدة عن المعلنين ولا يوقف الإعلانات الجارية.</InfoTip>
+              {saved === `promo-${p.id}` && <p role="status" className="flex items-center gap-1.5 rounded-lg border-2 border-green-300 bg-green-50 px-3 py-1.5 text-sm font-extrabold text-green-800"><Check className="h-4 w-4" /> تم الحفظ</p>}
               <div className="flex gap-2">
                 <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
 

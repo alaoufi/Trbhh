@@ -8,8 +8,10 @@ vi.mock('@/lib/auth',()=>({getSession:state.session}));
 vi.mock('@/lib/access-control/guards',()=>({hasAccess:state.has,readActorAccess:state.access}));
 import {AccessBoundary, AccessPage} from '@/components/access-boundary';
 describe('registered admin navigation and presentation boundaries',()=>{
- it('offers exactly ten departments and no unregistered navigation destinations',()=>{
-  expect(ADMIN_GROUPS.map(group=>group.key)).toEqual(DEPARTMENTS.map(department=>department.id));
+ it('offers the ten departments plus the packages hub and no unregistered navigation destinations',()=>{
+  // تبويب «الباقات» تجميع للعرض فقط بعد الإدارة العليا؛ بقية المجموعات هي الأقسام العشرة بترتيبها.
+  const departmentIds=DEPARTMENTS.map(department=>department.id) as string[];
+  expect(ADMIN_GROUPS.map(group=>group.key)).toEqual([departmentIds[0],'packages',...departmentIds.slice(1)]);
   expect(ADMIN_GROUPS.every(group=>group.items.length>0)).toBe(true);
   expect(ADMIN_NAV.every(item=>PERMISSIONS.some(permission=>permission.key===pagePermission(item.href)))).toBe(true);
  });

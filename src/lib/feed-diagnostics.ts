@@ -129,20 +129,3 @@ export async function getFeedDiagnostics(): Promise<FeedDiagnostics> {
 
   return { counts, sources, sample, lifetime, verdict, generatedAt: now.toISOString() };
 }
-
-/**
- * إصلاح بضغطة: يجعل مدة بقاء الإعلان للباقة الافتراضية بلا حد (ad_days=0) فلا يُخفى أي
- * إعلان قديم، ثم يمسح ذاكرة القوائم ليظهر الأثر فوراً. قراءة-فقط لبقية الإعدادات.
- * يُرجع عدد الصفوف المتأثرة. آمن ومتكرّر (idempotent).
- */
-export async function clearDefaultPackageAdLifetime(): Promise<{ ok: boolean; message: string }> {
-  try {
-    const def = await getDefaultPackage().catch(() => null);
-    await prisma.$executeRawUnsafe(`UPDATE packages SET ad_days = 0 WHERE is_default = 1`);
-    // احتياط: إن لم تُعلَّم أي باقة كافتراضية، صفّر الأقل سعراً (المجانية) أيضاً لا شيء — نكتفي بالافتراضية.
-    await import('./data').then((m) => m.bustAdCaches()).catch(() => {});
-    return { ok: true, message: `تم: مدة بقاء الإعلان للباقة الافتراضية «${def?.name ?? ''}» صارت بلا حد (0)، ومُسِحت الذاكرة المؤقتة. حدّث الرئيسية.` };
-  } catch (e) {
-    return { ok: false, message: `تعذّر الإصلاح: ${e instanceof Error ? e.message : String(e)}` };
-  }
-}

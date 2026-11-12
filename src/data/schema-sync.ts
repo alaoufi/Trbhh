@@ -896,6 +896,20 @@ const STATEMENTS: string[] = [
     INDEX wallet_withdrawals_user_status (user_id, status),
     INDEX wallet_withdrawals_status_created (status, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  /* سجل إصلاحات «طبيب المنصة» مع نقطة تراجع: كل إصلاح يُخزَّن قبل/بعد (JSON) ليُسترجَع. */
+  `CREATE TABLE IF NOT EXISTS admin_fix_log (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    fix_key VARCHAR(64) NOT NULL,
+    title VARCHAR(200) NOT NULL DEFAULT '',
+    before_json MEDIUMTEXT NULL,
+    after_json MEDIUMTEXT NULL,
+    affected INT NOT NULL DEFAULT 0,
+    reversible TINYINT NOT NULL DEFAULT 0,
+    actor BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    undone_at DATETIME NULL,
+    INDEX admin_fix_log_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
 let syncPromise: Promise<void> | null = null;

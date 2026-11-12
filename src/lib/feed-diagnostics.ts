@@ -114,7 +114,7 @@ export async function getFeedDiagnostics(): Promise<FeedDiagnostics> {
   if (anyError) {
     verdict = { ok: false, title: 'استثناء في أحد مصادر التغذية', detail: `فشل «${anyError.label}»: ${anyError.error}`, hint: 'الخطأ أعلاه يكشف الدالة/العمود الذي يفشل — يُصلَح في الكود مباشرة.' };
   } else if (defAdDays > 0 && (droppedByLifetime ?? 0) >= 5 && (homeLatest ?? 0) < 5) {
-    verdict = { ok: false, title: '🎯 السبب: سقف «مدة بقاء الإعلان» يُخفي الإعلانات القديمة المستوردة', detail: `المؤهّل=${eligible}، لكن ${droppedByLifetime} منها أقدم من ${defAdDays} يوماً (مدة الباقة الافتراضية «${def?.name ?? ''}») فيُخفيها toCards، ويبقى ${homeLatest} فقط.`, hint: 'الحل: اضبط مدة بقاء الإعلان للباقة الافتراضية = 0 (بلا حد) — بالزر أدناه، أو من: التحكم ← الباقات ← الباقة الافتراضية ← مدة بقاء الإعلان = 0.' };
+    verdict = { ok: false, title: '🎯 السبب: سقف «مدة بقاء الإعلان» يُخفي الإعلانات القديمة المستوردة', detail: `المؤهّل=${eligible}، لكن ${droppedByLifetime} منها أقدم من ${defAdDays} يوماً (مدة الباقة الافتراضية «${def?.name ?? ''}») فيُخفيها toCards، ويبقى ${homeLatest} فقط.`, hint: 'هذا سلوك الباقات المقصود (مدة بقاء الإعلان). تغييره قرار إداري من: كل التسعير ← باقات الإعلانات — لا يُعدَّل من هنا.' };
   } else if ((eligible ?? 0) >= 5 && (homeLatest ?? 0) < 5) {
     verdict = { ok: false, title: 'الإعلانات مؤهّلة في القاعدة لكنها تُحذف أثناء التحويل لبطاقات', detail: `المؤهّل=${eligible} لكن getHomeLatestAds أرجع ${homeLatest} فقط.`, hint: 'السبب في toCards: إمّا بائعون محظورون (banned)، أو سقف «مدة بقاء الإعلان» (adDays) يُسقط القديم. راجع getUsersAdMeta و loadBanned.' };
   } else if ((eligible ?? 0) < 5 && (bothOn ?? 0) >= 5) {

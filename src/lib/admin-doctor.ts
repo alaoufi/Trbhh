@@ -58,25 +58,6 @@ const FIXES: Record<string, FixDef> = {
     },
   },
 
-  // تصفير مدة بقاء الإعلان للباقة الافتراضية (خيار إضافي — العرض لم يعد يتأثر بها بعد
-  // إصلاح الكود، لكنه يحافظ على نظافة البيانات). قيمة واحدة ⇒ تراجع سهل.
-  default_pkg_adlifetime: {
-    key: 'default_pkg_adlifetime',
-    title: 'جعل مدة بقاء الإعلان للباقة الافتراضية بلا حدّ (0)',
-    run: async () => {
-      const rows = await prisma.$queryRawUnsafe<{ id: bigint; ad_days: number; name: string }[]>(`SELECT id, ad_days, name FROM packages WHERE is_default = 1`).catch(() => []);
-      const before = rows.map((r) => ({ id: Number(r.id), ad_days: Number(r.ad_days) }));
-      await prisma.$executeRawUnsafe(`UPDATE packages SET ad_days = 0 WHERE is_default = 1`).catch(() => {});
-      await bustAdCaches();
-      return { affected: before.length, before: { rows: before }, after: { ad_days: 0 }, message: `ضُبطت ${before.length} باقة افتراضية إلى بلا حدّ.`, reversible: before.some((r) => r.ad_days > 0) };
-    },
-    undo: async (before) => {
-      const rows = (before as { rows?: { id: number; ad_days: number }[] })?.rows ?? [];
-      for (const r of rows) await prisma.$executeRawUnsafe(`UPDATE packages SET ad_days = ? WHERE id = ?`, r.ad_days, r.id).catch(() => {});
-      await bustAdCaches();
-      return { affected: rows.length, message: `استُعيدت مدة بقاء الإعلان للباقة الافتراضية (${rows.map((r) => r.ad_days).join(', ')} يوم).` };
-    },
-  },
 };
 
 export function fixTitle(key: string): string { return FIXES[key]?.title ?? key; }
@@ -95,7 +76,7 @@ export async function runDoctorChecks(): Promise<{ checks: DoctorCheck[]; feed: 
     title: 'تطابق عرض الرئيسية مع القاعدة',
     severity: feed.verdict.ok ? 'ok' : (eligible >= 5 && (homeLatest ?? 0) < 5 ? 'crit' : 'warn'),
     detail: `${feed.verdict.title} — ${feed.verdict.detail}`,
-    fixKey: feed.verdict.ok ? undefined : (feed.lifetime.adDays > 0 ? 'default_pkg_adlifetime' : 'cache_clear'),
+    fixKey: feed.verdict.ok ? undefined : 'cache_clear',
   });
 
   // 2) أعمدة store_only الفارغة

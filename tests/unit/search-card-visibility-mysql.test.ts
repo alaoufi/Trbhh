@@ -77,11 +77,13 @@ describe.skipIf(!enabled)('real MySQL search visibility', () => {
   it('retains banned-seller exclusion with unlimited defaults', async () => {
     expect(await query({ bannedIds: [2n] })).toEqual([]);
   });
-  // قرار منتج ثابت: العرض/البحث غير محدود بمدة الباقة — لا قيد عمر على الظهور.
-  it('does not restrict display by package age: an old ad still shows regardless of default or subscription adDays', async () => {
-    expect(await query({ defaultDays: 7 })).toEqual([1n]);
-    expect(await query({ defaultDays: 1 })).toEqual([1n]);
-    expect(await query({ plans: [{ id: 1, adDays: 1 }], subscriptions: [{ userId: 2, packageId: 1 }] })).toEqual([1n]);
+  it('enforces finite default age and includes its exact boundary', async () => {
+    expect(await query({ defaultDays: 7 })).toEqual([]);
+    expect(await query({ defaultDays: 18 })).toEqual([1n]);
+  });
+  it('retains finite subscription limits under unlimited defaults', async () => {
+    expect(await query({ plans: [{ id: 1, adDays: 7 }], subscriptions: [{ userId: 2, packageId: 1 }] })).toEqual([]);
+    expect(await query({ defaultDays: 7, plans: [{ id: 1, adDays: 0 }], subscriptions: [{ userId: 2, packageId: 1 }] })).toEqual([1n]);
   });
   it.each([{ status: 0 }, { state: 'inactive' as const }, { store_only: 1 }])('preserves hidden platform filters: %j', async (changes) => {
     expect(await query({ changes })).toEqual([]);

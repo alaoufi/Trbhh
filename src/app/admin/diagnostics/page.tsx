@@ -47,8 +47,8 @@ export default async function DoctorPage({ searchParams }: { searchParams?: Prom
       </div>
       <p className="text-sm font-bold text-muted-foreground">
         فحص آلي لصحّة عرض الإعلانات، وإصلاحات ذكية بضغطة. كل إصلاح يغيّر بيانات يأخذ
-        <b className="text-primary"> نقطة تراجع</b> فيمكن استرجاعه. العرض العام في تربح غير محدود بمدة الباقة —
-        مدة الباقة تخصّ حدّ نشر المعلن فقط.
+        <b className="text-primary"> نقطة تراجع</b> فيمكن استرجاعه.
+        لا يغيّر أي إصلاح هنا بيانات الباقات أو أسعارها.
       </p>
 
       {sp.msg && (
@@ -93,7 +93,7 @@ export default async function DoctorPage({ searchParams }: { searchParams?: Prom
       <section className="rounded-xl border bg-white p-3">
         <h2 className="mb-2 flex items-center gap-1.5 text-sm font-extrabold text-primary"><Wrench className="h-4 w-4" /> إصلاحات سريعة</h2>
         <div className="flex flex-wrap gap-2">
-          {['cache_clear', 'store_only_null', 'default_pkg_adlifetime'].map((k) => (
+          {['cache_clear', 'store_only_null'].map((k) => (
             <form key={k} action={doFix}>
               <input type="hidden" name="key" value={k} />
               <button type="submit" className="rounded-lg border border-primary/30 bg-secondary/40 px-3 py-1.5 text-xs font-bold text-primary hover:bg-secondary">{fixTitle(k)}</button>

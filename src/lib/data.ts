@@ -155,11 +155,19 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   await loadBanned();
   const now = Date.now();
   return rows
-    // قرار منتج ثابت: العرض العام في تربح (الرئيسية/السوق/القوائم) غير محدود بمدة
-    // الباقة — مدة الباقة تخصّ حدّ نشر المعلن فقط، لا إخفاء إعلانه من التصفّح. لذا لا
-    // يُفرض أي قيد عمر هنا؛ يُستثنى فقط المعلن المحظور فلا تظهر إعلاناته. (التحديد
-    // العام للعمر، إن أراده المشرف، عبر الأرشفة التلقائية المنفصلة لا عبر مدة الباقة.)
-    .filter((r) => !sellers.get(toInt(r.user_id))?.banned)
+    .filter((r) => {
+      // إعلانات الأعضاء المحظورين لا تظهر للزوّار في أي قائمة
+      if (sellers.get(toInt(r.user_id))?.banned) return false;
+      // مميّز أو عاجل ساري الدفع يُستثنى تماماً من سقف «مدة بقاء الإعلان» —
+      // العضو دفع مقابل الظهور، فلا يُخفى إعلانه لمجرد تجاوز أيام باقته العادية.
+      const featuredActive = r.adsSpecial === 'checked' && !!r.expires_at && r.expires_at.getTime() > now;
+      const urgentActive = !!(r.urgent_until && r.urgent_until.getTime() > now);
+      if (featuredActive || urgentActive) return true;
+      // ad lifetime by the owner's package (0 => unlimited)
+      const days = adMeta.get(toInt(r.user_id))?.adDays ?? 0;
+      if (!days || !r.created_at) return true;
+      return (now - r.created_at.getTime()) / 86400000 <= days;
+    })
     .map((r) => {
       const s = sellers.get(toInt(r.user_id));
       return {

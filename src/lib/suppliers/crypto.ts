@@ -16,7 +16,7 @@ export function openTokens(sealed:string,context:string,rawKey:string):Tokens {
     const parts=sealed.split('.');if(parts.length!==4||parts[0]!=='v1'||sealed.length>50000)throw new Error();
     const iv=Buffer.from(parts[1],'base64url'),tag=Buffer.from(parts[2],'base64url');
     if(iv.length!==12||tag.length!==16)throw new Error();
-    const decipher=createDecipheriv('aes-256-gcm',key(rawKey),iv);decipher.setAAD(Buffer.from(context));decipher.setAuthTag(tag);
+    const decipher=createDecipheriv('aes-256-gcm',key(rawKey),iv,{authTagLength:16});decipher.setAAD(Buffer.from(context));decipher.setAuthTag(tag);
     const value=JSON.parse(Buffer.concat([decipher.update(Buffer.from(parts[3],'base64url')),decipher.final()]).toString('utf8'));
     if(typeof value.accessToken!=='string'||!value.accessToken||typeof value.refreshToken!=='string'||!value.refreshToken)throw new Error();
     return {accessToken:value.accessToken,refreshToken:value.refreshToken};

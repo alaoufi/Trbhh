@@ -1,0 +1,16 @@
+# ملفات لا تُفحص ولا تظهر في التقارير الأمنية: أسرار، بيانات، مخرجات بناء.
+node_modules/
+.next/
+android/
+storage/
+public/
+*.env
+*.env.*
+.env*
+*.pem
+*.key
+*.keystore
+*.jks
+security/reports/
+*.min.js
+pnpm-lock.yaml

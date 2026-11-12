@@ -16,7 +16,7 @@ export function encryptDetails(values:OnboardingValues,supplierId:bigint,secret:
  const body=Buffer.concat([cipher.update(JSON.stringify(values),'utf8'),cipher.final()]);return [iv.toString('base64url'),cipher.getAuthTag().toString('base64url'),body.toString('base64url')].join('.');
 }
 export function decryptDetails(raw:string,supplierId:bigint,secret:string):OnboardingValues {
- try{const [iv,tag,body,...extra]=raw.split('.');if(extra.length||!body||raw.length>150000)throw Error();const decipher=createDecipheriv('aes-256-gcm',key(secret),Buffer.from(iv,'base64url'));decipher.setAAD(Buffer.from(`supplier-onboarding:${supplierId}`));decipher.setAuthTag(Buffer.from(tag,'base64url'));return JSON.parse(Buffer.concat([decipher.update(Buffer.from(body,'base64url')),decipher.final()]).toString('utf8'));}catch{throw Error('onboarding_encryption');}
+ try{const [iv,tag,body,...extra]=raw.split('.');if(extra.length||!body||raw.length>150000)throw Error();const decipher=createDecipheriv('aes-256-gcm',key(secret),Buffer.from(iv,'base64url'),{authTagLength:16});decipher.setAAD(Buffer.from(`supplier-onboarding:${supplierId}`));decipher.setAuthTag(Buffer.from(tag,'base64url'));return JSON.parse(Buffer.concat([decipher.update(Buffer.from(body,'base64url')),decipher.final()]).toString('utf8'));}catch{throw Error('onboarding_encryption');}
 }
 function normalizedRegistrationSql(){let sql=Prisma.sql`REPLACE(REPLACE(registration_number,' ',''),'-','')`;for(let i=0;i<10;i++){sql=Prisma.sql`REPLACE(REPLACE(${sql},${String.fromCharCode(1632+i)},${String(i)}),${String.fromCharCode(1776+i)},${String(i)})`;}return sql;}
 export async function inspectOnboarding(db:Reader,values:OnboardingValues,secret:string,explicitSupplierId:bigint|null=null){

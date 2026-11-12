@@ -1,0 +1,118 @@
+{
+  "_doc": "فرز النتائج: المفتاح = بصمة النتيجة كما تظهر في التقرير. status: confirmed | false-positive | accepted. severity (اختياري) يتجاوز التصنيف الآلي: critical | high | medium | low | info. البوابة تفشل على critical/high غير المصنّفة false-positive أو accepted. كل إدخال يلزمه سبب مكتوب.",
+  "zap|10202|Absence of Anti-CSRF Tokens": {
+    "status": "false-positive",
+    "reason": "النماذج Server Actions في Next.js: الإطار يتحقق من ترويسة Origin مقابل Host ويرفض الطلبات العابرة للمواقع، وكوكي الجلسة SameSite=Lax."
+  },
+  "zap|10055|CSP: script-src unsafe-inline": {
+    "status": "accepted",
+    "severity": "medium",
+    "reason": "Next.js يحقن سكربتات مضمّنة للتهيئة؛ إزالتها تتطلب nonce لكل طلب عبر الوسيط — مهمة مستقلة. المصادر الخارجية مقيّدة بقائمة بيضاء."
+  },
+  "zap|10055|CSP: style-src unsafe-inline": {
+    "status": "accepted",
+    "severity": "low",
+    "reason": "أنماط مضمّنة من React/Tailwind؛ لا تنفّذ شيفرة."
+  },
+  "zap|10055|CSP: Wildcard Directive": {
+    "status": "accepted",
+    "severity": "low",
+    "reason": "img-src/media-src/connect-src تسمح بـhttps عموماً لأن صور الإعلانات والوسائط تأتي من مصادر متعددة؛ script-src مقيّد بقائمة بيضاء."
+  },
+  "zap|90003|Sub Resource Integrity Attribute Missing": {
+    "status": "accepted",
+    "severity": "low",
+    "reason": "سكربت ختم المركز السعودي للأعمال يُحمَّل من نطاق حكومي ويتغيّر محتواه؛ تثبيت بصمة له يعطّله عند أي تحديث من الجهة."
+  },
+  "semgrep|secrets-inherit|.github/workflows/integration-readiness.yml": {
+    "status": "accepted",
+    "severity": "low",
+    "reason": "سير عمل داخلي يستدعي سيراً قابلاً لإعادة الاستخدام في نفس المستودع."
+  },
+  "semgrep|secrets-inherit|.github/workflows/release-safeguards.yml": {
+    "status": "accepted",
+    "severity": "low",
+    "reason": "سير عمل داخلي يستدعي سيراً قابلاً لإعادة الاستخدام في نفس المستودع."
+  },
+  "semgrep|trbhh-shell-exec-interpolation|scripts/dev/live-audit-e2e.mjs": {
+    "status": "accepted",
+    "severity": "low",
+    "reason": "سكربت تطوير محلي؛ القيمة المُقحمة ثابت داخل الملف (اسم حاوية) لا مُدخل خارجي."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|scripts/dev/grant-cj-admin.mjs": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|scripts/preview/seed.mjs": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|scripts/release/salla-catalog-quarantine.cjs": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|scripts/release/supplier-preservation-proof.cjs": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/app/admin/search/page.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-dangerous-html|src/app/ads/[id]/page.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-dangerous-html|src/app/companies/[id]/p/[adId]/page.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-dangerous-html|src/app/companies/[id]/page.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-dangerous-html|src/app/layout.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-dangerous-html|src/app/site-map/page.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-dangerous-html|src/components/ad-pixels.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-dangerous-html|src/components/breadcrumb.tsx": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/admin-doctor.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/analytics.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/classified.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/dynamic-ads/repository.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/finance/tax-index-upgrade.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/wallet-money-migration.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  "semgrep|trbhh-raw-sql-interpolation|src/lib/wallet.ts": {
+    "status": "false-positive",
+    "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  }
+}

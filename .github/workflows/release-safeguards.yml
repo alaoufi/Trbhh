@@ -45,6 +45,7 @@ jobs:
           BACKUP_ID: ${{ inputs.backup_id || github.run_id }}
           REUSE_MEDIA_ID: ${{ inputs.reuse_media_id }}
           CANDIDATE_SHA: ${{ inputs.candidate_sha || github.sha }}
+          INPUT_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
           RELEASE_PROFILE: ${{ github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35656382084' && 'catalog_management' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35653890678' && 'onboarding_audit_compact' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35651818861' && 'onboarding_legacy_identity' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35649868888' && 'onboarding_legacy_email' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35644711205' && 'onboarding_template' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35642667045' && 'onboarding_link' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35640414518' && 'banner_separation' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35637559322' && 'supplier_admin' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35634930527' && 'national_day_loyalty' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35629850346' && 'national_day_immersive' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35626587686' && 'national_day' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35619790007' && 'public_home' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && 'supplier_selection' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && inputs.reuse_media_id == '35603864905' && 'merchant_headers' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && 'merchant_oauth' || 'standard' }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -56,7 +57,7 @@ jobs:
           umask 077
           [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
           [[ "$PHASE" == before || "$PHASE" == after ]]
-          if [[ -n "${{ inputs.candidate_sha }}" ]]; then
+          if [[ -n "$INPUT_CANDIDATE_SHA" ]]; then
             [[ "$PHASE" == after && "$RELEASE_PROFILE" == onboarding_link && "$CANDIDATE_SHA" == 408fb10d18ddad9f83259ffd8d006e441e6a6515 ]]
           fi
           if [[ "$RELEASE_PROFILE" == catalog_management ]]; then

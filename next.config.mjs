@@ -3,6 +3,15 @@ const mediaHost = (process.env.NEXT_PUBLIC_MEDIA_BASE || 'https://trbhh.com')
   .replace(/^https?:\/\//, '')
   .replace(/\/$/, '');
 
+// مصادر السكربتات الخارجية المسموحة فقط (بدل السماح لأي https): ختم «المركز السعودي للأعمال»
+// وبيكسلات الإعلانات الأربعة في src/components/ad-pixels.tsx (تعمل فقط إن ضُبطت معرّفاتها).
+// أي سكربت خارجي جديد يجب أن يُضاف هنا وإلا حجبه المتصفح.
+const SCRIPT_HOSTS = [
+  'https://eauthenticate.saudibusiness.gov.sa',
+  'https://connect.facebook.net', 'https://www.googletagmanager.com',
+  'https://analytics.tiktok.com', 'https://sc-static.net',
+].join(' ');
+
 const nextConfig = {
   async headers() {
     return [
@@ -15,7 +24,7 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'Content-Security-Policy', value: "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' https://eauthenticate.saudibusiness.gov.sa; form-action 'self'; object-src 'none'; img-src 'self' data: blob: https: http:; media-src 'self' blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; connect-src 'self' https: wss:" },
+          { key: 'Content-Security-Policy', value: `default-src 'self'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' https://eauthenticate.saudibusiness.gov.sa; form-action 'self'; object-src 'none'; img-src 'self' data: blob: https: http:; media-src 'self' blob: https: http:; script-src 'self' 'unsafe-inline' ${SCRIPT_HOSTS}; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; connect-src 'self' https: wss:` },
           { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), microphone=()' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000' },

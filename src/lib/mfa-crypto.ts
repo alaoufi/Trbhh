@@ -54,7 +54,7 @@ export function encryptSecret(plain: string, uid: number, key?: string): string 
 export function decryptSecret(sealed: string, uid: number, key?: string): string {
   const parts = sealed.split('.'); if (parts.length !== 3) throw new Error('Invalid encrypted secret');
   const [iv, tag, data] = parts.map((x) => Buffer.from(x, 'base64url'));
-  const decipher = createDecipheriv('aes-256-gcm', encryptionKey(key), iv);
+  const decipher = createDecipheriv('aes-256-gcm', encryptionKey(key), iv, { authTagLength: 16 });
   decipher.setAAD(Buffer.from('trbhh:mfa:' + uid)); decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }

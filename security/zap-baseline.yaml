@@ -1,0 +1,18 @@
+# خطة ZAP للفحص السلبي فقط (Baseline): زحف + قواعد سلبية، بلا أي هجوم نشط.
+# تُشغَّل عبر security/zap-local.sh على نسخة محلية معزولة ببيانات مصطنعة — لا على الإنتاج أبداً.
+env:
+  contexts:
+    - name: trbhh-local
+      urls: ["__TARGET__"]
+      includePaths: ["__TARGET__.*"]
+      excludePaths: [".*logout.*", ".*delete.*"]
+  parameters: { failOnError: false, failOnWarning: false, progressToStdout: false }
+jobs:
+  - type: passiveScan-config
+    parameters: { maxAlertsPerRule: 10, scanOnlyInScope: true }
+  - type: spider
+    parameters: { context: trbhh-local, url: "__TARGET__/", maxDuration: 5, maxDepth: 6, postForm: false }
+  - type: passiveScan-wait
+    parameters: { maxDuration: 5 }
+  - type: report
+    parameters: { template: traditional-json, reportDir: "__OUTDIR__", reportFile: "__OUTNAME__" }

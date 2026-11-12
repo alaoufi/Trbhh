@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/security/hooks/semgrep-changed.sh\"",
+            "timeout": 60,
+            "statusMessage": "فحص أمني خفيف للملف المعدَّل…"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -16,7 +16,7 @@ function decrypt(sealed) {
   if (version !== 'v1' || !iv64 || !tag64 || !body64 || extra !== undefined) throw Error('stored_token_invalid');
   const iv = Buffer.from(iv64, 'base64url'), tag = Buffer.from(tag64, 'base64url');
   if (iv.length !== 12 || tag.length !== 16) throw Error('stored_token_invalid');
-  const decipher = createDecipheriv('aes-256-gcm', Buffer.from(hexKey, 'hex'), iv);
+  const decipher = createDecipheriv('aes-256-gcm', Buffer.from(hexKey, 'hex'), iv, { authTagLength: 16 });
   decipher.setAAD(Buffer.from('cj:auth')); decipher.setAuthTag(tag);
   const token = JSON.parse(Buffer.concat([decipher.update(Buffer.from(body64, 'base64url')), decipher.final()]).toString('utf8'));
   if (!token.accessToken) throw Error('stored_token_invalid');

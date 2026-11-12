@@ -1,0 +1,406 @@
+{
+ "release": "306e31807f01a415e6b153f4d33720f75e168f89",
+ "date": "2026-11-12",
+ "tools": [
+  "semgrep",
+  "zap"
+ ],
+ "note": "خط الأساس قبل المعالجة: فحص Semgrep كامل + ZAP سلبي (زائر وعضو اختبار) على نسخة محلية معزولة ببيانات مصطنعة.",
+ "counts": {
+  "critical": 0,
+  "high": 3,
+  "medium": 7,
+  "low": 23,
+  "info": 4
+ },
+ "blocking": [
+  "semgrep|gcm-no-tag-length|src/lib/mfa-crypto.ts",
+  "semgrep|gcm-no-tag-length|src/lib/suppliers/crypto.ts",
+  "semgrep|gcm-no-tag-length|src/lib/suppliers/onboarding-store.ts"
+ ],
+ "previous_release": null,
+ "new_since_previous": null,
+ "fixed_since_previous": null,
+ "findings": [
+  {
+   "key": "semgrep|gcm-no-tag-length|src/lib/mfa-crypto.ts",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "src/lib/mfa-crypto.ts",
+   "count": 1,
+   "severity": "high",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|gcm-no-tag-length|src/lib/suppliers/crypto.ts",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "src/lib/suppliers/crypto.ts",
+   "count": 1,
+   "severity": "high",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|gcm-no-tag-length|src/lib/suppliers/onboarding-store.ts",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "src/lib/suppliers/onboarding-store.ts",
+   "count": 1,
+   "severity": "high",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|gcm-no-tag-length|scripts/diagnostics/salla-image-forensics.cjs",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "scripts/diagnostics/salla-image-forensics.cjs",
+   "count": 1,
+   "severity": "medium",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|gcm-no-tag-length|scripts/diagnostics/salla-order-capability-probe.cjs",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "scripts/diagnostics/salla-order-capability-probe.cjs",
+   "count": 1,
+   "severity": "medium",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|gcm-no-tag-length|scripts/release/cj-live-readonly-probe.cjs",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "scripts/release/cj-live-readonly-probe.cjs",
+   "count": 1,
+   "severity": "medium",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|gcm-no-tag-length|scripts/release/salla-catalog-quarantine.cjs",
+   "tool": "semgrep",
+   "rule": "gcm-no-tag-length",
+   "where": "scripts/release/salla-catalog-quarantine.cjs",
+   "count": 1,
+   "severity": "medium",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|run-shell-injection|.github/workflows/release-safeguards.yml",
+   "tool": "semgrep",
+   "rule": "run-shell-injection",
+   "where": ".github/workflows/release-safeguards.yml",
+   "count": 1,
+   "severity": "medium",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "zap|10055|CSP: script-src unsafe-eval",
+   "tool": "zap",
+   "rule": "CSP: script-src unsafe-eval",
+   "where": "الموقع (فحص سلبي)",
+   "count": 2,
+   "severity": "medium",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "zap|10055|CSP: script-src unsafe-inline",
+   "tool": "zap",
+   "rule": "CSP: script-src unsafe-inline",
+   "where": "الموقع (فحص سلبي)",
+   "count": 2,
+   "severity": "medium",
+   "status": "accepted",
+   "reason": "Next.js يحقن سكربتات مضمّنة للتهيئة؛ إزالتها تتطلب nonce لكل طلب عبر الوسيط — مهمة مستقلة. المصادر الخارجية مقيّدة بقائمة بيضاء."
+  },
+  {
+   "key": "zap|10202|Absence of Anti-CSRF Tokens",
+   "tool": "zap",
+   "rule": "Absence of Anti-CSRF Tokens",
+   "where": "الموقع (فحص سلبي)",
+   "count": 5,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "النماذج Server Actions في Next.js: الإطار يتحقق من ترويسة Origin مقابل Host ويرفض الطلبات العابرة للمواقع، وكوكي الجلسة SameSite=Lax."
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/build-android.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/build-android.yml",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/capture-screenshots.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/capture-screenshots.yml",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/check-vps-env.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/check-vps-env.yml",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/ci.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/ci.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/cj-live-readonly-probe.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/cj-live-readonly-probe.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/deploy.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/deploy.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/fetch-full-backup.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/fetch-full-backup.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/finance-release.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/finance-release.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/integration-readiness.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/integration-readiness.yml",
+   "count": 4,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/preview-audit.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/preview-audit.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/release-safeguards.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/release-safeguards.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/release-upgrade-check.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/release-upgrade-check.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/salla-release-prepare.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/salla-release-prepare.yml",
+   "count": 6,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/trbhh-storage-maintenance.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/trbhh-storage-maintenance.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/vps-disk-cleanup.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/vps-disk-cleanup.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|possible-nginx-h2c-smuggling|docker/nginx.conf",
+   "tool": "semgrep",
+   "rule": "possible-nginx-h2c-smuggling",
+   "where": "docker/nginx.conf",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|request-host-used|docker/nginx.conf",
+   "tool": "semgrep",
+   "rule": "request-host-used",
+   "where": "docker/nginx.conf",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|request-host-used|scripts/preview/nginx.conf",
+   "tool": "semgrep",
+   "rule": "request-host-used",
+   "where": "scripts/preview/nginx.conf",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|secrets-inherit|.github/workflows/integration-readiness.yml",
+   "tool": "semgrep",
+   "rule": "secrets-inherit",
+   "where": ".github/workflows/integration-readiness.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "سير عمل داخلي يستدعي سيراً قابلاً لإعادة الاستخدام في نفس المستودع."
+  },
+  {
+   "key": "semgrep|secrets-inherit|.github/workflows/release-safeguards.yml",
+   "tool": "semgrep",
+   "rule": "secrets-inherit",
+   "where": ".github/workflows/release-safeguards.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "سير عمل داخلي يستدعي سيراً قابلاً لإعادة الاستخدام في نفس المستودع."
+  },
+  {
+   "key": "zap|10055|CSP: Wildcard Directive",
+   "tool": "zap",
+   "rule": "CSP: Wildcard Directive",
+   "where": "الموقع (فحص سلبي)",
+   "count": 2,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "img-src/media-src/connect-src تسمح بـhttps عموماً لأن صور الإعلانات والوسائط تأتي من مصادر متعددة؛ script-src مقيّد بقائمة بيضاء."
+  },
+  {
+   "key": "zap|10055|CSP: style-src unsafe-inline",
+   "tool": "zap",
+   "rule": "CSP: style-src unsafe-inline",
+   "where": "الموقع (فحص سلبي)",
+   "count": 2,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "أنماط مضمّنة من React/Tailwind؛ لا تنفّذ شيفرة."
+  },
+  {
+   "key": "zap|90003|Sub Resource Integrity Attribute Missing",
+   "tool": "zap",
+   "rule": "Sub Resource Integrity Attribute Missing",
+   "where": "الموقع (فحص سلبي)",
+   "count": 5,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "سكربت ختم المركز السعودي للأعمال يُحمَّل من نطاق حكومي ويتغيّر محتواه؛ تثبيت بصمة له يعطّله عند أي تحديث من الجهة."
+  },
+  {
+   "key": "zap|10027|Information Disclosure - Suspicious Comments",
+   "tool": "zap",
+   "rule": "Information Disclosure - Suspicious Comments",
+   "where": "الموقع (فحص سلبي)",
+   "count": 11,
+   "severity": "info",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "zap|10031|User Controllable HTML Element Attribute (Potential XSS)",
+   "tool": "zap",
+   "rule": "User Controllable HTML Element Attribute (Potential XSS)",
+   "where": "الموقع (فحص سلبي)",
+   "count": 12,
+   "severity": "info",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "zap|10109|Modern Web Application",
+   "tool": "zap",
+   "rule": "Modern Web Application",
+   "where": "الموقع (فحص سلبي)",
+   "count": 1,
+   "severity": "info",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "zap|10112|Session Management Response Identified",
+   "tool": "zap",
+   "rule": "Session Management Response Identified",
+   "where": "الموقع (فحص سلبي)",
+   "count": 11,
+   "severity": "info",
+   "status": "open",
+   "reason": ""
+  }
+ ]
+}

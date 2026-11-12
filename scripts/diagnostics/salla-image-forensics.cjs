@@ -15,7 +15,7 @@ function openTokens(sealed,context,rawKey){
   const parts=String(sealed||'').split('.');check(parts.length===4&&parts[0]==='v1','token_format');
   const iv=Buffer.from(parts[1],'base64url'),tag=Buffer.from(parts[2],'base64url');
   check(iv.length===12&&tag.length===16,'token_format');
-  const decipher=createDecipheriv('aes-256-gcm',key(rawKey),iv);
+  const decipher=createDecipheriv('aes-256-gcm',key(rawKey),iv,{authTagLength:16});
   decipher.setAAD(Buffer.from(context));decipher.setAuthTag(tag);
   const value=JSON.parse(Buffer.concat([decipher.update(Buffer.from(parts[3],'base64url')),decipher.final()]).toString('utf8'));
   check(typeof value.accessToken==='string'&&value.accessToken,'token_value');return value.accessToken;

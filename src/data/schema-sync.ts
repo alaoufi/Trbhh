@@ -954,6 +954,7 @@ async function run(): Promise<void> {
   await backfillLegacyReceiptHashes();
   await backfillLegacyNotificationReadAt();
   await widenCjHighlightLabel();
+  await normalizeAdStoreOnly();
   await seedCjSupplier();
   // ملاحظة: بذر الأقسام الافتراضية لم يعد يعمل عند الإقلاع (أُزيل من المسار الحرج)؛
   // يُنفَّذ عند الحاجة يدوياً عبر scripts/seed-ad-categories.cjs من الخادم.
@@ -975,6 +976,28 @@ async function widenCjHighlightLabel(): Promise<void> {
   }
 }
 
+
+/**
+ * إصلاح حاسم لمرة واحدة: عمود ads.store_only. إن أُضيف العمود سابقاً كـ«يقبل NULL»
+ * (تثبيت/ترقيع قديم بلا DEFAULT)، فإن كل إعلانات الأعضاء القديمة تحمل store_only=NULL،
+ * وشرط ظهور الرئيسية «store_only = 0» لا يطابق NULL في SQL — فتختفي كل إعلانات الأعضاء
+ * ولا يظهر إلا منتجات المتاجر المدفوعة. نحوّل كل NULL إلى 0 ثم نثبّت العمود NOT NULL
+ * DEFAULT 0 ليستحيل تكرارها. مَحروس بفحص IS_NULLABLE: لا يلمس أي تثبيت سليم أصلاً.
+ */
+async function normalizeAdStoreOnly(): Promise<void> {
+  const rows = await prisma.$queryRawUnsafe<{ nullable: string }[]>(
+    `SELECT IS_NULLABLE AS nullable FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='ads' AND COLUMN_NAME='store_only'`,
+  ).catch(() => [] as { nullable: string }[]);
+  if (String(rows?.[0]?.nullable ?? '').toUpperCase() !== 'YES') return; // سليم بالفعل — لا شيء
+  await prisma.$executeRawUnsafe(`UPDATE ads SET store_only=0 WHERE store_only IS NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE ads MODIFY COLUMN store_only TINYINT NOT NULL DEFAULT 0`).catch(() => {});
+  await bustAdCachesSafely();
+}
+
+/** تفريغ ذاكرة قوائم الإعلانات بأمان بعد إصلاح بيانات يؤثر على ظهورها (إن توفّر redis). */
+async function bustAdCachesSafely(): Promise<void> {
+  await import('../lib/data').then((m) => m.bustAdCaches()).catch(() => {});
+}
 
 /** بذرة لمرة واحدة: مورد نظام «CJdropshipping» ليظهر ضمن قائمة الموردين مثل بقية
  *  الموردين، وتُنسب إليه منتجات CJ المستوردة لاحقاً (للتسوية/الفوترة خارج الموقع).

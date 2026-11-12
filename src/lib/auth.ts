@@ -61,7 +61,8 @@ export async function createSession(payload: SessionPayload): Promise<void> {
   const token = await new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('30d')
+    // جلسة دائمة (قرار المالك): تبقى سارية حتى يسجّل العضو الخروج بنفسه — ١٠ سنوات.
+    .setExpirationTime('3650d')
     .sign(secret);
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
@@ -70,7 +71,7 @@ export async function createSession(payload: SessionPayload): Promise<void> {
     secure: shouldUseSecureCookies(),
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: 60 * 60 * 24 * 3650,
   });
 }
 

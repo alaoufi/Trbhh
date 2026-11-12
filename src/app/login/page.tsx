@@ -42,7 +42,10 @@ function LoginInner() {
           <label htmlFor="login-factor" className="block text-sm font-medium">رمز التحقق (للحسابات التي فعّلته)</label>
           <input id="login-factor" name="factorCode" type="text" dir="ltr" autoComplete="one-time-code" autoCapitalize="none" spellCheck={false} placeholder="رمز التطبيق أو رمز استرداد" aria-describedby="factor-help" className={fieldCls} />
           <p id="factor-help" className="text-xs text-muted-foreground">أدخل رمز تطبيق التحقق من 6 أرقام، أو رمز استرداد محفوظاً. اتركه فارغاً إذا لم تفعّل الخدمة.</p>
-          {state?.error && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
+          {state?.error && <div role="alert" className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-bold text-destructive">{state.error}</p>
+            <Link href="/forgot" className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white">🔐 استعد كلمة المرور برمز تحقق على جوالك</Link>
+          </div>}
           <Submit />
         </form>
         <p className="mt-3 text-center text-sm">

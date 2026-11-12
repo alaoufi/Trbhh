@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Megaphone, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
   Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText, BellRing, Search as SearchIcon, Link2 as LinkIcon,
-   Archive, AlertTriangle, CreditCard, WalletCards, Landmark,
+   Archive, AlertTriangle, CreditCard, WalletCards, Landmark, Activity,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 import { DEPARTMENTS, MODULES, pagePermission } from '@/lib/access-control/catalog';
@@ -86,6 +86,7 @@ const LEGACY_GROUPS: AdminNavGroup[] = [
       { href: '/admin/settings', label: 'الإعدادات', icon: Settings, perm: 'users' },
       { href: '/admin/audit', label: 'سجل نشاط الإدارة', icon: ScrollText, perm: 'users' },
       { href: '/admin/errors', label: 'سجل الأخطاء التقنية', icon: AlertTriangle, perm: 'users' },
+      { href: '/admin/diagnostics', label: 'تشخيص تغذية الرئيسية', icon: Activity, perm: 'users', description: 'كشف سبب ظهور إعلانات قليلة في الرئيسية وحلّه', keywords: ['تشخيص', 'رئيسية', 'إعلانات قليلة', 'تغذية', 'لا تظهر'] },
       { href: '/admin/backup', label: 'نسخ احتياطي واستعادة', icon: DatabaseBackup, perm: 'backup' },
     ],
   },

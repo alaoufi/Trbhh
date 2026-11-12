@@ -9,7 +9,7 @@ vi.mock('@/lib/data',()=>({
  getFeaturedAds:state.featured,getHomeLatestAds:state.latest,searchAds:state.search,getPersonalizedAds:state.personalized,
  getMostViewedAds:async()=>[],getTopRatedAds:async()=>[],getStats:async()=>({ads:0,users:0,views:0}),getCities:async()=>[],getAreas:async()=>[],promoteScheduledAds:async()=>{},
 }));
-vi.mock('@/lib/settings',()=>({getHomeStats:async()=>new Set(),getHomeClassifiedText:async()=>({title:'',sub:''}),getSettingBool:async()=>false,getSetting:async(_k:string,v:string)=>v,getWelcomePopupSeconds:async()=>0,getFeedBannerItems:async()=>[],SETTING_WELCOME_GUEST_TEXT:'welcome',DEFAULT_WELCOME_GUEST_TEXT:''}));
+vi.mock('@/lib/settings',()=>({getHomeStats:async()=>new Set(),getHomeClassifiedText:async()=>({title:'',sub:''}),getSettingBool:async()=>false,getSettingNum:async(_k:string,v:number)=>v,getSetting:async(_k:string,v:string)=>v,getWelcomePopupSeconds:async()=>0,getFeedBannerItems:async()=>[],SETTING_WELCOME_GUEST_TEXT:'welcome',DEFAULT_WELCOME_GUEST_TEXT:''}));
 vi.mock('@/lib/merchant',()=>({homeFeaturedAds:async()=>[{id:30}],homeStoreCards:async()=>[],storeIdOfUser:async()=>1}));
 vi.mock('@/lib/platform-rating',()=>({getPlatformRating:async()=>({avg:0,count:0}),getMyPlatformReview:async()=>null}));
 // Only inspect the real page's composition; child components are not executed.

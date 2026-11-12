@@ -22,7 +22,10 @@ describe('public price and search presentation', () => {
   });
   it('does not present an unspecified amount as free or show a discount without a price', () => {
     const html = renderToStaticMarkup(createElement(AdCard, { ad: { ...card, price: 0, oldPrice: 600 } }));
-    expect(html).toContain('السعر غير محدد');
+    // قرار مقصود: البطاقة العامة لا تُظهر «السعر غير محدد» إطلاقاً (تبقى في صفحة التفاصيل)،
+    // والأهم ألّا يُعرض السعر صفراً كأنه «مجاني» ولا خصماً بلا سعر فعلي.
+    expect(html).not.toContain('مجان');
+    expect(html).not.toContain('السعر غير محدد');
     expect(html).toContain('الموقع غير محدد');
     expect(html).not.toContain('خصم');
     expect(adPriceLabel({ price: 0, priceType: 'som' })).toBe('على السوم');

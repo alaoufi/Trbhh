@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { KeyRound, Phone, ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PasswordStrengthInput } from '@/components/password-strength-input';
 import { sendCodeAction, resetAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +50,7 @@ export default async function ForgotPage({ searchParams }: { searchParams: Promi
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-bold">كلمة المرور الجديدة</span>
-            <input name="password" type="password" required minLength={4} placeholder="4 خانات على الأقل" className={field} />
+            <PasswordStrengthInput required minLength={4} placeholder="4 خانات على الأقل" className={field} />
           </label>
           <Button className="w-full">تعيين كلمة المرور</Button>
           <div className="text-center">

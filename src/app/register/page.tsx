@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
+import { PasswordStrengthInput } from '@/components/password-strength-input';
 import { confirmSaudiRegistrationAction, startRegistrationAction } from './actions';
 import { Button } from '@/components/ui/button';
 
@@ -30,7 +31,7 @@ export default function RegisterPage() {
           <input name="phone" placeholder="05xxxxxxxx"
             inputMode="tel" dir="ltr"
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
-          <input name="password" type="password" minLength={4} placeholder="كلمة المرور (4 خانات على الأقل)"
+          <PasswordStrengthInput required minLength={4} placeholder="كلمة المرور (4 خانات على الأقل)"
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
           <label className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
             <input type="checkbox" name="agree" required className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />

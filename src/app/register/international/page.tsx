@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
+import { PasswordStrengthInput } from '@/components/password-strength-input';
 import { submitInternationalRegistrationAction } from '../actions';
 import { Button } from '@/components/ui/button';
 
@@ -17,7 +18,7 @@ export default function InternationalRegistrationPage() {
       <input name="phone" required inputMode="tel" dir="ltr" placeholder="رقم الجوال الدولي" className="h-11 w-full rounded-lg border bg-background px-3 text-sm" />
       <input name="email" required type="email" dir="ltr" placeholder="البريد الإلكتروني" className="h-11 w-full rounded-lg border bg-background px-3 text-sm" />
       <textarea name="reason" required maxLength={500} rows={3} placeholder="عرّف بنفسك وسبب التسجيل" className="w-full rounded-lg border bg-background p-3 text-sm" />
-      <input name="password" required type="password" minLength={4} placeholder="كلمة المرور (4 خانات على الأقل)" className="h-11 w-full rounded-lg border bg-background px-3 text-sm" />
+      <PasswordStrengthInput required minLength={4} placeholder="كلمة المرور (4 خانات على الأقل)" className="h-11 w-full rounded-lg border bg-background px-3 text-sm" />
       <label className="flex gap-2 text-sm"><input type="checkbox" name="agree" required /> أوافق على الشروط والأحكام وسياسة الخصوصية.</label>
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
       <Submit />

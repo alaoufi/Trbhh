@@ -17,12 +17,12 @@ import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
 import { HomeCompactStrip } from '@/components/home-compact-strip';
 import feedStyles from '@/components/home-dense-feed.module.css';
-import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
+import { mergeHomeAds, selectedHomeCategory, fairFeed } from '@/lib/home-feed';
 import { fullRows } from '@/lib/commerce/home-layout';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
-import { getHomeStats, getHomeClassifiedText, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getSettingBool, getSetting, getSettingNum, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
@@ -89,7 +89,10 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   const personalizedAds = selectedCategory ? [] : await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
   const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
-  const feedAds = selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated);
+  // تنويع التغذية: حدّ أقصى لعدد إعلانات المعلن الواحد في الرئيسية (قابل للضبط من الإعدادات،
+  // 0 = بلا تنويع) فلا يحتكر من يملك مئات الإعلانات الصفوف الأولى ويظهر تنوّع المعلنين.
+  const maxPerSeller = await getSettingNum('home_max_per_seller', 3).catch(() => 3);
+  const feedAds = fairFeed(selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated), maxPerSeller);
   const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
   // تنويع الرئيسية: تغذية مضغوطة أكثف + شريط إعلانات صغيرة بين البطاقات — كلها قابلة
   // للتحكم والتراجع من الإعدادات (الافتراضي مفعّل)، ولا تؤثر على تكامل CJ/التجارة.

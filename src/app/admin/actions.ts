@@ -790,6 +790,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
   await setSetting('ad_lifetime_days', String(Math.max(0, parseInt(String(formData.get('adLifetimeDays') || '0')) || 0)));
+  await setSetting('home_max_per_seller', String(Math.max(0, parseInt(String(formData.get('homeMaxPerSeller') || '0')) || 0)));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
   for (const [key] of AUDIT_UX_FLAGS) await setSetting(key, formData.has(key) ? '1' : '0');

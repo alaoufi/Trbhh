@@ -38,6 +38,8 @@ export type AdCard = {
   views: number;
   sellerName: string | null;
   sellerTrusted: boolean;
+  /** معرّف المعلن — لتنويع التغذية فلا يحتكر معلن واحد الصفوف الأولى. */
+  sellerId?: number;
   tier?: 'gold' | 'silver' | '';
   storeName?: string | null;
   storeId?: number | null;
@@ -186,6 +188,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         views: views.get(toInt(r.id)) ?? 0,
         sellerName: s?.name ?? null,
         sellerTrusted: s?.trusted ?? false,
+        sellerId: toInt(r.user_id),
         tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
         oldPrice: categoryData.get(toInt(r.id))?.goodsEnabled === false ? 0 : (r.old_price && r.old_price > r.price ? r.old_price : 0),
         ratingAvg: ratings.get(toInt(r.id))?.avg ?? 0,

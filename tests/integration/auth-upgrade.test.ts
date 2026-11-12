@@ -257,6 +257,8 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
       'cj_webhook_events.cj_order_id','cj_webhook_events.order_number','cj_webhook_events.raw_status','cj_webhook_events.track_number','cj_webhook_events.processed','cj_webhook_events.payload',
       // جدول دفتر محاسبة CJ الجديد بالكامل.
       'cj_ledger.id','cj_ledger.entry_key','cj_ledger.order_id','cj_ledger.entry_type','cj_ledger.amount_usd_minor','cj_ledger.currency','cj_ledger.cj_ref','cj_ledger.source','cj_ledger.note','cj_ledger.reconciled','cj_ledger.created_at',
+      // جدول سجل إصلاحات «طبيب المنصة» مع نقاط التراجع.
+      'admin_fix_log.id','admin_fix_log.fix_key','admin_fix_log.title','admin_fix_log.before_json','admin_fix_log.after_json','admin_fix_log.affected','admin_fix_log.reversible','admin_fix_log.actor','admin_fix_log.created_at','admin_fix_log.undone_at',
     ].sort());
     expect(added.find((c) => c.table_name === 'users')).toMatchObject({ column_type: 'varchar(64)', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'auth_mfa' && c.column_name === 'last_step')).toMatchObject({ column_type: 'bigint', is_nullable: 'NO', column_default: '-1' });

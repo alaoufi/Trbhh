@@ -326,28 +326,23 @@ export async function getLatestAds(take = 12) {
   });
 }
 
-/** أحدث الإعلانات للرئيسية: كل إعلانات آخر ٣٠ يوماً — الأقدم يبقى في البحث والأقسام.
- *  عند خلوّ الشهر من إعلانات نعرض أحدث ١٢ حتى لا تبدو الرئيسية فارغة. */
+/** أحدث الإعلانات للرئيسية: الأحدث نشاطاً بلا أي قيد زمني — العرض العام مفتوح.
+ *  (كان يقتصر على آخر ٣٠ يوماً، فإن وُجدت فيها إعلانات قليلة عُرضت وحدها واختفى الباقي.) */
 export async function getHomeLatestAds(take = 20) {
   const safeTake = Math.min(Math.max(Math.floor(take) || 20, 1), 60);
-  return cached(`ads:home-latest:30d:${safeTake}`, 60, async () => {
+  return cached(`ads:home-latest:all:${safeTake}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
     sweepOldAdsToArchive().catch(() => {});
-    const since = new Date(Date.now() - 30 * 86400000);
-    const rows = await prisma.ads.findMany({
-      where: { ...(await activeAdWhere()), created_at: { gte: since } },
-      orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
-      // بطاقة الإعلانات تحمل بيانات وصوراً كثيرة؛ الرئيسية تحتاج أول دفعة فقط.
-      // نقرأ هامشاً صغيراً لإعادة ترتيب آخر نشاط ثم نرسل العدد المطلوب للعميل.
-      take: Math.min(safeTake * 3, 180),
-      select: adSelect,
-    });
-    // الترتيب الحقيقي بآخر نشاط (نشر أو تحديث ⬆) — يطابق الوقت الظاهر على البطاقة
+    // المُحدَّثة (bumped) أولاً ثم الأحدث نشراً — هامش صغير لإعادة الترتيب بآخر نشاط.
+    const [bumped, newest] = await Promise.all([
+      prisma.ads.findMany({ where: { ...(await activeAdWhere()), bumped_at: { not: null } }, orderBy: { bumped_at: 'desc' }, take: safeTake, select: adSelect }),
+      prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ created_at: 'desc' }, { id: 'desc' }], take: safeTake * 3, select: adSelect }),
+    ]);
+    const seen = new Set<bigint>();
+    const rows = [...bumped, ...newest].filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
     rows.sort((a, b) => activityMs(b) - activityMs(a));
-    if (rows.length > 0) return toCards(rows.slice(0, safeTake));
-    const fallback = await prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
-    return toCards(fallback.slice(0, safeTake));
+    return toCards(rows.slice(0, safeTake));
   });
 }
 

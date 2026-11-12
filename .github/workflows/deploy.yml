@@ -1,9 +1,10 @@
 name: نشر تربح على Hostinger VPS
 
+# التشغيل يدوي فقط (Run workflow). أُوقف التشغيل التلقائي عند كل push لأن سكربت النشر
+# مصمَّم لموقع الشراء فيه معطّل: يوقف حاوية التطبيق مؤقتاً لأخذ لقطة ثم يرفض المتابعة
+# ما دام الدفع/الشراء مفعّلاً — فكان كل push يوقف الموقع الحيّ لحظياً ويفشل. النشر الفعلي
+# الآن: git pull && docker compose up -d --build app على الخادم (انظر CLAUDE.md).
 on:
-  push:
-    branches: [claude/hostinger-vps-project-amw8vb]
-    paths-ignore: ['ops/**']
   workflow_dispatch:
 
 permissions:

@@ -11,10 +11,17 @@ Prisma على MySQL 8 + Redis، منشورة على Hostinger VPS عبر Docker 
 ## حقائق حرجة
 
 - **فرع التطوير:** `claude/hostinger-vps-project-amw8vb` — كل العمل يكون عليه.
-- **النشر تلقائي بالكامل:** أي `git push` لهذا الفرع يُشغّل `.github/workflows/deploy.yml`
-  (GitHub Actions عبر SSH) الذي يبني وينشر مباشرة على الخادم بلا أي تدخل يدوي. النشر
-  اليدوي (`git pull && docker compose up -d --build app` على الخادم في `/root/trbhh`)
-  يبقى بديلاً احتياطياً يعمل دائماً. التفاصيل والأسرار المطلوبة في `دليل-المطور.md` § 5.
+- **النشر يدوي حالياً:** على الخادم في `/root/trbhh`:
+  `git pull && TRBHH_RELEASE_COMMIT=$(git rev-parse HEAD) docker compose up -d --build app`.
+  سير `.github/workflows/deploy.yml` صار **يدوي التشغيل فقط** (workflow_dispatch): سكربت
+  النشر الآلي (`scripts/release/finance-*.sh`) مصمَّم لموقع الشراء فيه معطّل — يوقف حاوية
+  التطبيق مؤقتاً (`docker pause`) ثم يرفض المتابعة ما دام `commerce_payments_enabled` أو
+  `commerce_purchasing_enabled` مفعّلاً، فكان كل push يوقف الموقع لحظياً ويفشل. لا تُعِد
+  تشغيله عند push قبل إعادة تصميمه لموقع حيّ. التفاصيل في `دليل-المطور.md` § 5.
+- **قاعدة البيانات الفعلية على الخادم نفسه لا في Docker:** التطبيق يتصل عبر `DATABASE_URL`
+  بـ MySQL على `host.docker.internal`. حاوية `trbhh-db` (profile `localdb`) نسخة قديمة غير
+  مستخدمة — أي `docker compose exec db mysql …` يقرأ/يكتب في قاعدة لا يراها الموقع. للاستعلام
+  من القاعدة الحقيقية استخدم Prisma من داخل حاوية `app`.
 - **بوابات الجودة قبل أي دفع:** `npx tsc --noEmit` و`pnpm lint` و`pnpm build` (و`pnpm test`
   إن وُجد). لا تدفع كوداً لم يجتزها.
 - **رسائل الالتزام (commit) بالعربية دائماً.**

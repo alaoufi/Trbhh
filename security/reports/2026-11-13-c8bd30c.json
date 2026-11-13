@@ -1,0 +1,430 @@
+{
+ "release": "c8bd30cde094ac5af7df7bbe0ff51052aa7e9688",
+ "date": "2026-11-13",
+ "tools": [
+  "semgrep"
+ ],
+ "note": "بعد المراجعة الأمنية اليدوية العميقة — Semgrep فقط (ZAP يُشغَّل في CI)",
+ "counts": {
+  "critical": 0,
+  "high": 0,
+  "medium": 0,
+  "low": 21,
+  "info": 0
+ },
+ "blocking": [],
+ "previous_release": "e925df807ee624b8e1beaadb856cd41762046276",
+ "new_since_previous": [],
+ "fixed_since_previous": [
+  "zap|10027|Information Disclosure - Suspicious Comments",
+  "zap|10031|User Controllable HTML Element Attribute (Potential XSS)",
+  "zap|10055|CSP: Wildcard Directive",
+  "zap|10055|CSP: script-src unsafe-inline",
+  "zap|10055|CSP: style-src unsafe-inline",
+  "zap|10109|Modern Web Application",
+  "zap|10112|Session Management Response Identified",
+  "zap|90003|Sub Resource Integrity Attribute Missing"
+ ],
+ "findings": [
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/app/ads/[id]/page.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/app/ads/[id]/page.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/app/companies/[id]/p/[adId]/page.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/app/companies/[id]/p/[adId]/page.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/app/companies/[id]/page.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/app/companies/[id]/page.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/app/layout.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/app/layout.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/app/site-map/page.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/app/site-map/page.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/components/ad-pixels.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/components/ad-pixels.tsx",
+   "count": 4,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-dangerous-html|src/components/breadcrumb.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-dangerous-html",
+   "where": "src/components/breadcrumb.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): JSON-LD مع ترميز < > & ، أو سكربت بيكسل ثابت بمعرّف من متغيرات بيئة الخادم — لا مُدخل مستخدم خام."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/app/admin/search/page.tsx",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/app/admin/search/page.tsx",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/admin-doctor.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/admin-doctor.ts",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/analytics.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/analytics.ts",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/classified.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/classified.ts",
+   "count": 2,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/dynamic-ads/repository.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/dynamic-ads/repository.ts",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/finance/tax-index-upgrade.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/finance/tax-index-upgrade.ts",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/wallet-money-migration.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/wallet-money-migration.ts",
+   "count": 1,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|src/lib/wallet.ts",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "src/lib/wallet.ts",
+   "count": 2,
+   "severity": "medium",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/build-android.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/build-android.yml",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/capture-screenshots.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/capture-screenshots.yml",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/check-vps-env.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/check-vps-env.yml",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/ci.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/ci.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/cj-live-readonly-probe.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/cj-live-readonly-probe.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/deploy.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/deploy.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/fetch-full-backup.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/fetch-full-backup.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/finance-release.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/finance-release.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/integration-readiness.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/integration-readiness.yml",
+   "count": 4,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/preview-audit.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/preview-audit.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/release-safeguards.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/release-safeguards.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/release-upgrade-check.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/release-upgrade-check.yml",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/salla-release-prepare.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/salla-release-prepare.yml",
+   "count": 6,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/trbhh-storage-maintenance.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/trbhh-storage-maintenance.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|github-actions-mutable-action-tag|.github/workflows/vps-disk-cleanup.yml",
+   "tool": "semgrep",
+   "rule": "github-actions-mutable-action-tag",
+   "where": ".github/workflows/vps-disk-cleanup.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|possible-nginx-h2c-smuggling|docker/nginx.conf",
+   "tool": "semgrep",
+   "rule": "possible-nginx-h2c-smuggling",
+   "where": "docker/nginx.conf",
+   "count": 1,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|request-host-used|docker/nginx.conf",
+   "tool": "semgrep",
+   "rule": "request-host-used",
+   "where": "docker/nginx.conf",
+   "count": 3,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|request-host-used|scripts/preview/nginx.conf",
+   "tool": "semgrep",
+   "rule": "request-host-used",
+   "where": "scripts/preview/nginx.conf",
+   "count": 2,
+   "severity": "low",
+   "status": "open",
+   "reason": ""
+  },
+  {
+   "key": "semgrep|secrets-inherit|.github/workflows/integration-readiness.yml",
+   "tool": "semgrep",
+   "rule": "secrets-inherit",
+   "where": ".github/workflows/integration-readiness.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "سير عمل داخلي يستدعي سيراً قابلاً لإعادة الاستخدام في نفس المستودع."
+  },
+  {
+   "key": "semgrep|secrets-inherit|.github/workflows/release-safeguards.yml",
+   "tool": "semgrep",
+   "rule": "secrets-inherit",
+   "where": ".github/workflows/release-safeguards.yml",
+   "count": 1,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "سير عمل داخلي يستدعي سيراً قابلاً لإعادة الاستخدام في نفس المستودع."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|scripts/dev/grant-cj-admin.mjs",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "scripts/dev/grant-cj-admin.mjs",
+   "count": 4,
+   "severity": "low",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|scripts/preview/seed.mjs",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "scripts/preview/seed.mjs",
+   "count": 1,
+   "severity": "low",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|scripts/release/salla-catalog-quarantine.cjs",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "scripts/release/salla-catalog-quarantine.cjs",
+   "count": 1,
+   "severity": "low",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-raw-sql-interpolation|scripts/release/supplier-preservation-proof.cjs",
+   "tool": "semgrep",
+   "rule": "trbhh-raw-sql-interpolation",
+   "where": "scripts/release/supplier-preservation-proof.cjs",
+   "count": 1,
+   "severity": "low",
+   "status": "false-positive",
+   "reason": "رُوجع يدوياً (2026-11-12): المُقحم علامات ? مولَّدة، أو ثابت داخل الملف، أو رقم مُقيَّد، أو معرّف مُتحقَّق منه — لا مُدخل مستخدم. القيم تُمرَّر كمعاملات."
+  },
+  {
+   "key": "semgrep|trbhh-shell-exec-interpolation|scripts/dev/live-audit-e2e.mjs",
+   "tool": "semgrep",
+   "rule": "trbhh-shell-exec-interpolation",
+   "where": "scripts/dev/live-audit-e2e.mjs",
+   "count": 1,
+   "severity": "low",
+   "status": "accepted",
+   "reason": "سكربت تطوير محلي؛ القيمة المُقحمة ثابت داخل الملف (اسم حاوية) لا مُدخل خارجي."
+  }
+ ]
+}

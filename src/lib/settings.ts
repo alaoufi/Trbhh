@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { DISCLAIMER } from './constants';
+import { SECRET_SETTING_KEYS, isSealed, openSetting, sealSetting } from './secret-settings';
 import { normalizeTopupCampaignPresentation, type TopupCampaignPresentation } from './topup-campaign-presentation';
 
 const ensure = ensureSchema;
@@ -18,7 +19,13 @@ async function loadSettings(): Promise<Map<string, string | null>> {
   if (settingsCache && now - settingsCacheAt < SETTINGS_TTL_MS) return settingsCache;
   await ensure();
   const rows = await prisma.site_settings.findMany().catch(() => []);
-  settingsCache = new Map(rows.map((r) => [r.k, r.v]));
+  settingsCache = new Map(rows.map((r) => [r.k, SECRET_SETTING_KEYS.has(r.k) ? openSetting(r.k, r.v) : r.v]));
+  // ترحيل تلقائي: سرّ محفوظ نصاً من قبل يُعاد حفظه مشفّراً عند أول قراءة.
+  for (const r of rows) {
+    if (!SECRET_SETTING_KEYS.has(r.k) || !r.v || isSealed(r.v)) continue;
+    const sealed = sealSetting(r.k, r.v);
+    if (sealed !== r.v) void prisma.site_settings.update({ where: { k: r.k }, data: { v: sealed } }).catch(() => {});
+  }
   settingsCacheAt = now;
   return settingsCache;
 }
@@ -41,7 +48,8 @@ export const getGuardBlockCount = () => getSettingNum('guard_block_count', 3);
 
 export async function setSetting(k: string, v: string) {
   await ensure();
-  await prisma.site_settings.upsert({ where: { k }, create: { k, v }, update: { v } });
+  const stored = SECRET_SETTING_KEYS.has(k) ? sealSetting(k, v) : v;
+  await prisma.site_settings.upsert({ where: { k }, create: { k, v: stored }, update: { v: stored } });
   settingsCache = null; // الحفظ يُفرّغ الكاش فيظهر التعديل فوراً
 }
 

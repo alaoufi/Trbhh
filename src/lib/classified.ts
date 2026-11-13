@@ -100,9 +100,9 @@ export async function getAllClassifieds(limit = 120): Promise<AdminClassified[]>
 }
 
 /** Admin: enable/disable a classified ad (hidden everywhere while disabled). */
-export async function setClassifiedStatus(id: number, enabled: boolean) {
+export async function setClassifiedStatus(id: number, enabled: boolean, byOwner = false) {
   await ensureClassifiedTable();
-  await prisma.classified_ads.updateMany({ where: { id: BigInt(id) }, data: { status: enabled ? 1 : 0 } }).catch(() => {});
+  await prisma.classified_ads.updateMany({ where: { id: BigInt(id) }, data: { status: enabled ? 1 : 0, paused_by_owner: !enabled && byOwner ? 1 : 0 } }).catch(() => {});
 }
 
 /**
@@ -161,10 +161,10 @@ export async function classifiedPublicVisible(id: number): Promise<boolean> {
 }
 
 /** حالة المبوّب (1 ظاهر · 0 موقوف) ومالكه — لأزرار الإجراءات (المالك/الإدارة). */
-export async function getClassifiedOwnerState(id: number): Promise<{ status: number; userId: number | null } | null> {
+export async function getClassifiedOwnerState(id: number): Promise<{ status: number; userId: number | null; pausedByOwner: boolean } | null> {
   await ensureClassifiedTable();
-  const r = await prisma.classified_ads.findFirst({ where: { id: BigInt(id) }, select: { status: true, user_id: true } }).catch(() => null);
-  return r ? { status: r.status, userId: r.user_id == null ? null : Number(r.user_id) } : null;
+  const r = await prisma.classified_ads.findFirst({ where: { id: BigInt(id) }, select: { status: true, user_id: true, paused_by_owner: true } }).catch(() => null);
+  return r ? { status: r.status, userId: r.user_id == null ? null : Number(r.user_id), pausedByOwner: r.paused_by_owner === 1 } : null;
 }
 
 export async function getClassifiedById(id: number): Promise<Classified | null> {

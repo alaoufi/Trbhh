@@ -768,7 +768,8 @@ async function getAdImpl(id: number) {
           return {
             id: toInt(seller.id),
             name: useProfile ? pubProfile!.name : (seller.name || seller.userName || 'مستخدم'),
-            phone: useProfile ? (pubProfile!.phone || null) : (seller.allow_phone ? seller.phoneNumber : null),
+            // «إظهار رقم الجوال» في نموذج الإعلان: إن ألغاه المعلن (0) لا يُعرض رقم الاتصال لهذا الإعلان.
+            phone: ad.phoneAllow === 0 ? null : useProfile ? (pubProfile!.phone || null) : (seller.allow_phone ? seller.phoneNumber : null),
             whatsapp: useProfile ? (pubProfile!.whatsapp || null) : (seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null),
             trusted: seller.trusted === 1,
             banned: seller.ban === 'checked',

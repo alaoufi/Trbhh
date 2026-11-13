@@ -2292,6 +2292,7 @@ model classified_ads {
   expires_at  DateTime? @db.DateTime(0)
   publish_at  DateTime? @db.DateTime(0)
   profile_id  BigInt?
+  paused_by_owner Int   @default(0) @db.TinyInt
 }
 
 model classified_views {

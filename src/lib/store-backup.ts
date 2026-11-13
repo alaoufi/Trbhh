@@ -98,7 +98,12 @@ async function applySnapshot(userId: number, snap: StoreBackup): Promise<'ok' | 
     return 'blocked';
   }
 
-  await prisma.stores.updateMany({ where: { user_id: userId }, data }).catch(() => {});
+  // اسم المتجر ونشاطه لا يتغيّران بعد أول تسمية إلا بطلب وموافقة الإدارة — ونسخة احتياطية
+  // معدّلة يدوياً لا تتجاوز ذلك: يبقى الاسم/النشاط الحاليان ويُستعاد الباقي.
+  const current = await prisma.stores.findFirst({ where: { id: storeId }, select: { store_name: true, specialty: true } }).catch(() => null);
+  if ((current?.store_name || '').trim()) delete data.store_name;
+  if ((current?.specialty || '').trim()) delete data.specialty;
+  await prisma.stores.updateMany({ where: { id: storeId, user_id: userId }, data }).catch(() => {});
 
   if (Array.isArray(snap.products)) {
     const ids = snap.products.filter((n) => Number.isInteger(n) && n > 0).slice(0, 500);

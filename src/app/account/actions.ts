@@ -8,7 +8,7 @@ import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL,
 import { charge, buyDupPack } from '@/lib/wallet';
 import { buyMemberPackage, getUserPackage } from '@/lib/packages';
 import { setUserArea } from '@/lib/user-location';
-import { toLocalSaudi } from '@/lib/sms';
+import { normalizeSaudi, toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
 import { toInt } from '@/lib/utils';
 import { scanContent } from '@/lib/content-guard';
@@ -297,7 +297,8 @@ export async function featureAdAction(formData: FormData) {
   redirect('/account/ads?featured=1');
 }
 
-export async function updateProfileAction(_prev: unknown, formData: FormData) {
+type ProfileState = { ok?: boolean; error?: string; needCode?: boolean; pendingPhone?: string; notice?: string } | null;
+export async function updateProfileAction(_prev: unknown, formData: FormData): Promise<ProfileState> {
   const session = await requireUser();
   // قفل الاسم: عند تفعيله لا يتغيّر الاسم من هنا إطلاقاً — عبر «طلب تغيير الاسم» فقط
   const { nameLockEnabled } = await import('@/lib/settings');
@@ -318,13 +319,46 @@ export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const whatsapp = formData.get('whatsapp') ? 1 : 0;
   const cityId = Number(formData.get('city_id')) || 0; // المنطقة
   const areaId = Number(formData.get('area_id')) || 0; // المدينة / المحافظة
+  // تغيير رقم الجوال (وهو معرّف الدخول واستعادة كلمة المرور) لا يُحفظ إلا بعد إدخال رمز
+  // يُرسل إلى الرقم الجديد: يمنع ربط الحساب برقم لا يملكه صاحبه، أو خطف حساب من جلسة مفتوحة.
+  const me = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true } });
+  const currentPhone = me?.phoneNumber ? toLocalSaudi(me.phoneNumber) : '';
+  const phoneChanged = !!phoneNumber && phoneNumber !== currentPhone;
+  let savePhone = !phoneChanged; // بلا تغيير أو تفريغ للحقل: يُحفظ كما كان سابقاً
+  let pending: ProfileState = null;
+  if (phoneChanged) {
+    if (!/^05\d{8}$/.test(phoneNumber)) return { error: 'رقم الجوال غير صحيح — اكتبه بصيغة 05xxxxxxxx.' };
+    const sig = phoneNumber.slice(1);
+    const taken = await prisma.users.findFirst({
+      where: { id: { not: BigInt(session.uid) }, phoneNumber: { in: [phoneNumber, sig, `966${sig}`, `+966${sig}`, `00966${sig}`] } },
+      select: { id: true },
+    });
+    if (taken) return { error: 'رقم الجوال مستخدم في حساب آخر.' };
+    const { getMessagingConfig, createAndSendOtp, verifyOtp } = await import('@/lib/sms');
+    const otpAvailable = (await getMessagingConfig().catch(() => null))?.enabled === true;
+    const code = String(formData.get('phoneCode') || '').trim();
+    if (!otpAvailable) {
+      savePhone = true; // خدمة الرسائل معطّلة من الإدارة: لا وسيلة للتحقق، يبقى السلوك السابق
+    } else if (code) {
+      if (await verifyOtp(phoneNumber, code)) {
+        savePhone = true;
+        await prisma.password_otps.deleteMany({ where: { phone: normalizeSaudi(phoneNumber) } }).catch(() => {});
+      } else {
+        pending = { needCode: true, pendingPhone: phoneNumber, error: 'الرمز غير صحيح أو منتهي الصلاحية.' };
+      }
+    } else {
+      const sent = await createAndSendOtp(phoneNumber, 'رمز تأكيد رقم جوالك الجديد في تربح');
+      if (!sent.ok) return { error: sent.error || 'تعذّر إرسال رمز التحقق — حاول لاحقاً.' };
+      pending = { needCode: true, pendingPhone: phoneNumber, notice: 'أرسلنا رمز تحقق إلى الرقم الجديد. أدخله ثم احفظ لتأكيد تغيير الرقم.' };
+    }
+  }
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
-    data: { ...(nameLocked ? {} : { name }), phoneNumber, phone_whatsapp, allow_phone, whatsapp, ...(cityId ? { city_id: BigInt(cityId) } : {}) },
+    data: { ...(nameLocked ? {} : { name }), ...(savePhone ? { phoneNumber } : {}), phone_whatsapp, allow_phone, whatsapp, ...(cityId ? { city_id: BigInt(cityId) } : {}) },
   });
   await setUserArea(session.uid, areaId || null);
   revalidatePath('/account/profile');
-  return { ok: true };
+  return pending ?? { ok: true };
 }
 
 /** طلب تغيير اسم العضو: لا يتغيّر الاسم إلا بموافقة الإدارة — مع السبب ومستند إثبات. */

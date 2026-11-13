@@ -426,7 +426,10 @@ export async function toggleClassifiedStatusAction(formData: FormData) {
   const isOwner = st.userId === session.uid;
   const admin = await hasAccess(session.uid, 'classified', 'suspend').catch(() => false);
   if (!isOwner && !admin) redirect(`/classified/${id}`);
-  await setClassifiedStatus(id, st.status !== 1); // عكس الحالة الحالية
+  // المالك يعيد تشغيل ما أوقفه بنفسه فقط: مبوّب أوقفته الإدارة أو مجدول لم يحن موعده
+  // لا يُنشر بطلب مباشر منه.
+  if (!admin && st.status !== 1 && !st.pausedByOwner) redirect(`/classified/${id}`);
+  await setClassifiedStatus(id, st.status !== 1, !admin); // عكس الحالة الحالية
   revalidatePath(`/classified/${id}`);
   revalidatePath('/classified');
   revalidatePath('/');

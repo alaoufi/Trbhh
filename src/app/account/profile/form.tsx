@@ -21,7 +21,7 @@ const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 t
 const lbl = 'mb-1 block text-sm font-bold text-foreground';
 
 export function ProfileForm({ initial, regions, areas, nameLocked }: { initial: Initial; regions: Region[]; areas: Area[]; nameLocked?: boolean }) {
-  const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean; error?: string } | null);
+  const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean; error?: string; needCode?: boolean; pendingPhone?: string; notice?: string } | null);
   return (
     <form action={action} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
       {initial.trusted && (
@@ -42,7 +42,15 @@ export function ProfileForm({ initial, regions, areas, nameLocked }: { initial: 
       </div>
       <div>
         <label className={lbl}>رقم الجوال</label>
-        <input name="phoneNumber" type="tel" inputMode="tel" defaultValue={initial.phoneNumber} className={field} placeholder="05xxxxxxxx" />
+        <input key={state?.pendingPhone || 'phone'} name="phoneNumber" type="tel" inputMode="tel" defaultValue={state?.pendingPhone || initial.phoneNumber} className={field} placeholder="05xxxxxxxx" />
+        {state?.needCode && state.pendingPhone && (
+          <div className="mt-2 rounded-lg border-2 border-amber-300 bg-amber-50 p-3">
+            <label className={lbl}>رمز التحقق المرسل إلى الرقم الجديد</label>
+            <input name="phoneCode" inputMode="numeric" autoComplete="one-time-code" maxLength={4} dir="ltr" className={field} placeholder="••••" />
+            {state.notice && <p className="mt-1 text-xs font-bold text-amber-800">{state.notice}</p>}
+            <p className="mt-1 text-xs text-muted-foreground">رقمك الحالي يبقى كما هو حتى تُدخل الرمز وتحفظ.</p>
+          </div>
+        )}
       </div>
       <div>
         <label className={lbl}>رقم الواتساب</label>

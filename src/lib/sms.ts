@@ -1,5 +1,5 @@
 import 'server-only';
-import { randomInt, randomBytes, randomUUID } from 'node:crypto';
+import { randomInt, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { hashPassword } from './auth';
@@ -249,6 +249,9 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   const prevAttempts = otp && otp.expires_at.getTime() > Date.now() ? otp.attempts : 0;
   if (prevAttempts >= 10) return { ok: false, delivered: false, error: 'تجاوزت الحدّ المسموح للمحاولات — حاول بعد قليل' };
 
+  const { allowOtpSend } = await import('./throttle');
+  if (!(await allowOtpSend(norm))) return { ok: false, delivered: false, error: 'تجاوزت الحدّ المسموح لطلب الرموز — حاول لاحقاً' };
+
   const code = String(randomInt(1000, 10000)); // رمز تحقّق من ٤ خانات (1000–9999)
   const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: prevAttempts, last_sent: new Date() };
   await prisma.password_otps.upsert({ where: { phone: norm }, create: { phone: norm, ...fresh }, update: fresh });
@@ -283,11 +286,19 @@ export async function sendNewPasswordToUser(userId: number): Promise<{ ok: boole
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   await ensureOtp();
   const norm = normalizeSaudi(phone);
+  // حدّ يومي لكل رقم لا يتصفّر بإعادة إصدار الرمز: يمنع تخمين رمز الأربع خانات على مدى أيام.
+  const { allowOtpGuess } = await import('./throttle');
+  if (!(await allowOtpGuess(norm))) return false;
+  // حجز المحاولة ذرّياً: طلبات متزامنة لا تتجاوز حدّ الخمس محاولات للرمز الواحد.
+  const taken = await prisma.password_otps.updateMany({
+    where: { phone: norm, attempts: { lt: 5 }, expires_at: { gt: new Date() } },
+    data: { attempts: { increment: 1 } },
+  }).catch(() => ({ count: 0 }));
+  if (taken.count !== 1) return false;
   const r = await prisma.password_otps.findUnique({ where: { phone: norm } }).catch(() => null);
   if (!r) return false;
-  if (r.expires_at.getTime() < Date.now() || r.attempts >= 5) return false;
-  await prisma.password_otps.update({ where: { phone: norm }, data: { attempts: { increment: 1 } } });
-  return String(r.code) === String(code).trim();
+  const a = Buffer.from(String(r.code)), b = Buffer.from(String(code).trim());
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /** Set a new password for the member owning this phone. */

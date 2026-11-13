@@ -100,6 +100,12 @@ export async function toggleAdStatusAction(formData: FormData) {
     }
     // الإيقاف من العضو يُعلَّم paused_by_owner حتى لا يختلط بطلبات الموافقة عند الإدارة
     const pausing = ad.status === 1;
+    // إعادة التشغيل مسموحة فقط لإعلان أوقفه العضو نفسه. المؤرشف يُستعاد من «استعادة»
+    // (برسومها)، والمنتظر لموافقة الإدارة أو المجدول لا ينشره صاحبه بطلب مباشر.
+    if (!pausing) {
+      if (ad.data_archive && ad.data_archive.trim() !== '') redirect('/account/ads');
+      if (toInt(ad.paused_by_owner) !== 1) redirect('/account/ads?pending=1');
+    }
     await prisma.ads.update({ where: { id: adId }, data: { status: pausing ? 0 : 1, paused_by_owner: pausing ? 1 : 0 } });
     const { bustAdCaches } = await import('@/lib/data');
     await bustAdCaches().catch(() => {}); // يظهر/يختفي فوراً في القوائم
@@ -213,9 +219,14 @@ export async function requestTopupAction(formData: FormData) {
 
   if (confirmDup) {
     // إعادة إرسال بعد تأكيد العضو رغم تنبيه التشابه — لا حاجة لإعادة رفع الملف (محفوظ من المحاولة الأولى)
+    // المسار يأتي من النموذج: لا يُقبل إلا إيصال رفعه هذا العضو نفسه وموجود فعلاً، والبصمة
+    // تُحسب من الملف على الخادم — لا يُوثَق بقيمة يرسلها العميل (كانت تسمح بإرفاق سند عضو
+    // آخر أو مسار عشوائي، وبتجاوز كشف السند المكرر ببصمة مختلقة).
     rel = String(formData.get('existingReceipt') || '');
-    receiptHash = String(formData.get('existingHash') || '');
-    if (!rel) redirect('/account/wallet?error=topupreceipt');
+    if (!new RegExp(`^uploads/topup_${session.uid}_\\d{10,16}\\.(jpg|jpeg|png|webp|gif|pdf)$`).test(rel)) redirect('/account/wallet?error=topupreceipt');
+    const stored = await import('@/lib/storage').then((m) => m.readLocal(rel)).catch(() => null);
+    if (!stored) redirect('/account/wallet?error=topupreceipt');
+    receiptHash = await import('@/lib/phash').then((m) => m.receiptHash(stored)).catch(() => '');
   } else {
     const file = formData.get('receipt');
     if (!(file instanceof File) || file.size === 0) redirect('/account/wallet?error=topupreceipt');

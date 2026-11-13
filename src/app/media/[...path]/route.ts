@@ -4,7 +4,7 @@ import { open, readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { statLocal, statInDir } from '@/lib/storage';
 import { isHeicBytes, heicBytesToJpeg } from '@/lib/upload-normalize';
-import { isCanonicalMediaPath, isPotentiallyProtectedUploadPath, isProtectedUploadType } from '@/lib/media-access';
+import { isCanonicalMediaPath, isPotentiallyProtectedUploadPath, isProtectedUploadType, isServableMediaPath, privateOwnerDocument } from '@/lib/media-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,16 @@ const TYPES: Record<string, string> = {
   // JPEG bytes but saved with the source extension (.heic/.heif from iPhones).
   // Serving them as image/jpeg makes those already-stored images render again.
   heic: 'image/jpeg', heif: 'image/jpeg', bmp: 'image/jpeg', tiff: 'image/jpeg', tif: 'image/jpeg',
+  pdf: 'application/pdf',
 };
+
+/** الملفات المرفوعة لا تُنفَّذ كصفحات في نطاق الموقع: فتح SVG/أي وسيط مباشرةً يكون داخل
+ *  sandbox بلا سكربتات. PDF مستثنى لأن عارض المتصفح لا يعمل داخل sandbox. */
+function mediaSecurityHeaders(contentType: string): Record<string, string> {
+  return contentType === 'application/pdf'
+    ? { 'X-Content-Type-Options': 'nosniff' }
+    : { 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" };
+}
 
 function parseRange(range: string | null, size: number): { start: number; end: number } | null {
   if (!range) return null;
@@ -53,7 +62,7 @@ function serveFile(file: { abs: string; size: number }, req: NextRequest, conten
         'Content-Range': `bytes ${start}-${end}/${file.size}`,
         'Accept-Ranges': 'bytes',
         'Cache-Control': cacheControl,
-        'X-Content-Type-Options': 'nosniff',
+        ...mediaSecurityHeaders(contentType),
       },
     });
   }
@@ -64,12 +73,23 @@ function serveFile(file: { abs: string; size: number }, req: NextRequest, conten
       'Content-Length': String(file.size),
       'Accept-Ranges': 'bytes',
       'Cache-Control': cacheControl,
-      'X-Content-Type-Options': 'nosniff',
+      ...mediaSecurityHeaders(contentType),
     },
   });
 }
 
 async function protectedMediaCacheControl(rel: string): Promise<string | null> {
+  const ownerDoc = privateOwnerDocument(rel);
+  if (ownerDoc) {
+    const { getSession } = await import('@/lib/auth');
+    const session = await getSession();
+    if (!session) return null;
+    if (session.uid === ownerDoc.ownerId) return 'private, no-store';
+    const { hasAccess } = await import('@/lib/access-control/guards');
+    const can = (m: string) => hasAccess(session.uid, m as Parameters<typeof hasAccess>[1], 'view').catch(() => false);
+    const allowed = ownerDoc.kind === 'topup' ? await can('topups') : (await can('users')) || (await can('verifications'));
+    return allowed ? 'private, no-store' : null;
+  }
   if (!isPotentiallyProtectedUploadPath(rel)) return 'public, max-age=31536000, immutable';
   const { prisma } = await import('@/lib/prisma');
   const upload = await prisma.uploads.findFirst({ where: { file_name: rel }, select: { type: true, user_id: true } }).catch(() => null);
@@ -108,7 +128,7 @@ async function serveConvertedHeic(abs: string, ext: string, cacheControl: string
         'Content-Type': 'image/jpeg',
         'Content-Length': String(jpg.length),
         'Cache-Control': cacheControl,
-        'X-Content-Type-Options': 'nosniff',
+        ...mediaSecurityHeaders('image/jpeg'),
       },
     });
   } catch { return null; }
@@ -117,7 +137,7 @@ async function serveConvertedHeic(abs: string, ext: string, cacheControl: string
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await params;
   const rel = parts.join('/');
-  if (!isCanonicalMediaPath(rel)) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  if (!isCanonicalMediaPath(rel) || !isServableMediaPath(rel)) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   const ext = rel.split('.').pop()?.toLowerCase() || '';
   const contentType = TYPES[ext] || 'application/octet-stream';
   const cacheControl = await protectedMediaCacheControl(rel);
@@ -153,7 +173,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
         }
         if (!h.has('accept-ranges')) h.set('Accept-Ranges', 'bytes');
         h.set('Cache-Control', cacheControl === 'private, no-store' ? cacheControl : 'public, max-age=86400');
-        h.set('X-Content-Type-Options', 'nosniff');
+        for (const [k, v] of Object.entries(mediaSecurityHeaders(h.get('Content-Type') || contentType))) h.set(k, v);
         return new Response(upstream.body, { status: upstream.status, headers: h });
       }
     } catch {

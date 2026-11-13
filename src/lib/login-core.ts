@@ -19,7 +19,10 @@ export async function verifyLogin(identifier: string, password: string, factorCo
   // تحديد المعدّل: نمنع تخمين كلمة المرور بعد عدة محاولات فاشلة لنفس المُعرِّف.
   const { rateGet, rateHit, rateReset } = await import('./redis');
   const rlKey = `rl:login:${identifier.toLowerCase().replace(/\s+/g, '')}`;
-  if ((await rateGet(rlKey)) >= 8) {
+  // حدّ لكل عنوان: يمنع تجربة كلمة مرور واحدة على حسابات كثيرة (واسع لأن شبكات الجوال تتشارك العنوان).
+  const ip = await import('./throttle').then((m) => m.clientIp());
+  const ipKey = ip ? `rl:login-ip:${ip}` : '';
+  if ((await rateGet(rlKey)) >= 8 || (ipKey && (await rateGet(ipKey)) >= 60)) {
     return { ok: false, error: 'محاولات دخول كثيرة، انتظر قليلاً ثم أعد المحاولة' };
   }
 
@@ -48,6 +51,7 @@ export async function verifyLogin(identifier: string, password: string, factorCo
   if (user && !(await takeSecurityAttempt(`password:${user.id}`))) return { ok: false, error: 'محاولات دخول كثيرة؛ انتظر عشر دقائق ثم أعد المحاولة.' };
   if (!user || !(await verifyPassword(password, user.password))) {
     await rateHit(rlKey, 600); // احتسب المحاولة الفاشلة ضمن نافذة ١٠ دقائق
+    if (ipKey) await rateHit(ipKey, 600);
     return { ok: false, error: 'بيانات الدخول غير صحيحة' };
   }
   const uid = toInt(user.id);

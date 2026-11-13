@@ -1020,12 +1020,13 @@ export async function saveVerificationAction(formData: FormData) {
     setSetting(MSG_KEYS.smsUrl, s('sms_url') || defUrl),
     // المفتاح/السر لا يحتويان مسافات إطلاقاً — تُزال أي مسافة لُصقت بالخطأ.
     setSetting(MSG_KEYS.smsUser, s('sms_username').replace(/\s+/g, '')),
-    setSetting(MSG_KEYS.smsPass, s('sms_password').replace(/\s+/g, '')),
+    // السرّ لا يُعرض في الصفحة: حقل فارغ = إبقاء القيمة المحفوظة.
+    ...(s('sms_password') ? [setSetting(MSG_KEYS.smsPass, s('sms_password').replace(/\s+/g, ''))] : []),
     setSetting(MSG_KEYS.smsSender, s('sms_sender')),
     setSetting(MSG_KEYS.smsUnicode, s('sms_unicode') || 'e'),
     setSetting(MSG_KEYS.waUrl, s('wa_url') || 'https://user.4whats.net/api/sendMessage'),
     setSetting(MSG_KEYS.waInstance, s('wa_instance')),
-    setSetting(MSG_KEYS.waToken, s('wa_token')),
+    ...(s('wa_token') ? [setSetting(MSG_KEYS.waToken, s('wa_token'))] : []),
     setSetting(MSG_KEYS.channel, channel),
     setSetting(MSG_KEYS.enabled, formData.get('enabled') !== null ? '1' : '0'),
   ]);

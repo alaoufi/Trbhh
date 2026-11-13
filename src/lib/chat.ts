@@ -23,6 +23,9 @@ export async function screenChatMessage(userId: number, text: string): Promise<{
 
 export async function sendChat(fromId: number, toId: number, message: string): Promise<number> {
   await ensureChatExtras();
+  // العضو المحظور لا يراسل أحداً من أي مسار (بعض المسارات تتحقق من الجلسة فقط لا من الحظر).
+  const { isUserBanned } = await import('./moderation');
+  if (await isUserBanned(fromId).catch(() => false)) return 0;
   const text = message.slice(0, 2000);
   const now = new Date();
   // منع التكرار المطابق بنفس اليوم: نفس المرسل والمستلم والنص خلال ٢٤ ساعة → لا تُنشأ نسخة ثانية

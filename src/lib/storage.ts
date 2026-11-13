@@ -17,8 +17,22 @@ export function isSafeStoragePath(baseDir: string, relPath: string): boolean {
   return relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative);
 }
 
+/** امتدادات يُسمح بتخزينها. أي امتداد آخر (svg/html/js…) يُحفظ كـ«bin» فلا يُخدَّم ولا
+ *  يُنفَّذ: كان فشل معالجة الصورة يحفظ الملف الأصلي بامتداد العميل، فيُرفع SVG فيه سكربت. */
+const STORABLE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'heic', 'heif', 'bmp', 'tif', 'tiff', 'pdf',
+  'mp4', 'mov', 'm4v', 'webm', 'mkv', '3gp', 'ogg', 'mp3', 'm4a', 'wav']);
+
+/** اسم ملف آمن للتخزين: بلا مسارات، حروف محدودة، وامتداد من القائمة المسموحة فقط. */
+export function safeUploadName(fileName: string): string {
+  const base = fileName.replace(/\\/g, '/').split('/').pop() || 'file';
+  const dot = base.lastIndexOf('.');
+  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 120) || 'file';
+  const ext = (dot > 0 ? base.slice(dot + 1) : '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return `${stem}.${STORABLE_EXT.has(ext) ? ext : 'bin'}`;
+}
+
 export async function saveUpload(buffer: Buffer, fileName: string): Promise<string> {
-  const rel = path.join('uploads', fileName);
+  const rel = path.join('uploads', safeUploadName(fileName));
   const abs = path.join(STORAGE_DIR, rel);
   await fs.mkdir(path.dirname(abs), { recursive: true });
   await fs.writeFile(abs, buffer);

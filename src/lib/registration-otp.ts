@@ -19,13 +19,18 @@ export async function startSaudiRegistrationIntent(input: { name: string; phone:
   const existing = await prisma.users.findFirst({ where: { phoneNumber: input.phone }, select: { id: true } });
   if (existing) return { ok: false as const, error: 'رقم الجوال مسجّل مسبقاً' };
   const now = new Date();
-  const rows = await prisma.$queryRawUnsafe<{ attempts: number; last_sent: Date }[]>(
-    'SELECT attempts,last_sent FROM registration_intents WHERE phone = ? LIMIT 1', input.phone,
+  const rows = await prisma.$queryRawUnsafe<{ attempts: number; last_sent: Date; expires_at: Date }[]>(
+    'SELECT attempts,last_sent,expires_at FROM registration_intents WHERE phone = ? LIMIT 1', input.phone,
   );
   const previous = rows[0];
   if (previous && now.getTime() - new Date(previous.last_sent).getTime() < 60_000) return { ok: false as const, error: 'انتظر دقيقة قبل طلب رمز جديد.' };
-  const attempts = nextRegistrationOtpAttempts(Number(previous?.attempts || 0));
+  // العدّاد يبقى عبر إعادة الإرسال ما دام الرمز السابق سارياً، ويتصفّر بعد انتهائه (كان يبقى
+  // للأبد فيُقفل الرقم نهائياً). الحدّ اليومي في throttle يمنع استغلال التصفير للتخمين.
+  const stillValid = !!previous && new Date(previous.expires_at).getTime() > now.getTime();
+  const attempts = stillValid ? nextRegistrationOtpAttempts(Number(previous?.attempts || 0)) : 0;
   if (attempts >= MAX_ATTEMPTS) return { ok: false as const, error: 'تجاوزت الحد المسموح للمحاولات. حاول بعد قليل.' };
+  const { allowOtpSend } = await import('@/lib/throttle');
+  if (!(await allowOtpSend(input.phone))) return { ok: false as const, error: 'تجاوزت الحدّ المسموح لطلب الرموز. حاول لاحقاً.' };
   const code = String(randomInt(1000, 10000));
   const expiry = new Date(now.getTime() + TTL_MS);
   await prisma.$executeRawUnsafe(
@@ -45,8 +50,11 @@ export async function consumeSaudiRegistrationIntent(phone: string, code: string
   );
   const intent = rows[0];
   if (!intent || !isRegistrationIntentUsable({ expiresAt: new Date(intent.expires_at), attempts: Number(intent.attempts) })) return { ok: false as const, error: 'الرمز غير صحيح أو منتهي الصلاحية. اطلب رمزاً جديداً.' };
-  await prisma.$executeRawUnsafe('UPDATE registration_intents SET attempts = attempts + 1 WHERE phone = ?', phone);
-  if (String(intent.code) !== String(code).trim()) return { ok: false as const, error: 'الرمز غير صحيح أو منتهي الصلاحية. اطلب رمزاً جديداً.' };
+  const { allowOtpGuess } = await import('@/lib/throttle');
+  const taken = (await allowOtpGuess(phone))
+    ? Number(await prisma.$executeRawUnsafe('UPDATE registration_intents SET attempts = attempts + 1 WHERE phone = ? AND attempts < ? AND expires_at > ?', phone, MAX_ATTEMPTS, new Date()))
+    : 0;
+  if (taken !== 1 || String(intent.code) !== String(code).trim()) return { ok: false as const, error: 'الرمز غير صحيح أو منتهي الصلاحية. اطلب رمزاً جديداً.' };
   try {
     const user = await prisma.$transaction(async (tx) => {
       const existing = await tx.users.findFirst({ where: { phoneNumber: phone }, select: { id: true } });

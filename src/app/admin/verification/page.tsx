@@ -80,7 +80,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
             </p>
             <L label="رابط الـAPI"><input name="sms_url" defaultValue={c.smsUrl} className={field} dir="ltr" /></L>
             <L label="المفتاح (app_key / username) — يُترك فارغاً مع تقنيات"><input name="sms_username" defaultValue={c.smsUser} className={field} dir="ltr" /></L>
-            <L label="السر (app_secret / رمز تقنيات Bearer)"><input name="sms_password" defaultValue={c.smsPass} className={field} dir="ltr" /></L>
+            <L label="السر (app_secret / رمز تقنيات Bearer)"><input name="sms_password" type="password" autoComplete="new-password" placeholder={c.smsPass ? 'محفوظ — اتركه فارغاً للإبقاء عليه' : ''} className={field} dir="ltr" /></L>
             <L label="اسم المرسِل (sender)"><input name="sms_sender" defaultValue={c.smsSender} className={field} /></L>
             <L label="الترميز (للقديمة فقط)"><input name="sms_unicode" defaultValue={c.smsUnicode} className={field} /></L>
           </div>
@@ -95,7 +95,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
             <p className="text-xs font-bold text-amber-700">إن كانت خدمة الواتساب متوقّفة، اترك القناة على «SMS فقط».</p>
             <L label="رابط الـAPI"><input name="wa_url" defaultValue={c.waUrl} className={field} /></L>
             <L label="instanceid"><input name="wa_instance" defaultValue={c.waInstance} className={field} /></L>
-            <L label="token"><input name="wa_token" defaultValue={c.waToken} className={field} /></L>
+            <L label="token"><input name="wa_token" type="password" autoComplete="new-password" placeholder={c.waToken ? 'محفوظ — اتركه فارغاً للإبقاء عليه' : ''} className={field} dir="ltr" /></L>
           </div>
         </section>
 

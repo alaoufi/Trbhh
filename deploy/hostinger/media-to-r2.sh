@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # نقل وسائط «تربح» من خادم Hostinger إلى مخزن R2 مباشرةً (لا تمر بالخادم الجديد).
-# ينقل كل الوسائط عدا وسائط الإعلانات الأقدم من TRBHH_ADS_DAYS يوماً (الافتراضي 90) — قرار المالك.
+# ينقل وسائط الإعلانات المنشورة من آخر TRBHH_ADS_DAYS يوماً (الافتراضي 90) فقط — قرار المالك.
+# وسائط الإعلانات الأقدم أو غير المنشورة لا تُنقل (TRBHH_PUBLISHED_ONLY=0 ينقل غير المنشور أيضاً).
 # شعارات المتاجر وصور الحسابات والإيصالات وكل ما ليس صورة/فيديو إعلان قديم يُنقل كاملاً.
 # وسائط الإعلانات القديمة تبقى على Hostinger ويمكن نقلها لاحقاً بـ TRBHH_ADS_DAYS=100000.
 # نسخ فقط: لا يحذف ولا يعدّل أي ملف على Hostinger، ولا يحذف شيئاً من المخزن.
@@ -25,7 +26,7 @@ mkdir -p "$WORK"
 # يبني قائمة الاستثناء من قاعدة البيانات (قراءة فقط) ثم ملف الفلتر النهائي.
 prepare() {
   if [[ -n "${TRBHH_EXCLUDE_LIST:-}" ]]; then cp "$TRBHH_EXCLUDE_LIST" "$WORK/old-ads-media.txt"
-  else docker exec -i -e DAYS="$DAYS" -w /app trbhh-app node - < "$HERE/old-ads-media.cjs" > "$WORK/old-ads-media.txt" 2> "$WORK/prepare-summary.txt" || { cat "$WORK/prepare-summary.txt" >&2; echo "تعذّر بناء قائمة الإعلانات القديمة — لم يُنقل شيء" >&2; exit 4; }
+  else docker exec -i -e DAYS="$DAYS" -e PUBLISHED_ONLY="${TRBHH_PUBLISHED_ONLY:-1}" -w /app trbhh-app node - < "$HERE/old-ads-media.cjs" > "$WORK/old-ads-media.txt" 2> "$WORK/prepare-summary.txt" || { cat "$WORK/prepare-summary.txt" >&2; echo "تعذّر بناء قائمة الإعلانات القديمة — لم يُنقل شيء" >&2; exit 4; }
   fi
   # كل مسار مستثنى يُكتب قاعدة مثبّتة مع تهريب رموز الأنماط.
   { sed -e 's/[][\\*?{}]/\\&/g' -e 's|^|- /|' "$WORK/old-ads-media.txt"; cat "$BASE_FILTER"; } > "$FILTER"

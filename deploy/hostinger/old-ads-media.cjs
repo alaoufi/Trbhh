@@ -1,10 +1,12 @@
-// يطبع مسارات وسائط الإعلانات الأقدم من DAYS يوماً (صور وفيديو) التي لا يستخدمها أي إعلان أحدث.
-// قراءة فقط من قاعدة البيانات. إعلان بلا تاريخ إنشاء يُعامل كحديث (تُنقل وسائطه) احتياطاً.
+// يطبع مسارات وسائط الإعلانات التي لا تُنقل (صور وفيديو): الأقدم من DAYS يوماً، وغير المنشورة
+// (status != 1) عند PUBLISHED_ONLY=1 — ما لم يستخدم الملف نفسه إعلانٌ يُنقل.
+// قراءة فقط من قاعدة البيانات. إعلان منشور بلا تاريخ إنشاء يُعامل كحديث احتياطاً.
 const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 (async () => {
   const days = Math.max(1, Math.floor(Number(process.env.DAYS || 90)));
-  const ads = await p.$queryRawUnsafe(`SELECT id, video_path, (created_at < NOW() - INTERVAL ${days} DAY) AS old FROM ads`);
+  const publishedOnly = process.env.PUBLISHED_ONLY !== '0';
+  const ads = await p.$queryRawUnsafe(`SELECT id, video_path, (created_at < NOW() - INTERVAL ${days} DAY${publishedOnly ? ' OR status <> 1' : ''}) AS old FROM ads`);
   const photos = await p.$queryRawUnsafe('SELECT ph.other_id AS ad, u.file_name AS f FROM photos ph JOIN uploads u ON u.id = CAST(ph.photo_path AS UNSIGNED)');
   const isOld = new Map(ads.map((a) => [String(a.id), Number(a.old) === 1]));
   const oldFiles = new Set(), keepFiles = new Set();
@@ -17,6 +19,6 @@ const p = new PrismaClient();
   let n = 0;
   for (const f of oldFiles) if (!keepFiles.has(f)) { process.stdout.write(f + '\n'); n++; }
   const oldAds = [...isOld.values()].filter(Boolean).length;
-  process.stderr.write(`ads_total=${ads.length} ads_older_than_${days}d=${oldAds} ads_recent=${ads.length - oldAds} old_media_skipped=${n} recent_media_files=${keepFiles.size}\n`);
+  process.stderr.write(`ads_total=${ads.length} ads_skipped=${oldAds} ads_transferred=${ads.length - oldAds} published_only=${publishedOnly ? 1 : 0} days=${days} skipped_media_files=${n} transferred_ad_media_files=${keepFiles.size}\n`);
   process.exit(0);
 })().catch((e) => { process.stderr.write('ERROR ' + e.message + '\n'); process.exit(1); });

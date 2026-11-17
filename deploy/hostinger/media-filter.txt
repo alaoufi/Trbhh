@@ -1,0 +1,6 @@
+# ما يُنقل إلى مخزن الوسائط: الصور والفيديو والصوت وPDF فقط (يُطابق بلا تمييز حالة الأحرف).
+# نسخ قاعدة البيانات والملفات البرمجية والرفع الناقص لا تدخل مخزن الوسائط.
+- backups/**
+- .well-known/**
++ *.{jpg,jpeg,png,webp,gif,svg,avif,heic,heif,bmp,tif,tiff,jfif,ico,pdf,mp4,mov,m4v,webm,mkv,3gp,ogg,mp3,m4a,wav}
+- *

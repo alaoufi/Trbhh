@@ -1,0 +1,86 @@
+# «تربح» على الخادم المشترك 84.247.166.216 — عزل كامل (COORDINATION.md في alaoufi/server-edge).
+# الموارد: حاويات trbhh-* فقط، شبكة خاصة، ومنفذ واحد 127.0.0.1:8101 للبوابة. لا منفذ لقاعدة البيانات.
+# الأسرار في /etc/trbhh (صلاحية 600) لا في المستودع. الوسائط على R2 لا على القرص.
+# التشغيل: docker compose -f /opt/trbhh/deploy/edge-server/compose.yml up -d --build
+name: trbhh
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  networks: [trbhh]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  db:
+    <<: *hardening
+    image: mysql:8.0
+    container_name: trbhh-db
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=${TRBHH_DB_BUFFER:-512M}
+      - --max-connections=150
+    env_file: /etc/trbhh/db.env
+    volumes:
+      - /srv/trbhh/mysql:/var/lib/mysql
+    mem_limit: ${TRBHH_DB_MEM:-1536m}
+    cpus: ${TRBHH_DB_CPUS:-1.5}
+    pids_limit: 512
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  redis:
+    <<: *hardening
+    image: redis:7-alpine
+    container_name: trbhh-redis
+    # ذاكرة مؤقتة وعدّادات فقط: لا حفظ على القرص.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-lru"]
+    read_only: true
+    tmpfs: ["/data"]
+    cap_drop: [ALL]
+    cap_add: [SETGID, SETUID]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+
+  app:
+    <<: *hardening
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        TRBHH_RELEASE_COMMIT: ${TRBHH_RELEASE_COMMIT:-development}
+    container_name: trbhh-app
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    env_file: /etc/trbhh/app.env
+    environment:
+      REDIS_URL: "redis://redis:6379"
+      NODE_ENV: production
+      TZ: Asia/Riyadh
+      COOKIE_SECURE: "true"
+      # مساحة مؤقتة في الذاكرة فقط (تفريغ قاعدة البيانات من لوحة الإدارة) — الوسائط على R2.
+      STORAGE_DIR: /app/storage
+      LEGACY_MEDIA_BASE: ""
+      LEGACY_LOCAL_DIR: ""
+    tmpfs:
+      - /app/storage:size=768m,uid=1001,gid=1001,mode=0700
+    ports:
+      - "127.0.0.1:8101:3000"
+    cap_drop: [ALL]
+    mem_limit: ${TRBHH_APP_MEM:-1536m}
+    cpus: ${TRBHH_APP_CPUS:-2}
+    pids_limit: 512
+
+networks:
+  trbhh:
+    name: trbhh
+    driver: bridge

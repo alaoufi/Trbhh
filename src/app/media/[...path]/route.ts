@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { open, readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { statLocal, statInDir } from '@/lib/storage';
+import { r2Enabled, r2Open } from '@/lib/r2';
 import { isHeicBytes, heicBytesToJpeg } from '@/lib/upload-normalize';
 import { isCanonicalMediaPath, isPotentiallyProtectedUploadPath, isProtectedUploadType, isServableMediaPath, privateOwnerDocument } from '@/lib/media-access';
 
@@ -134,6 +135,38 @@ async function serveConvertedHeic(abs: string, ext: string, cacheControl: string
   } catch { return null; }
 }
 
+/**
+ * العرض من مخزن R2 الخاص: الخادم يجلب الملف بطلب موقّع ويمرّره للزائر (مع Range للفيديو)،
+ * فلا يُخزَّن شيء على قرص الخادم ولا يُكشف المخزن. الصور تُقرأ كاملة لفحص بصمة HEIC القديمة.
+ */
+async function serveFromR2(rel: string, ext: string, req: NextRequest, contentType: string, cacheControl: string): Promise<Response> {
+  const notFound = () => new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  const range = req.headers.get('range');
+  let obj: Awaited<ReturnType<typeof r2Open>>;
+  try { obj = await r2Open(rel, range); } catch { return new Response('Storage unavailable', { status: 502, headers: { 'Cache-Control': 'no-store' } }); }
+  if (obj.status === 404) { obj.body.destroy(); return notFound(); }
+  if (obj.status !== 200 && obj.status !== 206) {
+    obj.body.destroy();
+    return new Response(obj.status === 416 ? 'Range not satisfiable' : 'Storage unavailable', { status: obj.status === 416 ? 416 : 502, headers: { 'Cache-Control': 'no-store' } });
+  }
+  const size = Number(obj.headers['content-length'] || 0);
+  if (obj.status === 200 && IMG_EXT.has(ext) && size > 0 && size <= 25 * 1024 * 1024) {
+    const chunks: Buffer[] = [];
+    for await (const c of obj.body) chunks.push(c as Buffer);
+    let buf: Buffer = Buffer.concat(chunks);
+    let type = contentType;
+    if (isHeicBytes(buf.subarray(0, 12))) {
+      const jpg = await heicBytesToJpeg(buf).catch(() => null);
+      if (jpg) { buf = jpg; type = 'image/jpeg'; }
+    }
+    return new Response(new Uint8Array(buf), { headers: { 'Content-Type': type, 'Content-Length': String(buf.length), 'Cache-Control': cacheControl, ...mediaSecurityHeaders(type) } });
+  }
+  const headers: Record<string, string> = { 'Content-Type': contentType, 'Accept-Ranges': 'bytes', 'Cache-Control': cacheControl, ...mediaSecurityHeaders(contentType) };
+  if (obj.headers['content-length']) headers['Content-Length'] = String(obj.headers['content-length']);
+  if (obj.headers['content-range']) headers['Content-Range'] = String(obj.headers['content-range']);
+  return new Response(Readable.toWeb(obj.body) as unknown as ReadableStream, { status: obj.status, headers });
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await params;
   const rel = parts.join('/');
@@ -144,6 +177,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   // Return the same response for missing and inaccessible documents so their
   // existence cannot be inferred from a URL or filename.
   if (!cacheControl) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+
+  // مع R2 كل الوسائط (الجديدة والقديمة المنقولة) في المخزن — لا قراءة من قرص الخادم.
+  if (r2Enabled()) return serveFromR2(rel, ext, req, contentType, cacheControl);
 
   // 1) app storage (newly uploaded media)
   const local = await statLocal(rel);

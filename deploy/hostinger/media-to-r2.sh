@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # نقل وسائط «تربح» من خادم Hostinger إلى مخزن R2 مباشرةً (لا تمر بالخادم الجديد).
+# ينقل كل الوسائط عدا وسائط الإعلانات الأقدم من TRBHH_ADS_DAYS يوماً (الافتراضي 90) — قرار المالك.
+# شعارات المتاجر وصور الحسابات والإيصالات وكل ما ليس صورة/فيديو إعلان قديم يُنقل كاملاً.
+# وسائط الإعلانات القديمة تبقى على Hostinger ويمكن نقلها لاحقاً بـ TRBHH_ADS_DAYS=100000.
 # نسخ فقط: لا يحذف ولا يعدّل أي ملف على Hostinger، ولا يحذف شيئاً من المخزن.
 #   bash deploy/hostinger/media-to-r2.sh start    يبدأ النقل في الخلفية (يكمل لو انقطع الاتصال)
 #   bash deploy/hostinger/media-to-r2.sh status   يعرض التقدم
@@ -7,15 +10,27 @@
 set -euo pipefail
 REMOTE="${TRBHH_R2_REMOTE:-trbhh-media:trbhh-media}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-FILTER="$HERE/media-filter.txt"
+BASE_FILTER="$HERE/media-filter.txt"
+DAYS="${TRBHH_ADS_DAYS:-90}"
 LOG=/root/trbhh-media-to-r2.log
 WORK=/root/trbhh-media-to-r2
 LEGACY="${TRBHH_LEGACY_DIR:-/home/trbhh/htdocs/haftastore/public}"
 STORAGE="${TRBHH_STORAGE_DIR:-$(docker volume inspect trbhh_trbhh-storage --format '{{.Mountpoint}}')}"
+FILTER="$WORK/filter.txt"
 RC=(rclone --bind 0.0.0.0 --filter-from "$FILTER" --ignore-case --s3-no-check-bucket)
 
 [[ -d "$LEGACY" && -d "$STORAGE" ]] || { echo "مجلد مصدر غير موجود: $LEGACY أو $STORAGE" >&2; exit 2; }
 mkdir -p "$WORK"
+
+# يبني قائمة الاستثناء من قاعدة البيانات (قراءة فقط) ثم ملف الفلتر النهائي.
+prepare() {
+  if [[ -n "${TRBHH_EXCLUDE_LIST:-}" ]]; then cp "$TRBHH_EXCLUDE_LIST" "$WORK/old-ads-media.txt"
+  else docker exec -i -e DAYS="$DAYS" -w /app trbhh-app node - < "$HERE/old-ads-media.cjs" > "$WORK/old-ads-media.txt" 2> "$WORK/prepare-summary.txt" || { cat "$WORK/prepare-summary.txt" >&2; echo "تعذّر بناء قائمة الإعلانات القديمة — لم يُنقل شيء" >&2; exit 4; }
+  fi
+  # كل مسار مستثنى يُكتب قاعدة مثبّتة مع تهريب رموز الأنماط.
+  { sed -e 's/[][\\*?{}]/\\&/g' -e 's|^|- /|' "$WORK/old-ads-media.txt"; cat "$BASE_FILTER"; } > "$FILTER"
+  echo "PREPARED days=$DAYS skipped_old_ad_files=$(grep -c . "$WORK/old-ads-media.txt" || true) $(cat "$WORK/prepare-summary.txt" 2>/dev/null || true)"
+}
 
 copy_all() {
   echo "== $(date -Is) بدء النقل"
@@ -46,13 +61,15 @@ verify() {
 case "${1:-}" in
   start)
     if pgrep -f "media-to-r2.sh run" >/dev/null; then echo "النقل يعمل بالفعل. استخدم: status"; exit 0; fi
+    prepare
     nohup bash "$0" run >> "$LOG" 2>&1 &
     echo "بدأ النقل في الخلفية. للمتابعة: bash $0 status" ;;
-  run) copy_all ;;
+  run) [[ -s "$FILTER" ]] || prepare; copy_all ;;
   status)
     pgrep -f "media-to-r2.sh run" >/dev/null && echo "الحالة: يعمل" || echo "الحالة: متوقف"
     grep -E "COPY_DONE|ERROR|Failed" "$LOG" 2>/dev/null | tail -5 || true
     tail -n 3 "$LOG" 2>/dev/null || true ;;
-  verify) verify ;;
-  *) echo "الاستعمال: $0 start|status|verify" >&2; exit 2 ;;
+  prepare) prepare ;;
+  verify) [[ -s "$FILTER" ]] || prepare; verify ;;
+  *) echo "الاستعمال: $0 start|status|verify|prepare" >&2; exit 2 ;;
 esac

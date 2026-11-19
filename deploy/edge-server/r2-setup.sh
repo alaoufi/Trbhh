@@ -5,11 +5,12 @@
 #   bash r2-setup.sh backups <ACCOUNT_ID>    مخزن النسخ trbhh-backups
 # إعداد rclone في ملف خاص بتربح (/etc/trbhh/rclone.conf) لا في إعداد root المشترك.
 set -euo pipefail
+export PATH="/srv/trbhh/bin:$PATH" # rclone الخاص بتربح
 [[ $EUID -eq 0 ]] || { echo "شغّله بصلاحية root" >&2; exit 2; }
 kind="${1:-}"; acct="${2:-}"
 [[ "$kind" == media || "$kind" == backups ]] || { echo "الاستعمال: $0 media|backups <ACCOUNT_ID>" >&2; exit 2; }
 [[ "$acct" =~ ^[0-9a-f]{32}$ ]] || { echo "ACCOUNT_ID يجب أن يكون 32 حرفاً (من رابط r2.cloudflarestorage.com)" >&2; exit 2; }
-command -v rclone >/dev/null || { echo "rclone غير مثبّت على الخادم" >&2; exit 3; }
+command -v rclone >/dev/null || bash "$(dirname "$0")/install-rclone.sh"
 umask 077
 CONF=/etc/trbhh/rclone.conf
 remote="trbhh-$kind"

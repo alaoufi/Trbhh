@@ -4,6 +4,7 @@
 # + ملفات الخادم خارج Git + أسرار /etc/trbhh (عدا مفتاح التشفير نفسه) + SHA256SUMS.
 # لا تبقى نسخة على الخادم: الملف المؤقت يُحذف بعد الرفع. لا يطبع أي سر.
 set -euo pipefail
+export PATH="/srv/trbhh/bin:$PATH" # rclone الخاص بتربح
 umask 077
 REMOTE="${TRBHH_BACKUP_REMOTE:-trbhh-backups:trbhh-backups}"
 KEY=/etc/trbhh/backup.key

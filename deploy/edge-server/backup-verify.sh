@@ -2,6 +2,7 @@
 # اختبار استرجاع فعلي لآخر نسخة: تنزيل، فك تشفير، مطابقة SHA256SUMS، قراءة التفريغ، استنساخ الكود.
 # لا يمسّ قاعدة البيانات الحية ولا الكود الحي. المؤقت يُحذف في النهاية.
 set -euo pipefail
+export PATH="/srv/trbhh/bin:$PATH" # rclone الخاص بتربح
 umask 077
 REMOTE="${TRBHH_BACKUP_REMOTE:-trbhh-backups:trbhh-backups}"
 KEY=/etc/trbhh/backup.key

@@ -13,13 +13,23 @@ D=/opt/trbhh/deploy/edge-server
 . /etc/trbhh/db.env
 step() { echo; echo "=== $* ==="; }
 
+# المزامنة الأخيرة قبل تحويل DNS: bring-up.sh --replace-database
+# تستبدل قاعدة الخادم الجديد بآخر تصدير من Hostinger وتعيد تطبيق قرارات الإعلانات عليه.
+# تُرفض بعد فتح الموقع للزوار (/srv/trbhh/went-live) حتى لا تُمحى بيانات حية.
+RESYNC=0
+if [[ "${1:-}" == "--replace-database" ]]; then
+  [[ ! -f /srv/trbhh/went-live ]] || { echo "مرفوض: الموقع مفتوح للزوار منذ $(cat /srv/trbhh/went-live) — لا استبدال للقاعدة." >&2; exit 2; }
+  RESYNC=1; rm -f /srv/trbhh/prune-done /srv/trbhh/incomplete-done
+fi
+
 step "1/5 قاعدة البيانات والأسرار"
 rm -rf /srv/trbhh/tmp/import.* # مؤقت الاستيراد (تفريغ وأسرار مفكوكة) لا يبقى على القرص
 tables=0
 if docker inspect trbhh-db >/dev/null 2>&1; then
   tables="$(docker exec -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" trbhh-db mysql -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$MYSQL_DATABASE'" 2>/dev/null || echo 0)"
 fi
-if [[ "$tables" -gt 0 ]]; then echo "القاعدة مستوردة سابقاً ($tables جدولاً) — تُتجاوز"; else bash "$D/migrate.sh" import; fi
+if [[ $RESYNC -eq 1 ]]; then bash "$D/migrate.sh" import --replace
+elif [[ "$tables" -gt 0 ]]; then echo "القاعدة مستوردة سابقاً ($tables جدولاً) — تُتجاوز"; else bash "$D/migrate.sh" import; fi
 
 step "2/5 الإعلانات المنقولة فقط"
 # مرة واحدة فقط عند النقل: بعد فتح الموقع لا تُزال إعلانات الأعضاء بمرور الوقت.

@@ -41,5 +41,12 @@ if [[ "$kind" == media ]]; then
     printf 'R2_ACCOUNT_ID=%s\nR2_ACCESS_KEY_ID=%s\nR2_SECRET_ACCESS_KEY=%s\nR2_MEDIA_BUCKET=trbhh-media\n' "$acct" "$K" "$S"; } > "$env.new"
   cat "$env.new" > "$env"; rm -f "$env.new"; chmod 600 "$env"
 fi
+if [[ "$kind" == backups ]]; then
+  # لوحة الإدارة تعرض النسخ وتنزّلها: التطبيق يقرأ مخزن النسخ بمتغيّرات مستقلة عن مخزن الوسائط.
+  env=/etc/trbhh/app.env
+  { grep -v -E '^R2_BACKUP_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|BUCKET)=' "$env" || true
+    printf 'R2_BACKUP_ACCESS_KEY_ID=%s\nR2_BACKUP_SECRET_ACCESS_KEY=%s\nR2_BACKUP_BUCKET=trbhh-backups\n' "$K" "$S"; } > "$env.new"
+  cat "$env.new" > "$env"; rm -f "$env.new"; chmod 600 "$env"
+fi
 unset K S
 echo "R2_OK $remote (bind=$bind)"

@@ -21,6 +21,15 @@ export function r2Config(env: NodeJS.ProcessEnv = process.env): R2Config | null 
 }
 export const r2Enabled = (): boolean => r2Config() !== null;
 
+/** مخزن النسخ الاحتياطية (trbhh-backups) بمفتاحه المستقل — للعرض والتنزيل من لوحة الإدارة فقط. */
+export function r2BackupConfig(env: NodeJS.ProcessEnv = process.env): R2Config | null {
+  const accountId = (env.R2_ACCOUNT_ID || '').trim();
+  const accessKeyId = (env.R2_BACKUP_ACCESS_KEY_ID || '').trim();
+  const secretAccessKey = (env.R2_BACKUP_SECRET_ACCESS_KEY || '').trim();
+  const bucket = (env.R2_BACKUP_BUCKET || '').trim();
+  return accountId && accessKeyId && secretAccessKey && bucket ? { accountId, accessKeyId, secretAccessKey, bucket } : null;
+}
+
 const hmac = (key: Buffer | string, data: string) => createHmac('sha256', key).update(data, 'utf8').digest();
 const sha256Hex = (data: string | Buffer) => createHash('sha256').update(data).digest('hex');
 
@@ -49,19 +58,27 @@ export function sigV4(input: {
 const agent = new https.Agent({ keepAlive: true, maxSockets: 64, family: 4 });
 const PAYLOAD = 'UNSIGNED-PAYLOAD';
 
-function request(method: 'GET' | 'PUT' | 'HEAD', key: string, opts: { body?: Buffer; range?: string | null; contentType?: string } = {}): Promise<IncomingMessage> {
-  const cfg = r2Config();
+const rfc3986 = (v: string) => encodeURIComponent(v).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+
+/** سلسلة الاستعلام القانونية لـSigV4: مفاتيح مرتّبة، وكل مفتاح وقيمة مرمّزان. */
+export function canonicalQuery(params: Record<string, string>): string {
+  return Object.keys(params).sort().map((k) => `${rfc3986(k)}=${rfc3986(params[k])}`).join('&');
+}
+
+function request(method: 'GET' | 'PUT' | 'HEAD', key: string, opts: { body?: Buffer; range?: string | null; contentType?: string; cfg?: R2Config | null; query?: Record<string, string> } = {}): Promise<IncomingMessage> {
+  const cfg = opts.cfg === undefined ? r2Config() : opts.cfg;
   if (!cfg) return Promise.reject(new Error('R2 غير مهيأ'));
   const host = `${cfg.accountId}.r2.cloudflarestorage.com`;
-  const path = `/${cfg.bucket}/${encodeKeyPath(key)}`;
+  const query = opts.query ? canonicalQuery(opts.query) : '';
+  const path = key ? `/${cfg.bucket}/${encodeKeyPath(key)}` : `/${cfg.bucket}`;
   const amzDate = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const signed: Record<string, string> = { host, 'x-amz-content-sha256': PAYLOAD, 'x-amz-date': amzDate };
-  const authorization = sigV4({ method, path, headers: signed, payloadHash: PAYLOAD, region: 'auto', service: 's3', accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey, amzDate });
+  const authorization = sigV4({ method, path, query, headers: signed, payloadHash: PAYLOAD, region: 'auto', service: 's3', accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey, amzDate });
   const headers: Record<string, string | number> = { ...signed, authorization };
   if (opts.range) headers.range = opts.range;
   if (opts.body) { headers['content-length'] = opts.body.length; headers['content-type'] = opts.contentType || 'application/octet-stream'; }
   return new Promise((resolve, reject) => {
-    const req = https.request({ host, path, method, headers, agent, family: 4, timeout: 30_000 }, resolve);
+    const req = https.request({ host, path: query ? `${path}?${query}` : path, method, headers, agent, family: 4, timeout: 30_000 }, resolve);
     req.on('timeout', () => req.destroy(new Error('انتهت مهلة الاتصال بـR2')));
     req.on('error', reject);
     req.end(opts.body);
@@ -82,14 +99,48 @@ export async function r2Put(key: string, body: Buffer, contentType?: string): Pr
 }
 
 /** فتح ملف للبث (يدعم Range). المستدعي يستهلك الجسم أو يتلفه. */
-export async function r2Open(key: string, range?: string | null): Promise<{ status: number; headers: IncomingMessage['headers']; body: IncomingMessage }> {
-  const res = await request('GET', key, { range });
+export async function r2Open(key: string, range?: string | null, cfg?: R2Config | null): Promise<{ status: number; headers: IncomingMessage['headers']; body: IncomingMessage }> {
+  const res = await request('GET', key, { range, cfg });
   return { status: res.statusCode || 0, headers: res.headers, body: res };
 }
 
 /** قراءة ملف كاملاً في الذاكرة (للإيصالات والصور الصغيرة). null إن غاب. */
-export async function r2Read(key: string, maxBytes = 64 * 1024 * 1024): Promise<Buffer | null> {
-  const res = await request('GET', key);
+export async function r2Read(key: string, maxBytes = 64 * 1024 * 1024, cfg?: R2Config | null): Promise<Buffer | null> {
+  const res = await request('GET', key, { cfg });
   if (res.statusCode !== 200 || Number(res.headers['content-length'] || 0) > maxBytes) { res.destroy(); return null; }
   return drain(res);
+}
+
+export type R2Object = { key: string; size: number; lastModified: string };
+
+/** يحلّل رد ListObjectsV2 (XML). */
+export function parseListXml(xml: string): { objects: R2Object[]; next: string | null } {
+  const un = (v: string) => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  const objects: R2Object[] = [];
+  for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+    const key = /<Key>([\s\S]*?)<\/Key>/.exec(m[1])?.[1];
+    if (!key) continue;
+    objects.push({ key: un(key), size: Number(/<Size>(\d+)<\/Size>/.exec(m[1])?.[1] || 0), lastModified: /<LastModified>([^<]+)<\/LastModified>/.exec(m[1])?.[1] || '' });
+  }
+  const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml);
+  const token = /<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/.exec(xml)?.[1];
+  return { objects, next: truncated && token ? un(token) : null };
+}
+
+/** قائمة ملفات مخزن تحت بادئة (حتى 5000 ملف). */
+export async function r2List(prefix: string, cfg?: R2Config | null): Promise<R2Object[]> {
+  const out: R2Object[] = [];
+  let token: string | null = null;
+  for (let page = 0; page < 5; page++) {
+    const query: Record<string, string> = { 'list-type': '2', prefix, 'max-keys': '1000' };
+    if (token) query['continuation-token'] = token;
+    const res = await request('GET', '', { cfg, query });
+    const xml = (await drain(res)).toString('utf8');
+    if (res.statusCode !== 200) throw new Error(`تعذّر قراءة قائمة المخزن (${res.statusCode})`);
+    const parsed = parseListXml(xml);
+    out.push(...parsed.objects);
+    if (!parsed.next) break;
+    token = parsed.next;
+  }
+  return out;
 }

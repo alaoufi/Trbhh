@@ -1050,6 +1050,20 @@ export async function createBackupAction() {
   redirect(dest);
 }
 
+/** طلب نسخة احتياطية كاملة مشفّرة إلى المخزن الآن — ينفّذها مراقب الخادم خلال دقيقة تقريباً. */
+export async function requestCloudBackupAction() {
+  const session = await requireAccess('backup', 'create');
+  let dest = '/admin/backup?done=cloudreq';
+  try {
+    const { requestCloudBackup } = await import('@/lib/cloud-backup');
+    if ((await requestCloudBackup(session.uid)) === 'already-pending') dest = '/admin/backup?done=cloudpending';
+  } catch (e) {
+    dest = errUrl(e instanceof Error ? e.message : 'تعذّر تسجيل الطلب');
+  }
+  revalidatePath('/admin/backup');
+  redirect(dest);
+}
+
 export async function deleteBackupAction(formData: FormData) {
   await requireAccess('backup', 'delete');
   const name = String(formData.get('name') || '');

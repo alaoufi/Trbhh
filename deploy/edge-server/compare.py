@@ -7,7 +7,7 @@
   - كل ملف منها يُخدَّم من الجديد (من R2) بالحجم نفسه الذي يخدّمه القديم.
 يطبع ملخصاً وينتهي بـ COMPARE_OK أو COMPARE_DIFF مع أول الفروقات.
 """
-import concurrent.futures as cf, hashlib, os, re, subprocess, sys, urllib.parse, urllib.request, urllib.error
+import concurrent.futures as cf, hashlib, os, re, subprocess, sys, time, urllib.parse, urllib.request, urllib.error
 
 OLD = os.environ.get('TRBHH_OLD_BASE', 'https://trbhh.sa')
 NEW = os.environ.get('TRBHH_NEW_BASE', 'http://127.0.0.1:8101')
@@ -41,14 +41,35 @@ opener = urllib.request.build_opener(NoRedirect)
 
 def fetch(base, path, extra=None, body=True):
     headers = dict(UA); headers.update(NEW_HEADERS if base == NEW else {}); headers.update(extra or {})
-    req = urllib.request.Request(base + path, headers=headers)
-    try:
-        with opener.open(req, timeout=45) as r:
-            return r.status, dict(r.headers), (r.read() if body else b'')
-    except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers or {}), b''
-    except Exception as e:  # noqa: BLE001 — يُسجَّل كفرق لا كتعطل
-        return 0, {'error': str(e)[:80]}, b''
+    last = (0, {}, b'')
+    for attempt in range(3):  # خطأ اتصال عابر لا يُحسب فرقاً: تُعاد المحاولة
+        req = urllib.request.Request(base + path, headers=headers)
+        try:
+            with opener.open(req, timeout=45) as r:
+                return r.status, dict(r.headers), (r.read() if body else b'')
+        except urllib.error.HTTPError as e:
+            return e.code, dict(e.headers or {}), b''
+        except Exception as e:  # noqa: BLE001 — يُسجَّل كفرق لا كتعطل
+            last = (0, {'error': str(e)[:80]}, b''); time.sleep(2 + attempt * 3)
+    return last
+
+
+def ad_page(base, ad):
+    """صفحة الإعلان كما يراها الزائر: إعلان المتجر يُحوَّل من /ads/N إلى صفحة منتجه في المتجر
+    (تحويل Next داخل الصفحة)، فنتبع التحويل ونفحص الصفحة النهائية."""
+    path = '/ads/' + ad
+    status, headers, html = fetch(base, path)
+    for _ in range(2):
+        loc = headers.get('Location') or headers.get('location')
+        m = re.search(rb'NEXT_REDIRECT;(?:replace|push);([^;"\\]+);', html)
+        target = loc or (m.group(1).decode('utf-8', 'replace') if m else None)
+        if not target or not target.startswith('/'): break
+        path = target
+        status, headers, html = fetch(base, urllib.parse.quote(path, safe='/?=&%'))
+    # صفحة «غير موجود» في Next تُرسل بحالة 200 مع علامة داخلية: نعدّها 404 كما يراها الزائر.
+    m = re.search(rb'NEXT_HTTP_ERROR_FALLBACK;(\d{3})', html)
+    if m: status = int(m.group(1))
+    return status, html, path
 
 
 VIDEO_EXT = {'mp4', 'mov', 'm4v', 'webm', 'mkv', '3gp'}
@@ -81,18 +102,23 @@ def main():
     for ad, f in sql("SELECT a.id, u.file_name FROM ads a JOIN uploads u ON u.id=CAST(a.video_path AS UNSIGNED) WHERE a.video_path REGEXP '^[0-9]+$' AND a.video_path<>'0' AND u.file_name<>''"):
         media.setdefault(ad, set()).add(f.lstrip('/'))
     published = {r[0] for r in sql('SELECT id FROM ads WHERE status=1')}
-    diffs, no_images = [], []
+    diffs, no_images, not_on_either, hidden_both = [], [], [], []
 
     def check_ad(ad):
         out = []
-        so, _, ho = fetch(OLD, '/ads/' + ad)
-        sn, _, hn = fetch(NEW, '/ads/' + ad)
+        so, ho, po = ad_page(OLD, ad)
+        sn, hn, pn = ad_page(NEW, ad)
         if so != sn: out.append(f'ad {ad}: page status old={so} new={sn}')
+        if po != pn: out.append(f'ad {ad}: final page differs old={po} new={pn}')
+        if so == sn and so != 200: hidden_both.append(ad)
         if so == 200 and sn == 200 and title_of(ho) != title_of(hn): out.append(f'ad {ad}: title differs')
         text = urllib.parse.unquote(hn.decode('utf-8', 'replace'))
         if sn == 200 and ad in published:
+            old_text = urllib.parse.unquote(ho.decode('utf-8', 'replace'))
             for f in media.get(ad, ()):
-                if f not in text: out.append(f'ad {ad}: media not shown on new page: {f}')
+                # فرق حقيقي فقط إن كان القديم يعرض الملف في الصفحة والجديد لا يعرضه.
+                if f not in text and f in old_text: out.append(f'ad {ad}: media shown on old page but not on new: {f}')
+                elif f not in text: not_on_either.append((ad, f))
         return out
 
     broken_both = []
@@ -119,6 +145,8 @@ def main():
 
     print(f'ads_compared={len(ads)} published={len(published)} ads_with_media={len(media)} media_files={len(files)} published_ads_without_any_media_in_db={len(no_images)}')
     if no_images: print('ads with no image/video rows at all (text-only in the old site too): ' + ','.join(no_images[:40]))
+    if hidden_both: print(f'ads not publicly visible in BOTH sites (same status, e.g. product of a store that is not public now): {len(hidden_both)} -> ' + ','.join(sorted(hidden_both)))
+    if not_on_either: print(f'media rows not rendered on the ad page in BOTH sites (same behaviour): {len(not_on_either)} in ads ' + ','.join(sorted({a for a, _ in not_on_either})[:20]))
     if broken_both: print(f'media broken in the OLD site too (not caused by the move): {len(broken_both)} -> ' + ', '.join(sorted(bb)[:10]))
     if all_broken: print('published ads whose every image is already broken in the old site: ' + ','.join(all_broken))
     if diffs:

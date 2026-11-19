@@ -5,11 +5,12 @@ set -euo pipefail
 umask 077
 REMOTE="${TRBHH_BACKUP_REMOTE:-trbhh-backups:trbhh-backups}"
 KEY=/etc/trbhh/backup.key
+BIND="$(cat /etc/trbhh/rclone-bind 2>/dev/null || echo 0.0.0.0)"
 WORK="$(mktemp -d /srv/trbhh/tmp/verify.XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
-LATEST="$(rclone --bind 0.0.0.0 lsf "$REMOTE/daily/" | sort | tail -1)"
+LATEST="$(rclone --config /etc/trbhh/rclone.conf --bind "$BIND" lsf "$REMOTE/daily/" | sort | tail -1)"
 [[ -n "$LATEST" ]] || { echo "VERIFY_FAIL: لا توجد نسخ" >&2; exit 1; }
-rclone --bind 0.0.0.0 copyto "$REMOTE/daily/$LATEST" "$WORK/b.tar.gpg"
+rclone --config /etc/trbhh/rclone.conf --bind "$BIND" copyto "$REMOTE/daily/$LATEST" "$WORK/b.tar.gpg"
 gpg --batch --quiet --pinentry-mode loopback --decrypt --passphrase-file "$KEY" "$WORK/b.tar.gpg" | tar -C "$WORK" -xf -
 D="$(find "$WORK" -maxdepth 1 -type d -name 'trbhh-*' | head -1)"
 ( cd "$D" && sha256sum --quiet -c SHA256SUMS )

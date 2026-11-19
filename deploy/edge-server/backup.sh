@@ -7,6 +7,7 @@ set -euo pipefail
 umask 077
 REMOTE="${TRBHH_BACKUP_REMOTE:-trbhh-backups:trbhh-backups}"
 KEY=/etc/trbhh/backup.key
+BIND="$(cat /etc/trbhh/rclone-bind 2>/dev/null || echo 0.0.0.0)"
 STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 WORK="$(mktemp -d /srv/trbhh/tmp/backup.XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
@@ -27,8 +28,8 @@ tar -C /etc -czf "$D/etc-trbhh.tar.gz" --exclude='trbhh/backup.key' --exclude='t
 
 OUT="$WORK/trbhh-$STAMP.tar.gpg"
 tar -C "$WORK" -cf - "trbhh-$STAMP" | gpg --batch --yes --quiet --pinentry-mode loopback --symmetric --cipher-algo AES256 --passphrase-file "$KEY" -o "$OUT"
-rclone --bind 0.0.0.0 --s3-no-check-bucket copyto "$OUT" "$REMOTE/daily/trbhh-$STAMP.tar.gpg"
+rclone --config /etc/trbhh/rclone.conf --bind "$BIND" --s3-no-check-bucket copyto "$OUT" "$REMOTE/daily/trbhh-$STAMP.tar.gpg"
 SIZE=$(stat -c %s "$OUT")
-REMOTE_SIZE=$(rclone --bind 0.0.0.0 lsf --format s "$REMOTE/daily/trbhh-$STAMP.tar.gpg")
+REMOTE_SIZE=$(rclone --config /etc/trbhh/rclone.conf --bind "$BIND" lsf --format s "$REMOTE/daily/trbhh-$STAMP.tar.gpg")
 [[ "$SIZE" == "$REMOTE_SIZE" ]] || { echo "BACKUP_FAIL: حجم الملف في المخزن لا يطابق" >&2; exit 1; }
 echo "BACKUP_OK daily/trbhh-$STAMP.tar.gpg bytes=$SIZE"

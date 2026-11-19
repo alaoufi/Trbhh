@@ -12,7 +12,8 @@ const p = new PrismaClient();
   const photos = await p.$queryRawUnsafe('SELECT ph.other_id AS ad, u.file_name AS f FROM photos ph JOIN uploads u ON u.id = CAST(ph.photo_path AS UNSIGNED)');
   const isOld = new Map(ads.map((a) => [String(a.id), Number(a.old) === 1]));
   const oldFiles = new Set(), keepFiles = new Set();
-  const add = (adId, f) => { if (!f) return; const rel = String(f).replace(/^\/+/, ''); if (!rel || /[\r\n]/.test(rel)) return; (isOld.get(String(adId)) ? oldFiles : keepFiles).add(rel); };
+  // صف صورة لإعلان محذوف من القاعدة لا يُحسب على أي إعلان (ملفه يُنقل كملف غير مرتبط).
+  const add = (adId, f) => { if (!f || !isOld.has(String(adId))) return; const rel = String(f).replace(/^\/+/, ''); if (!rel || /[\r\n]/.test(rel)) return; (isOld.get(String(adId)) ? oldFiles : keepFiles).add(rel); };
   for (const r of photos) add(r.ad, r.f);
   const ids = ads.filter((a) => /^\d+$/.test(a.video_path || '') && Number(a.video_path) > 0).map((a) => Number(a.video_path));
   const vids = [];

@@ -16,7 +16,15 @@ CONF=/etc/trbhh/rclone.conf
 remote="trbhh-$kind"
 
 # اللصق بالزر الأيمن في PowerShell قد يلصق القيمة مرتين: نكتشف التكرار ونأخذ نصفها.
-dedupe() { local v="${1//[[:space:]]/}" n="$2"; if [[ ${#v} -eq $((n*2)) && "${v:0:n}" == "${v:n}" ]]; then v="${v:0:n}"; fi; printf '%s' "$v"; }
+dedupe() {
+  local v="${1//[[:space:]]/}" n="$2" first i same=1
+  if (( ${#v} > n && ${#v} % n == 0 )); then
+    first="${v:0:n}"
+    for (( i=n; i<${#v}; i+=n )); do [[ "${v:i:n}" == "$first" ]] || { same=0; break; }; done
+    (( same )) && v="$first"
+  fi
+  printf '%s' "$v"
+}
 # Access Key ID ليس سراً وحده (هو رقم المفتاح)، فيظهر عند اللصق ليتأكد المالك مما لصقه. السر يبقى مخفياً.
 read -r -p 'Access Key ID: ' K
 read -r -s -p 'Secret Access Key: ' S; echo

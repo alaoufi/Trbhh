@@ -22,6 +22,12 @@ const p = new PrismaClient();
   }
   const vidById = new Map(vids.map((v) => [String(v.id), v.file_name]));
   for (const a of ads) { const v = a.video_path || ''; add(a.id, /^\d+$/.test(v) ? vidById.get(v) : v); }
+  // MODE=keep: يطبع وسائط الإعلانات المنقولة (للتحقق أن كل إعلان منقول له كل وسائطه في المخزن).
+  if (process.env.MODE === 'keep') {
+    for (const f of keepFiles) process.stdout.write(f + '\n');
+    process.stderr.write(`ads_transferred=${[...isOld.values()].filter((v) => !v).length} ad_media_files=${keepFiles.size}\n`);
+    process.exit(0);
+  }
   let n = 0;
   for (const f of oldFiles) if (!keepFiles.has(f)) { process.stdout.write(f + '\n'); n++; }
   const oldAds = [...isOld.values()].filter(Boolean).length;

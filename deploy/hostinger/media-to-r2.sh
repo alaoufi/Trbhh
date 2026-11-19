@@ -66,6 +66,17 @@ verify() {
   [[ $bad -eq 0 ]] && echo "VERIFY_OK: كل الوسائط موجودة في المخزن" || { echo "VERIFY_FAIL: راجع الملفات في $WORK"; exit 1; }
 }
 
+# تحقق على مستوى الإعلان: كل صورة وفيديو لإعلان منقول (من قاعدة البيانات) موجود في المخزن.
+verify_ads() {
+  docker exec -i -e DAYS="$DAYS" -e PUBLISHED_ONLY="${TRBHH_PUBLISHED_ONLY:-1}" -e MODE=keep -w /app trbhh-app node - < "$HERE/old-ads-media.cjs" 2> "$WORK/ads-summary.txt" | sort -u > "$WORK/ads-media.txt"
+  rclone --bind "$BIND" lsf -R --files-only "$REMOTE" | sort -u > "$WORK/bucket-files.txt"
+  comm -23 "$WORK/ads-media.txt" "$WORK/bucket-files.txt" > "$WORK/ads-media-missing.txt"
+  local miss; miss=$(grep -c . "$WORK/ads-media-missing.txt" || true)
+  echo "$(cat "$WORK/ads-summary.txt") in_bucket=$(( $(grep -c . "$WORK/ads-media.txt" || true) - miss )) missing=$miss"
+  if [[ "$miss" -eq 0 ]]; then echo "ADS_OK: كل وسائط الإعلانات المنقولة موجودة في المخزن"
+  else echo "ADS_MISSING: أول الملفات الناقصة:"; head -10 "$WORK/ads-media-missing.txt"; for f in $(head -3 "$WORK/ads-media-missing.txt"); do [[ -f "$STORAGE/$f" || -f "$LEGACY/$f" ]] && echo "  موجود على Hostinger: $f" || echo "  غير موجود على Hostinger أصلاً: $f"; done; exit 1; fi
+}
+
 case "${1:-}" in
   start)
     if pgrep -f "media-to-r2.sh run" >/dev/null; then echo "النقل يعمل بالفعل. استخدم: status"; exit 0; fi
@@ -78,6 +89,7 @@ case "${1:-}" in
     grep -E "COPY_DONE|ERROR|Failed" "$LOG" 2>/dev/null | tail -5 || true
     tail -n 3 "$LOG" 2>/dev/null || true ;;
   prepare) prepare ;;
+  verify-ads) verify_ads ;;
   verify) [[ -s "$FILTER" ]] || prepare; verify ;;
-  *) echo "الاستعمال: $0 start|status|verify|prepare" >&2; exit 2 ;;
+  *) echo "الاستعمال: $0 start|status|verify|verify-ads|prepare" >&2; exit 2 ;;
 esac

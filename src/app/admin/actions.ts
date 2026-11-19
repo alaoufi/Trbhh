@@ -1064,6 +1064,28 @@ export async function requestCloudBackupAction() {
   redirect(dest);
 }
 
+/** طلب استرجاع قاعدة البيانات من نسخة في المخزن — بعد كتابة عبارة التأكيد وتعليم الإقرار. */
+export async function requestCloudRestoreAction(formData: FormData) {
+  const session = await requireAccess('backup', 'edit');
+  const key = String(formData.get('key') || '');
+  const agree = formData.get('agree') !== null;
+  const { isRestorePhrase, requestCloudRestore, RESTORE_PHRASE } = await import('@/lib/cloud-backup');
+  let dest: string;
+  if (!agree || !isRestorePhrase(String(formData.get('confirm') || ''))) {
+    dest = errUrl(`لم يُؤكَّد الاسترجاع — يجب كتابة «${RESTORE_PHRASE}» وتعليم الإقرار.`);
+  } else {
+    try {
+      const r = await requestCloudRestore(key, session.uid);
+      dest = r === 'requested' ? '/admin/backup?done=cloudrestore'
+        : errUrl(r === 'busy' ? 'توجد عملية نسخ أو استرجاع قيد التنفيذ — انتظر اكتمالها.' : 'النسخة غير موجودة في المخزن.');
+    } catch (e) {
+      dest = errUrl(e instanceof Error ? e.message : 'تعذّر تسجيل طلب الاسترجاع');
+    }
+  }
+  revalidatePath('/admin/backup');
+  redirect(dest);
+}
+
 export async function deleteBackupAction(formData: FormData) {
   await requireAccess('backup', 'delete');
   const name = String(formData.get('name') || '');

@@ -4,10 +4,10 @@ import { requireAdminPage } from '@/lib/access-control/guards';
 import { DatabaseBackup, Download, Trash2, AlertTriangle, ShieldAlert, Check, HardDriveDownload, RotateCcw, CloudUpload, Lock, Clock } from 'lucide-react';
 import { hasAction } from '@/lib/roles';
 import { listBackups } from '@/lib/backup';
-import { cloudBackupsEnabled, cloudBackupStatus, listCloudBackups, type CloudBackup } from '@/lib/cloud-backup';
+import { cloudBackupsEnabled, cloudBackupStatus, cloudRestoreStatus, listCloudBackups, RESTORE_PHRASE, type CloudBackup } from '@/lib/cloud-backup';
 import { Button } from '@/components/ui/button';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { createBackupAction, deleteBackupAction, restoreBackupAction, requestCloudBackupAction } from '../actions';
+import { createBackupAction, deleteBackupAction, restoreBackupAction, requestCloudBackupAction, requestCloudRestoreAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'النسخ الاحتياطي والاستعادة' };
@@ -44,11 +44,12 @@ function describeBackup(b: CloudBackup): string[] {
 export default async function BackupPage({ searchParams }: { searchParams: Promise<{ done?: string; error?: string; name?: string; safety?: string }> }) {
   const session = await requireAdminPage('/admin/backup');
   const cloudOn = cloudBackupsEnabled();
-  const [{ done, error, name, safety }, backups, cloud, cloudStatus, canAdd, canRestore, canDelete] = await Promise.all([
+  const [{ done, error, name, safety }, backups, cloud, cloudStatus, restoreStatus, canAdd, canRestore, canDelete] = await Promise.all([
     searchParams,
     listBackups(),
     cloudOn ? listCloudBackups().then((list) => ({ list, error: '' })).catch((e: unknown) => ({ list: [] as CloudBackup[], error: e instanceof Error ? e.message : 'تعذّر قراءة المخزن' })) : Promise.resolve({ list: [] as CloudBackup[], error: '' }),
     cloudOn ? cloudBackupStatus() : Promise.resolve(null),
+    cloudOn ? cloudRestoreStatus() : Promise.resolve(null),
     hasAction(session.uid, 'backup', 'add'),
     hasAction(session.uid, 'backup', 'edit'),
     hasAction(session.uid, 'backup', 'delete'),
@@ -70,6 +71,7 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
         </Banner>
       )}
       {done === 'cloudreq' && <Banner ok>سُجّل طلب النسخة. تبدأ خلال دقيقة تقريباً وتظهر في القائمة عند اكتمالها — حدّث الصفحة بعد دقيقتين.</Banner>}
+      {done === 'cloudrestore' && <Banner ok>سُجّل طلب الاسترجاع. يبدأ خلال دقيقة: تؤخذ نسخة أمان من الحالة الحالية أولاً، ثم يتوقف الموقع دقيقة أو دقيقتين أثناء الاسترجاع ويعود تلقائياً. حدّث الصفحة بعد ثلاث دقائق لرؤية النتيجة.</Banner>}
       {done === 'cloudpending' && <Banner ok>يوجد طلب نسخة قيد التنفيذ بالفعل — انتظر اكتماله.</Banner>}
       {error && <Banner>{decodeURIComponent(error)}</Banner>}
 
@@ -91,6 +93,10 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
             <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Clock className="h-4 w-4" /> آخر نسخة: {cloudStatus.lastAt ? fmtIso(cloudStatus.lastAt) : 'لم تُسجَّل بعد'}{cloudStatus.lastStatus ? ` — ${cloudStatus.lastStatus === 'ok' ? 'ناجحة' : `فشلت: ${cloudStatus.lastStatus}`}` : ''}</span>
               {cloudStatus.pending && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-sky-800">طلب نسخة قيد التنفيذ منذ {fmtIso(cloudStatus.requestedAt)}</span>}
+              {restoreStatus?.pending && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-800">استرجاع قيد التنفيذ منذ {fmtIso(restoreStatus.requestedAt)}</span>}
+              {restoreStatus && !restoreStatus.pending && restoreStatus.lastAt && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">آخر استرجاع: {fmtIso(restoreStatus.lastAt)} — {restoreStatus.lastStatus === 'ok' ? `ناجح${restoreStatus.safetyName ? ` (نسخة الأمان: ${restoreStatus.safetyName.split('/').pop()})` : ''}` : `فشل: ${restoreStatus.lastStatus}`}</span>
+              )}
             </div>
             {canAdd && (
               <AccessBoundary module={'backup'} action={'create'}><form action={requestCloudBackupAction}>
@@ -114,6 +120,38 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
                 >
                   <Download className="h-4 w-4" /> تنزيل
                 </a></AccessBoundary>
+                {canRestore && (
+                  <AccessBoundary module={'backup'} action={'edit'}>
+                    <details className="w-full rounded-xl border-2 border-red-200 bg-red-50/40">
+                      <summary className="cursor-pointer select-none p-2 text-sm font-extrabold text-red-700"><RotateCcw className="me-1 inline h-4 w-4" /> استرجاع هذه النسخة…</summary>
+                      <form action={requestCloudRestoreAction} className="space-y-2 border-t-2 border-red-200 p-3">
+                        <input type="hidden" name="key" value={b.key} />
+                        <div className="flex items-start gap-2 text-xs font-bold text-red-800">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div className="space-y-1">
+                            <p>الاسترجاع <b>يستبدل قاعدة البيانات الحالية كلها</b> بحالتها يوم {fmtIso(b.manifest?.createdAt || b.lastModified)}. كل ما أُضيف بعد ذلك التاريخ (أعضاء، إعلانات، رسائل، أرصدة) <b>سيُفقد</b>.</p>
+                            <p>قبل الاسترجاع تؤخذ تلقائياً <b>نسخة أمان كاملة من الحالة الحالية</b> وتظهر في هذه القائمة، فتستطيع الرجوع إليها.</p>
+                            <p>الموقع يتوقف دقيقة أو دقيقتين أثناء الاسترجاع ثم يعود تلقائياً. الصور والفيديوهات لا تتأثر.</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input name="confirm" autoComplete="off" placeholder={`اكتب: ${RESTORE_PHRASE}`} className="h-10 w-44 rounded-lg border-2 border-red-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-red-400" />
+                          <label className="flex items-center gap-2 text-xs font-bold text-red-800">
+                            <input type="checkbox" name="agree" className="h-4 w-4 accent-red-600" /> أُقرّ بأن ما أُضيف بعد تاريخ هذه النسخة سيُفقد
+                          </label>
+                          <ConfirmSubmit
+                            msg={`تأكيد أخير: استرجاع قاعدة البيانات إلى نسخة ${fmtIso(b.manifest?.createdAt || b.lastModified)}؟ ستُستبدل البيانات الحالية كلها (بعد أخذ نسخة أمان منها) ويتوقف الموقع دقيقة أو دقيقتين.`}
+                            title="استرجاع نسخة"
+                            disabled={!!(cloudStatus.pending || restoreStatus?.pending)}
+                            className="inline-flex h-10 items-center gap-1 rounded-lg bg-red-600 px-4 text-sm font-extrabold text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            <RotateCcw className="h-4 w-4" /> استرجاع النسخة
+                          </ConfirmSubmit>
+                        </div>
+                      </form>
+                    </details>
+                  </AccessBoundary>
+                )}
               </div>
             ))}
           </div>

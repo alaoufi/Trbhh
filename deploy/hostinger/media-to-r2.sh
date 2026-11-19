@@ -18,7 +18,14 @@ WORK=/root/trbhh-media-to-r2
 LEGACY="${TRBHH_LEGACY_DIR:-/home/trbhh/htdocs/haftastore/public}"
 STORAGE="${TRBHH_STORAGE_DIR:-$(docker volume inspect trbhh_trbhh-storage --format '{{.Mountpoint}}')}"
 FILTER="$WORK/filter.txt"
-RC=(rclone --bind 0.0.0.0 --filter-from "$FILTER" --ignore-case --s3-no-check-bucket)
+# مفتاح R2 مقيّد بعنوان الخادم IPv4. rclone القديم (1.60) لا يلتزم بـ--bind 0.0.0.0 فيخرج عبر
+# IPv6 ويُرفض (403)، لذلك نربطه بعنوان IPv4 العام للخادم صراحةً إن كان على إحدى واجهاته.
+BIND="${TRBHH_RCLONE_BIND:-}"
+if [[ -z "$BIND" ]]; then
+  pub="$(curl -4 -s --max-time 10 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | sed -n 's/^ip=//p' || true)"
+  if [[ "$pub" =~ ^[0-9.]+$ ]] && ip -4 -o addr 2>/dev/null | grep -qw "$pub"; then BIND="$pub"; else BIND=0.0.0.0; fi
+fi
+RC=(rclone --bind "$BIND" --filter-from "$FILTER" --ignore-case --s3-no-check-bucket)
 
 [[ -d "$LEGACY" && -d "$STORAGE" ]] || { echo "مجلد مصدر غير موجود: $LEGACY أو $STORAGE" >&2; exit 2; }
 mkdir -p "$WORK"
@@ -55,7 +62,7 @@ verify() {
   done
   echo "LOCAL_STORAGE: $("${RC[@]}" size "$STORAGE" 2>/dev/null | tr '\n' ' ')"
   echo "LOCAL_LEGACY:  $("${RC[@]}" size "$LEGACY" 2>/dev/null | tr '\n' ' ')"
-  echo "R2_BUCKET:     $(rclone --bind 0.0.0.0 size "$REMOTE" 2>/dev/null | tr '\n' ' ')"
+  echo "R2_BUCKET:     $(rclone --bind "$BIND" size "$REMOTE" 2>/dev/null | tr '\n' ' ')"
   [[ $bad -eq 0 ]] && echo "VERIFY_OK: كل الوسائط موجودة في المخزن" || { echo "VERIFY_FAIL: راجع الملفات في $WORK"; exit 1; }
 }
 

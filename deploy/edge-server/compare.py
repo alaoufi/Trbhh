@@ -95,8 +95,11 @@ def main():
                 if f not in text: out.append(f'ad {ad}: media not shown on new page: {f}')
         return out
 
+    broken_both = []
+
     def check_file(f):
         so, zo, ho = total_size(OLD, f); sn, zn, hn = total_size(NEW, f)
+        if so not in (200, 206) and sn not in (200, 206): broken_both.append(f); return None  # معطوب في القديم أيضاً
         if sn not in (200, 206): return f'media {f}: new status={sn} (old={so})'
         if so not in (200, 206): return f'media {f}: old status={so} but new serves it'
         if zo != zn or ho != hn: return f'media {f}: differs old={zo}/{ho} new={zn}/{hn}'
@@ -108,12 +111,16 @@ def main():
         for res in ex.map(check_file, files):
             if res: diffs.append(res)
     no_images = [ad for ad in ads if ad in published and not media.get(ad)]
+    bb = set(broken_both)
+    all_broken = [ad for ad in ads if ad in published and media.get(ad) and media[ad] <= bb]
     for path in ('/', '/search', '/login'):
         so, _, _ = fetch(OLD, path, body=False); sn, _, _ = fetch(NEW, path, body=False)
         if so != sn: diffs.append(f'page {path}: status old={so} new={sn}')
 
     print(f'ads_compared={len(ads)} published={len(published)} ads_with_media={len(media)} media_files={len(files)} published_ads_without_any_media_in_db={len(no_images)}')
     if no_images: print('ads with no image/video rows at all (text-only in the old site too): ' + ','.join(no_images[:40]))
+    if broken_both: print(f'media broken in the OLD site too (not caused by the move): {len(broken_both)} -> ' + ', '.join(sorted(bb)[:10]))
+    if all_broken: print('published ads whose every image is already broken in the old site: ' + ','.join(all_broken))
     if diffs:
         print(f'differences={len(diffs)}')
         for d in diffs[:40]: print('  ' + d)

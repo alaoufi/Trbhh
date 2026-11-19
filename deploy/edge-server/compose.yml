@@ -42,10 +42,11 @@ services:
     container_name: trbhh-redis
     # ذاكرة مؤقتة وعدّادات فقط: لا حفظ على القرص.
     command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-lru"]
+    # يعمل بمستخدم redis مباشرة: مدخل الصورة لا يحتاج عندها تغيير مالك /data ولا أي صلاحية.
+    user: redis
     read_only: true
     tmpfs: ["/data"]
     cap_drop: [ALL]
-    cap_add: [SETGID, SETUID]
     mem_limit: 256m
     cpus: 0.5
     pids_limit: 128

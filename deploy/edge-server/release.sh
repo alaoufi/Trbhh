@@ -9,19 +9,25 @@ STATE=/srv/trbhh/release-current
 commit="$(git rev-parse HEAD)"
 prev="$(cat "$STATE" 2>/dev/null || true)"
 
-probe() { curl -fsS --max-time 5 -H 'Host: trbhh.sa' -H 'X-Forwarded-Proto: https' "http://127.0.0.1:8101$1"; }
+probe() { local path="$1"; shift; curl -fsS --max-time 5 -H 'Host: trbhh.sa' -H 'X-Forwarded-Proto: https' "$@" "http://127.0.0.1:8101$path"; }
 wait_live() {
   local want="$1" i
   for i in $(seq 1 90); do
-    if probe /api/version 2>/dev/null | grep -q "\"$want\"" && probe / -o /dev/null 2>/dev/null; then return 0; fi
+    if probe /api/version 2>/dev/null | grep -q "\"$want\"" && probe / -o /dev/null 2>/dev/null \
+       && [[ "$(docker inspect -f '{{.State.Status}}' trbhh-redis 2>/dev/null)" == running ]]; then return 0; fi
     sleep 2
   done
   return 1
 }
 
 echo "release: building $commit (live: ${prev:-none})"
-TRBHH_RELEASE_COMMIT="$commit" "${COMPOSE[@]}" build app
-TRBHH_RELEASE_COMMIT="$commit" "${COMPOSE[@]}" up -d --no-build
+# سجل البناء الطويل يُحفظ في ملف ولا يُطبع إلا آخره عند الفشل.
+BUILD_LOG=/srv/trbhh/tmp/build.log
+if ! TRBHH_RELEASE_COMMIT="$commit" "${COMPOSE[@]}" build app > "$BUILD_LOG" 2>&1; then
+  tail -n 40 "$BUILD_LOG"; echo "RELEASE_FAILED build (السجل الكامل: $BUILD_LOG)"; exit 1
+fi
+echo "release: built"
+TRBHH_RELEASE_COMMIT="$commit" "${COMPOSE[@]}" up -d --no-build 2>&1 | grep -v -E 'Running|Pulling|Pulled|Download|Extract|Waiting|Verifying|layer' || true
 if wait_live "$commit"; then
   echo "$commit" > "$STATE"
   # صور تربح الأقدم من الحالية والسابقة تُزال (صور هذا الموقع فقط).

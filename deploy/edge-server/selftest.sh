@@ -41,7 +41,18 @@ work="$(mktemp -d /srv/trbhh/tmp/selftest.XXXXXX)"; trap 'rm -rf "$work"' EXIT
 rclone --config /etc/trbhh/rclone.conf --bind "$BIND" lsf -R --files-only trbhh-media:trbhh-media | sort -u > "$work/bucket.txt"
 miss="$(comm -23 "$work/db.txt" "$work/bucket.txt" | grep -c . || true)"
 total="$(grep -c . "$work/db.txt" || true)"
-[[ "$miss" -eq 0 ]] && ok "ad media in R2: $total/$total (ads=$(my 'SELECT COUNT(*) FROM ads'))" || { bad "ad media missing in R2: $miss of $total"; comm -23 "$work/db.txt" "$work/bucket.txt" | head -5; }
+if [[ "$miss" -eq 0 ]]; then ok "ad media in R2: $total/$total (ads=$(my 'SELECT COUNT(*) FROM ads'))"
+else
+  # ملف مذكور في القاعدة وغير موجود في المخزن: خلل نقل إن كان الموقع القديم يعرضه، وإلا فهو
+  # مرجع معطوب قديم (مثل مسارات tmp/php من الموقع السابق) لا يعرضه القديم أيضاً.
+  real=0
+  while IFS= read -r f; do
+    code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "https://trbhh.sa/media/$(enc "$f")")"
+    if [[ "$code" == 200 || "$code" == 206 ]]; then bad "missing in R2 but served by the old site: $f"; real=1
+    else echo "WARN  مرجع معطوب في القديم أيضاً ($code): $f"; fi
+  done < <(comm -23 "$work/db.txt" "$work/bucket.txt")
+  [[ $real -eq 0 ]] && ok "ad media in R2: $((total-miss))/$total (+$miss مرجعاً معطوباً في الموقع القديم نفسه)"
+fi
 
 echo "containers: $(docker ps --format '{{.Names}}={{.Status}}' | grep '^trbhh-' | tr '\n' ' ')"
 echo "ports: $(docker ps --format '{{.Names}} {{.Ports}}' | grep '^trbhh-' | tr '\n' ';')"

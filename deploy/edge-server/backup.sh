@@ -22,7 +22,7 @@ git -C /opt/trbhh bundle create "$D/code.bundle" --all >/dev/null 2>&1
 git -C /opt/trbhh rev-parse HEAD > "$D/code-commit.txt"
 # ملفات داخل /opt/trbhh غير متتبَّعة في Git (إن وجدت)، بلا node_modules ومخرجات البناء.
 ( cd /opt/trbhh && git ls-files --others --exclude-standard -z | tar --null -T - -czf "$D/untracked-files.tar.gz" 2>/dev/null ) || true
-tar -C /etc -czf "$D/etc-trbhh.tar.gz" --exclude='trbhh/backup.key' trbhh
+tar -C /etc -czf "$D/etc-trbhh.tar.gz" --exclude='trbhh/backup.key' --exclude='trbhh/ci' trbhh
 ( cd "$D" && sha256sum -- * > SHA256SUMS )
 
 OUT="$WORK/trbhh-$STAMP.tar.gpg"

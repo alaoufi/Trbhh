@@ -8,6 +8,8 @@ on:
     branches: [claude/hostinger-vps-project-amw8vb]
   pull_request:
   workflow_dispatch:
+  # يستدعيه سير النشر (deploy-edge.yml): لا تُنشر حفظة فشلت في البوابة الأمنية.
+  workflow_call:
   schedule:
     - cron: '17 3 * * 1'
 

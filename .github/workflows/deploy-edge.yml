@@ -1,0 +1,64 @@
+# نشر «تربح» على الخادم المشترك 84.247.166.216 من GitHub: Actions ← «Deploy trbhh.sa» ← Run workflow
+# على فرع العمل. تُشغَّل فحوص CI والبوابة الأمنية نفسها أولاً؛ ثم يُطلب من الخادم نشر هذه الحفظة
+# بعينها، ويُتحقق أن التطبيق الحي يعرضها. مفتاح SSH لا يستطيع شيئاً آخر على الخادم
+# (deploy/edge-server/ci-command.sh، ويفعّله المالك بـ deploy/edge-server/ci-setup.sh).
+# الأسرار: TRBHH_DEPLOY_KEY (المفتاح الخاص) و TRBHH_HOST_KEY (سطر مفتاح الخادم العام).
+# يدوي فقط: لا يعمل عند push. (deploy.yml القديم يخص خادم Hostinger ولا علاقة له بهذا.)
+name: Deploy trbhh.sa
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_check:
+        description: 'فحص الموقع عبر البوابة (https://trbhh.sa على عنوان الخادم) — فعّله بعد دمج ملف البوابة وصدور الشهادة'
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-trbhh-edge
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
+    uses: ./.github/workflows/ci.yml
+
+  security:
+    if: github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
+    uses: ./.github/workflows/security.yml
+
+  deploy:
+    needs: [checks, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Deploy this commit on the server
+        env:
+          KEY: ${{ secrets.TRBHH_DEPLOY_KEY }}
+          HOST_KEY: ${{ secrets.TRBHH_HOST_KEY }}
+        run: |
+          if [ -z "$KEY" ] || [ -z "$HOST_KEY" ]; then echo "::error::Add the secrets TRBHH_DEPLOY_KEY and TRBHH_HOST_KEY"; exit 1; fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          run() { ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ServerAliveInterval=30 root@84.247.166.216 "$1"; }
+          run "deploy $GITHUB_SHA" | tail -n 40
+          # الخادم نفسه يؤكد أن التطبيق الحي يعرض هذه الحفظة.
+          status="$(run status)"; echo "$status"
+          rm -f ~/.ssh/deploy
+          grep -q "live: .*$GITHUB_SHA" <<< "$status" || { echo "::error::The server does not serve $GITHUB_SHA"; exit 1; }
+
+      - name: Check the site through the gateway
+        if: ${{ inputs.public_check }}
+        run: |
+          for i in $(seq 1 20); do
+            version="$(curl -fsS --max-time 10 --resolve trbhh.sa:443:84.247.166.216 https://trbhh.sa/api/version || true)"
+            home="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 --resolve trbhh.sa:443:84.247.166.216 https://trbhh.sa/ || true)"
+            echo "version: $version  home: $home"
+            if grep -q "$GITHUB_SHA" <<< "$version" && [ "$home" = 200 ]; then echo "Live: $version"; exit 0; fi
+            sleep 6
+          done
+          echo "::error::The gateway does not show $GITHUB_SHA with a healthy home page"; exit 1

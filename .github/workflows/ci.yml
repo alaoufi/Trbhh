@@ -4,6 +4,8 @@ on:
   push:
     branches: ['**']
   pull_request:
+  # يستدعيه سير النشر (deploy-edge.yml): لا تُنشر حفظة لم تجتز هذه الفحوص نفسها.
+  workflow_call:
 
 jobs:
   quality:

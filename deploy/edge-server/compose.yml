@@ -57,6 +57,8 @@ services:
       dockerfile: Dockerfile
       args:
         TRBHH_RELEASE_COMMIT: ${TRBHH_RELEASE_COMMIT:-development}
+    # صورة لكل حفظة: النشر يبني الجديدة والقديمة تخدم، والتراجع يعيد تشغيل السابقة بلا بناء.
+    image: trbhh-app:${TRBHH_RELEASE_COMMIT:-development}
     container_name: trbhh-app
     depends_on:
       db: { condition: service_healthy }

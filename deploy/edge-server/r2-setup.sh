@@ -17,12 +17,15 @@ remote="trbhh-$kind"
 
 # اللصق بالزر الأيمن في PowerShell قد يلصق القيمة مرتين: نكتشف التكرار ونأخذ نصفها.
 dedupe() { local v="${1//[[:space:]]/}" n="$2"; if [[ ${#v} -eq $((n*2)) && "${v:0:n}" == "${v:n}" ]]; then v="${v:0:n}"; fi; printf '%s' "$v"; }
-read -r -s -p 'Access Key ID: ' K; echo
+# Access Key ID ليس سراً وحده (هو رقم المفتاح)، فيظهر عند اللصق ليتأكد المالك مما لصقه. السر يبقى مخفياً.
+read -r -p 'Access Key ID: ' K
 read -r -s -p 'Secret Access Key: ' S; echo
 K="$(dedupe "$K" 32)"; S="$(dedupe "$S" 64)"
-echo "LEN key=${#K} secret=${#S}"
+echo "LEN key=${#K} secret=${#S} key_starts_with=${K:0:6}"
 [[ "$K" =~ ^[0-9a-f]{32}$ && "$S" =~ ^[0-9a-f]{64}$ ]] || { echo "R2_FAIL: الأطوال غير صحيحة (المطلوب 32 و64) — أعد الأمر والصق كل قيمة مرة واحدة" >&2; exit 1; }
 
+# إزالة أي إعداد سابق بهذا الاسم أولاً حتى لا تبقى قيم مفتاح قديم.
+rclone --config "$CONF" config delete "$remote" >/dev/null 2>&1 || true
 rclone --config "$CONF" config create "$remote" s3 provider Cloudflare access_key_id "$K" secret_access_key "$S" \
   endpoint "https://$acct.r2.cloudflarestorage.com" region auto acl private no_check_bucket true >/dev/null 2>&1
 chmod 600 "$CONF"
@@ -31,6 +34,7 @@ chmod 600 "$CONF"
 pub="$(curl -4 -s --max-time 10 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | sed -n 's/^ip=//p' || true)"
 if [[ "$pub" =~ ^[0-9.]+$ ]] && ip -4 -o addr 2>/dev/null | grep -qw "$pub"; then bind="$pub"; else bind=0.0.0.0; fi
 echo "$bind" > /etc/trbhh/rclone-bind
+grep -A12 "^\[$remote\]" "$CONF" | grep -q "access_key_id = $K" || { echo "R2_FAIL: لم يُحفظ المفتاح في الإعداد" >&2; exit 1; }
 if ! rclone --config "$CONF" --bind "$bind" size "$remote:$remote"; then
   echo "R2_FAIL: رُفض الاتصال — راجع صلاحية المفتاح والمخزن ومرشح العناوين (عنوان هذا الخادم: ${pub:-غير معروف})" >&2; exit 1
 fi

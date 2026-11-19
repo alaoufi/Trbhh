@@ -1,0 +1,23 @@
+# فحص قراءة فقط لمفتاح الرفع إلى Google Play: يعرض مسارات تطبيقَي «تربح» وإصداراتها ولا يغيّر
+# شيئاً في المتجر. المفتاح من السر PLAY_SERVICE_ACCOUNT_JSON ولا يُطبع.
+name: Google Play key check
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/hostinger-vps-project-amw8vb]
+    paths: ['android/play/**', '.github/workflows/play-check.yml']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: node android/play/check.cjs
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_PACKAGE: app.haftastore.com,com.trbhh.app

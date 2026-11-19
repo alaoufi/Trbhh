@@ -25,6 +25,9 @@ step "2/5 الإعلانات المنقولة فقط"
 # مرة واحدة فقط عند النقل: بعد فتح الموقع لا تُزال إعلانات الأعضاء بمرور الوقت.
 if [[ -f /srv/trbhh/prune-done ]]; then echo "أُزيلت سابقاً ($(cat /srv/trbhh/prune-done)) — تُتجاوز"
 else bash "$D/prune-ads.sh" apply --yes && date -u +%FT%TZ > /srv/trbhh/prune-done; fi
+# إعلان ناقص من المصدر (صورة أو فيديو غير موجود) لا يُنشر: يُزال، مرة واحدة عند النقل.
+if [[ -f /srv/trbhh/incomplete-done ]]; then echo "الناقصة أُزيلت سابقاً ($(cat /srv/trbhh/incomplete-done)) — تُتجاوز"
+else bash "$D/prune-ads.sh" incomplete-apply --yes && date -u +%FT%TZ > /srv/trbhh/incomplete-done; fi
 
 step "3/5 بناء التطبيق وتشغيله (عدة دقائق)"
 bash "$D/release.sh"

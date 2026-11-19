@@ -56,13 +56,17 @@ def links_and_media(body):
     text = body.decode('utf-8', 'replace')
     hrefs = {html.unescape(h) for h in re.findall(r'<a\b[^>]*\bhref="(/[^"#]*)', text)}
     media = set()
-    for src in re.findall(r'(?:src|poster)="([^"]+)"', text) + re.findall(r'srcSet="([^"]+)"', text):
-        for part in html.unescape(src).split(','):
-            u = part.strip().split(' ')[0]
-            if u.startswith('/_next/image?'):
-                q = urllib.parse.parse_qs(urllib.parse.urlsplit(u).query).get('url', [''])[0]
-                if q.startswith('/media/'): media.add(q)
-            elif u.startswith('/media/') and not re.search(r'\.woff2?$', u): media.add(u)
+    def add_media(u):
+        if u.startswith('/_next/image?'):
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(u).query).get('url', [''])[0]
+            if q.startswith('/media/'): media.add(q)
+        elif u.startswith('/media/') and not re.search(r'\.woff2?$', u): media.add(u)
+    # src/poster: القيمة كاملة رابط واحد (قد يحوي اسم الملف مسافات أو فواصل).
+    for src in re.findall(r'(?:src|poster)="([^"]+)"', text): add_media(html.unescape(src).strip())
+    # srcSet: قائمة «رابط عرض» مفصولة بفواصل؛ روابط next/image فيها مرمّزة فلا فواصل داخلها.
+    for srcset in re.findall(r'srcSet="([^"]+)"', text):
+        for part in html.unescape(srcset).split(', '):
+            add_media(part.strip().rsplit(' ', 1)[0])
     return {h for h in hrefs if not h.startswith('//') and not SKIP.match(h)}, media
 
 

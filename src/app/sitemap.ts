@@ -34,12 +34,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (const s of stores) entries.push({ url: `${base}/companies/${Number(s.id)}`, lastModified: s.updated_at ?? undefined, changeFrequency: 'weekly', priority: 0.7 });
 
     // منتجات المتاجر — كل منتج نشره تاجر داخل واجهة متجره المستقلة (/companies/{id}/p/{adId}).
-    const storeIds = stores.map((s) => Number(s.id));
+    // صفحة المنتج تظهر للعموم فقط إن كان اشتراك المتجر سارياً (أو ضمن المهلة) — نفس قاعدة
+    // الصفحة نفسها (store-product-access). كانت الخريطة تُدرج منتجات متاجر موقوفة فتقود
+    // محركات البحث إلى صفحات «غير موجود».
+    const [{ publicStoreWhere }, { getStoreSubPricing }] = await Promise.all([import('@/lib/store-subscription-access'), import('@/lib/settings')]);
+    const publicStores = await prisma.stores.findMany({ where: publicStoreWhere(await getStoreSubPricing()), select: { id: true } });
+    const storeIds = publicStores.map((s) => Number(s.id));
     if (storeIds.length) {
       const products = await prisma.store_products.findMany({ where: { store_id: { in: storeIds } }, select: { store_id: true, ad_id: true } });
       if (products.length) {
         const productAdIds = [...new Set(products.map((p) => p.ad_id))];
-        const productAds = await prisma.ads.findMany({ where: { id: { in: productAdIds.map((n) => BigInt(n)) }, status: 1, state: 'active' }, select: { id: true, updated_at: true } });
+        const now = new Date();
+        const productAds = await prisma.ads.findMany({
+          where: { id: { in: productAdIds.map((n) => BigInt(n)) }, status: 1, state: 'active', paused_by_owner: 0,
+            AND: [{ OR: [{ data_archive: null }, { data_archive: '' }] }, { OR: [{ publish_at: null }, { publish_at: { lte: now } }] }] },
+          select: { id: true, updated_at: true },
+        });
         const adInfo = new Map(productAds.map((a) => [Number(a.id), a.updated_at]));
         for (const p of products) {
           if (!adInfo.has(p.ad_id)) continue; // منتج غير منشور/محذوف

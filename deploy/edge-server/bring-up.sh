@@ -13,7 +13,7 @@ D=/opt/trbhh/deploy/edge-server
 . /etc/trbhh/db.env
 step() { echo; echo "=== $* ==="; }
 
-step "1/4 قاعدة البيانات والأسرار"
+step "1/5 قاعدة البيانات والأسرار"
 rm -rf /srv/trbhh/tmp/import.* # مؤقت الاستيراد (تفريغ وأسرار مفكوكة) لا يبقى على القرص
 tables=0
 if docker inspect trbhh-db >/dev/null 2>&1; then
@@ -21,15 +21,18 @@ if docker inspect trbhh-db >/dev/null 2>&1; then
 fi
 if [[ "$tables" -gt 0 ]]; then echo "القاعدة مستوردة سابقاً ($tables جدولاً) — تُتجاوز"; else bash "$D/migrate.sh" import; fi
 
-step "2/4 الإعلانات المنقولة فقط"
+step "2/5 الإعلانات المنقولة فقط"
 # مرة واحدة فقط عند النقل: بعد فتح الموقع لا تُزال إعلانات الأعضاء بمرور الوقت.
 if [[ -f /srv/trbhh/prune-done ]]; then echo "أُزيلت سابقاً ($(cat /srv/trbhh/prune-done)) — تُتجاوز"
 else bash "$D/prune-ads.sh" apply --yes && date -u +%FT%TZ > /srv/trbhh/prune-done; fi
 
-step "3/4 بناء التطبيق وتشغيله (عدة دقائق)"
+step "3/5 بناء التطبيق وتشغيله (عدة دقائق)"
 bash "$D/release.sh"
 
-step "4/4 الفحص الذاتي"
+step "4/5 الفحص الذاتي"
 bash "$D/selftest.sh"
+
+step "5/5 مقارنة القديم (الحي) بالجديد إعلاناً إعلاناً"
+python3 "$D/compare.py" || echo "(الموقع يعمل؛ راجع الفروقات أعلاه قبل DNS)"
 echo
 echo "BRING_UP_OK"

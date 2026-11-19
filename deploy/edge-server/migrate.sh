@@ -25,7 +25,11 @@ init() {
 }
 
 import() {
-  local replace="${1:-}" WORK; WORK="$(mktemp -d /srv/trbhh/tmp/import.XXXXXX)"; trap 'rm -rf "$WORK"' EXIT
+  local replace="${1:-}"
+  # WORK عامّ لا محلي: التنظيف يجري عند خروج السكربت بعد انتهاء الدالة. ويُزال أي مؤقت سابق
+  # (فيه تفريغ القاعدة وملف الأسرار مفكوكين) تُرك من تشغيل لم يُنظَّف.
+  rm -rf /srv/trbhh/tmp/import.*
+  WORK="$(mktemp -d /srv/trbhh/tmp/import.XXXXXX)"; trap 'rm -rf "$WORK"' EXIT
   "${RC[@]}" copyto "$REMOTE/_migration/export.tar.enc" "$WORK/export.tar.enc"
   "${RC[@]}" copyto "$REMOTE/_migration/export.key.enc" "$WORK/export.key.enc"
   openssl pkeyutl -decrypt -inkey "$KEY" -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -in "$WORK/export.key.enc" -out "$WORK/keyblob"

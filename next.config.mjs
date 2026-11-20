@@ -21,6 +21,13 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
         ],
       },
+      // صور public/ الثابتة: أسماؤها غير مرقّمة بإصدار، فيوم واحد في المتصفح وأسبوع مع إعادة تحقق في الخلفية.
+      {
+        source: '/:file(logo-header.*|payment-card-symbolic\\.webp|icon-.*\\.png|apple-icon\\.png|placeholder-ad\\.svg)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' },
+        ],
+      },
       {
         source: '/:path*',
         headers: [

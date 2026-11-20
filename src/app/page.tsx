@@ -62,13 +62,36 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string; category?: string | string[] }> }) {
   const sp = (await searchParams) || {};
   const nationalDayActive = isNationalDayCampaignActive();
-  const categoryConfig = await getCategoryFormConfig().catch(() => null);
+  // استعلامات مستقلة تُطلَق معاً بدل التسلسل (كل انتظار متتابع جولة إضافية لقاعدة البيانات).
+  const [categoryConfig, maxPerSeller, session, ck] = await Promise.all([
+    getCategoryFormConfig().catch(() => null),
+    // تنويع التغذية: حدّ أقصى لإعلانات المعلن الواحد (0 = بلا تنويع) — يُطبَّق داخل الجلب ليُكمَل من معلنين آخرين.
+    getSettingNum('home_max_per_seller', 3).catch(() => 3),
+    getSession().catch(() => null),
+    cookies(),
+  ]);
   const selectedCategory = selectedHomeCategory(categoryConfig, sp.category);
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
-  // تنويع التغذية: حدّ أقصى لإعلانات المعلن الواحد (0 = بلا تنويع) — يُطبَّق داخل الجلب ليُكمَل من معلنين آخرين.
-  const maxPerSeller = await getSettingNum('home_max_per_seller', 3).catch(() => 3);
-  const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
+  // اهتمام الزائر/العضو يُستنتَج بدلالة المحتوى الفعلي الذي تصفّحه وبحث عنه
+  // (كلمات عناوين الإعلانات والمتاجر التي زارها + بحثه المحفوظ). يعمل للزوّار
+  // أيضاً عبر معرّف زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
+  const vid = ck.get('trbhh_vid')?.value;
+  const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
+  const design = ck.get('design')?.value || '';
+  // التقييم للمسجّلين فقط: نتحقق من تقييم العضو بمفتاحه (u{id})، لا الزائر — ونجلب تقييمه الحالي للتعديل
+  const myViewerKey = session ? `u${session.uid}` : null;
+  // تقييم المنصة بالنجوم — قابل للإخفاء من التحكم ← الإعدادات
+  const platformRatingP = getSettingBool('platform_rating_on', true).catch(() => true).then(async (on) => on
+    ? [on, await getPlatformRating().catch(() => ({ avg: 0, count: 0 })), await getMyPlatformReview(myViewerKey).catch(() => null)] as const
+    : [on, { avg: 0, count: 0 }, null] as const);
+  const [
+    featured, latest, mostViewed, topRated, stats, homeStats, clsText,
+    personalizedAds, storeAds, compactStripSetting, denseFeed, stripMotion, compactStripTitle, compactStripHint,
+    feedTexts, homeActionsOn, storeCardsRaw, myStore, welcomeCredit, guestWelcomeText, welcomePopupSeconds,
+    [platformRatingOn, platformRating, myReview],
+    discoveryOn, discoveryTitle, discoverySubtitle, discoveryPlaceholder, discoveryAddLabel, priceOn, cities, areas,
+  ] = await Promise.all([
     selectedCategory ? Promise.resolve([]) : getFeaturedAds(8),
     selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(20, maxPerSeller),
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
@@ -76,66 +99,23 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'adsTotal', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
-  ]);
-  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
-    { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
-    { key: 'adsTotal', icon: Megaphone, value: stats.adsTotal, label: 'إجمالي الإعلانات' },
-    { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
-    { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
-  ].filter((s) => homeStats.has(s.key));
-
-  const session = await getSession().catch(() => null);
-  // اهتمام الزائر/العضو يُستنتَج بدلالة المحتوى الفعلي الذي تصفّحه وبحث عنه
-  // (كلمات عناوين الإعلانات والمتاجر التي زارها + بحثه المحفوظ). يعمل للزوّار
-  // أيضاً عبر معرّف زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
-  const vid = (await cookies()).get('trbhh_vid')?.value;
-  const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
-  const personalizedAds = selectedCategory ? [] : await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
-  const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
-  // تنويع التغذية: حدّ أقصى لعدد إعلانات المعلن الواحد في الرئيسية (قابل للضبط من الإعدادات،
-  // 0 = بلا تنويع) فلا يحتكر من يملك مئات الإعلانات الصفوف الأولى ويظهر تنوّع المعلنين.
-  const feedAds = fairFeed(selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated), maxPerSeller);
-  const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
-  // تنويع الرئيسية: تغذية مضغوطة أكثف + شريط إعلانات صغيرة بين البطاقات — كلها قابلة
-  // للتحكم والتراجع من الإعدادات (الافتراضي مفعّل)، ولا تؤثر على تكامل CJ/التجارة.
-  const design = (await cookies()).get('design')?.value || '';
-  const compactStripOn = !selectedCategory && !['shop', 'list'].includes(design) && await getSettingBool('home_compact_strip_on', true).catch(() => false);
-  const [denseFeed, stripMotion] = await Promise.all([
+    selectedCategory ? Promise.resolve([]) : getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []),
+    selectedCategory ? Promise.resolve([]) : homeFeaturedAds().catch(() => []),
+    getSettingBool('home_compact_strip_on', true).catch(() => false),
     getSettingBool('home_dense_feed_on', true).catch(() => true),
     getSettingBool('home_strip_motion_on', true).catch(() => true),
-  ]);
-  // الشريط «لمحة من السوق» يُغذّى من مجموعة مستقلة (الأكثر مشاهدة/تقييماً/مميّزة)
-  // كي يبقى ممتلئاً دائماً دون أن يستهلك تغذية الشبكات. التخطيط المطلوب:
-  //   صفّ «اكتشف السوق» فوق الشريط  →  شريط «لمحة من السوق»  →  عدّة صفوف تحته.
-  const stripAds = selectedCategory ? [] : mergeHomeAds(mostViewed, topRated, featured, latest).slice(0, 16);
-  // شبكات السوق تُقصّ إلى صفوف كاملة فلا يبقى فراغ في آخر صفّ (الإعلانات كثيرة والباقي في «عرض الكل»).
-  const feedBefore = fullRows(selectedCategory ? feedAds : feedAds.slice(0, 8));
-  const feedAfter = selectedCategory ? [] : fullRows(feedAds.slice(8));
-  const [compactStripTitle, compactStripHint] = await Promise.all([
     getSetting('home_compact_strip_title', 'لمحة من السوق'),
     getSetting('home_compact_strip_hint', 'تصفّح المزيد بالسحب أو التمرير'),
-  ]);
-  const feedTexts = await getFeedBannerItems().catch(() => []);
-  // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
-  const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
-  const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
-  const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
-  const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
-  // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
-  const welcomeCredit = session ? 0 : await import('@/lib/points').then((m) => m.getWelcomeCredit()).catch(() => 0);
-  const [guestWelcomeText, welcomePopupSeconds] = await Promise.all([
+    getFeedBannerItems().catch(() => []),
+    // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
+    getSettingBool('home_actions_on', true).catch(() => true),
+    homeStoreCards().catch(() => []),
+    session ? storeIdOfUser(session.uid).catch(() => 0) : Promise.resolve(0),
+    // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
+    session ? Promise.resolve(0) : import('@/lib/points').then((m) => m.getWelcomeCredit()).catch(() => 0),
     getSetting(SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT),
     getWelcomePopupSeconds(),
-  ]);
-  // تقييم المنصة بالنجوم — قابل للإخفاء من التحكم ← الإعدادات
-  const platformRatingOn = await getSettingBool('platform_rating_on', true).catch(() => true);
-  // التقييم للمسجّلين فقط: نتحقق من تقييم العضو بمفتاحه (u{id})، لا الزائر — ونجلب تقييمه الحالي للتعديل
-  const myViewerKey = session ? `u${session.uid}` : null;
-  const [platformRating, myReview] = platformRatingOn
-    ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), getMyPlatformReview(myViewerKey).catch(() => null)])
-    : [{ avg: 0, count: 0 }, null];
-  const platformRated = !!myReview;
-  const [discoveryOn, discoveryTitle, discoverySubtitle, discoveryPlaceholder, discoveryAddLabel, priceOn, cities, areas] = await Promise.all([
+    platformRatingP,
     getSettingBool('home_discovery_on', true),
     getSetting('home_discovery_title', 'تربح — إعلانات ومتاجر قريبة منك'),
     getSetting('home_discovery_subtitle', 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.'),
@@ -144,6 +124,30 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     getSettingBool('search_price_filter_on', true),
     getCities(), getAreas(),
   ]);
+  const storeCards = storeCardsRaw as StoreCardData[];
+  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
+    { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
+    { key: 'adsTotal', icon: Megaphone, value: stats.adsTotal, label: 'إجمالي الإعلانات' },
+    { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
+    { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
+  ].filter((s) => homeStats.has(s.key));
+
+  // تنويع التغذية: حدّ أقصى لعدد إعلانات المعلن الواحد في الرئيسية (قابل للضبط من الإعدادات،
+  // 0 = بلا تنويع) فلا يحتكر من يملك مئات الإعلانات الصفوف الأولى ويظهر تنوّع المعلنين.
+  const feedAds = fairFeed(selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated), maxPerSeller);
+  const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
+  // تنويع الرئيسية: تغذية مضغوطة أكثف + شريط إعلانات صغيرة بين البطاقات — كلها قابلة
+  // للتحكم والتراجع من الإعدادات (الافتراضي مفعّل)، ولا تؤثر على تكامل CJ/التجارة.
+  const compactStripOn = !selectedCategory && !['shop', 'list'].includes(design) && compactStripSetting;
+  // الشريط «لمحة من السوق» يُغذّى من مجموعة مستقلة (الأكثر مشاهدة/تقييماً/مميّزة)
+  // كي يبقى ممتلئاً دائماً دون أن يستهلك تغذية الشبكات. التخطيط المطلوب:
+  //   صفّ «اكتشف السوق» فوق الشريط  →  شريط «لمحة من السوق»  →  عدّة صفوف تحته.
+  const stripAds = selectedCategory ? [] : mergeHomeAds(mostViewed, topRated, featured, latest).slice(0, 16);
+  // شبكات السوق تُقصّ إلى صفوف كاملة فلا يبقى فراغ في آخر صفّ (الإعلانات كثيرة والباقي في «عرض الكل»).
+  const feedBefore = fullRows(selectedCategory ? feedAds : feedAds.slice(0, 8));
+  const feedAfter = selectedCategory ? [] : fullRows(feedAds.slice(8));
+  const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
+  const platformRated = !!myReview;
   const marketplaceHeroSlides = publicHomeHero(
     feedAds,
     discoveryTitle === 'تربح — إعلانات ومتاجر قريبة منك' ? 'بيع. اشترِ. وتربح.' : discoveryTitle,

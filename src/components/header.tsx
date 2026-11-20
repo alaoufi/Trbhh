@@ -73,7 +73,7 @@ export async function Header() {
             تعليق remotePatterns) — نفس فئة العطل هنا (شعار يظهر ثم يختفي فوراً). صورة
             محلية صغيرة من public/ لا تحتاج تحسيناً خادمياً أصلاً. */}
         <Link href="/" className="shrink-0">
-          <img src="/logo-header.png" alt="تربح" width={256} height={256} className="h-11 w-11 rounded-xl object-cover" />
+          <img src="/logo-header-132.webp" alt="تربح" width={132} height={132} className="h-11 w-11 rounded-xl object-cover" />
         </Link>
       </div>
     </header>

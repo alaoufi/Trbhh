@@ -87,5 +87,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|media|favicon.ico|manifest.webmanifest|sw.js|icon|apple-icon|placeholder).*)'],
+  // صور ‎public/‎ الثابتة (الشعار وغيره) مستثناة بامتدادها: لو مرّت من هنا لأخذت no-store
+  // وأُعيد تنزيلها في كل صفحة.
+  matcher: ['/((?!_next/static|_next/image|media|favicon.ico|manifest.webmanifest|sw.js|icon|apple-icon|placeholder|.*\\.(?:png|webp|jpg|jpeg|svg|ico)$).*)'],
 };

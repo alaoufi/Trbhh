@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 import { randomUUID } from 'node:crypto';
+import { cookies } from 'next/headers';
 import { destroySession, getSession } from '@/lib/auth';
+import { deleteApnsDevice } from '@/lib/apns';
+import { APNS_COOKIE } from '@/lib/apns-cookie';
 
 /**
  * A prefetch/preload must NEVER log the user out. Browsers and Next.js may
@@ -24,6 +27,12 @@ async function signOut(): Promise<void> {
     const { prisma } = await import('@/lib/prisma');
     await prisma.users.update({ where: { id: BigInt(session.uid) }, data: { auth_session_version: randomUUID() } }).catch(() => {});
   }
+  // جهاز iPhone يُفصل عن الحساب عند الخروج، فلا تصله إشعارات حساب خرج منه صاحبه.
+  try {
+    const jar = await cookies();
+    const token = jar.get(APNS_COOKIE)?.value || '';
+    if (token) { await deleteApnsDevice(token); jar.delete(APNS_COOKIE); }
+  } catch { /* لا يُفشل الخروج */ }
   await destroySession();
 }
 

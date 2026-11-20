@@ -2110,6 +2110,17 @@ model push_subs {
   @@index([endpoint(length: 191)], map: "push_subs_endpoint")
 }
 
+model apns_devices {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt    @db.UnsignedBigInt
+  token      String    @unique(map: "apns_devices_token") @db.VarChar(200)
+  sandbox    Int       @default(0) @db.TinyInt
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([user_id], map: "apns_devices_user")
+}
+
 model saved_searches {
   id          BigInt    @id @default(autoincrement())
   user_id     BigInt    @db.UnsignedBigInt

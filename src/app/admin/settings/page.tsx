@@ -1,3 +1,4 @@
+import { apnsConfigured } from '@/lib/apns';
 import { AccessPage } from '@/components/access-boundary';
 import { AccessBoundary } from '@/components/access-boundary';
 import { requireAdminPage } from '@/lib/access-control/guards';
@@ -32,6 +33,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
   await requireAdminPage('/admin/settings');
   const auditUx = await getAuditUxSettings();
   const [{ saved, error: saveError }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, archiveAutodeleteOn, platformRatingOn, adLifetimeDays, strikeBanDays, maxProfiles, identityPlans, identityExemptDays, maxStores, scheduleMaxDays, storeShieldOn, adReviewsOn, requestsMarketOn, guideBookOn, homeMaxPerSeller] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('archive_autodelete_on', false), getSettingBool('platform_rating_on', true), getAdLifetimeDays(), getStrikeBanDays(), getSettingNum('max_profiles', 5), getIdentityPlans(), getExemptDays(), getSettingNum('max_stores', 3), getSettingNum('schedule_max_days', 30), getStoreShield(), getSettingBool('ad_reviews_on', true), getSettingBool('requests_market_on', true), getSettingBool('guide_book_enabled', true), getSettingNum('home_max_per_seller', 3)]);
+  const apnsReady = apnsConfigured();
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -134,7 +136,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <div className="space-y-2">
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="pushOn" defaultChecked={pushOn} className="mt-0.5 h-4 w-4 accent-primary" />
-              <span><b>التنبيهات الفورية (Push)</b> — تصل الأعضاء على أجهزتهم فور وصول رسالة أو قرار توثيق/شحن. عند التفعيل تظهر بطاقة «التنبيهات الفورية» في لوحة كل عضو ليفعّلها على جهازه.</span>
+              <span><b>التنبيهات الفورية (Push)</b> — تصل الأعضاء على أجهزتهم فور وصول رسالة أو قرار توثيق/شحن. عند التفعيل تظهر بطاقة «التنبيهات الفورية» في لوحة كل عضو ليفعّلها على جهازه. تشمل المتصفح وتطبيق iPhone (تصل والتطبيق مغلق){apnsReady ? '' : ' — إشعارات iPhone تنتظر ضبط مفتاح Apple على الخادم'}.</span>
             </label>
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="searchSuggestOn" defaultChecked={suggestOn} className="mt-0.5 h-4 w-4 accent-primary" />

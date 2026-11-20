@@ -11,6 +11,7 @@ import { PwaRegister } from '@/components/pwa-register';
 import { releaseVersion } from '@/lib/release-version';
 import { GeoPrompt } from '@/components/geo-prompt';
 import { ForceUpdateGate } from '@/components/force-update-gate';
+import { IosPushBridge } from '@/components/ios-push-bridge';
 import { InstallPrompt } from '@/components/install-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
@@ -155,6 +156,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
         <GeoPrompt />
         <ForceUpdateGate />
+        <IosPushBridge signedIn={!!session} />
         <InstallPrompt />
         <PwaRegister version={release} />
         {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — شارة عائمة تُثبَّت أسفل يسار

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Bell, BellOff, BellRing } from 'lucide-react';
+import { askIosPush, iosPushHandler, registerIosPush, IOS_PUSH_OFF_KEY } from './ios-push-bridge';
 
 function b64ToU8(b64: string) {
   const pad = '='.repeat((4 - (b64.length % 4)) % 4);
@@ -13,10 +14,19 @@ export function PushToggle() {
   const [state, setState] = useState<'hidden' | 'off' | 'on' | 'busy' | 'denied'>('hidden');
   const [key, setKey] = useState('');
   const [test, setTest] = useState('');
+  // داخل تطبيق iPhone: الإشعارات عبر Apple لا عبر المتصفح.
+  const [native, setNative] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
+        if (iosPushHandler()) {
+          const r = await fetch('/api/push').then((x) => x.json()).catch(() => null);
+          if (!r?.enabled || !r.ios) return;
+          setNative(true);
+          setState(r.iosSubscribed ? 'on' : 'off');
+          return;
+        }
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
         const r = await fetch('/api/push').then((x) => x.json()).catch(() => null);
         if (!r?.enabled) return;
@@ -31,6 +41,14 @@ export function PushToggle() {
 
   async function enable() {
     setState('busy');
+    if (native) {
+      const reply = await askIosPush('register');
+      if (reply && !reply.granted) { setState('denied'); return; }
+      const ok = reply ? await registerIosPush(reply) : false;
+      if (ok) { try { localStorage.removeItem(IOS_PUSH_OFF_KEY); } catch { /* التخزين غير متاح */ } }
+      setState(ok ? 'on' : 'off');
+      return;
+    }
     try {
       const perm = await Notification.requestPermission();
       if (perm !== 'granted') { setState(perm === 'denied' ? 'denied' : 'off'); return; }
@@ -57,6 +75,12 @@ export function PushToggle() {
 
   async function disable() {
     setState('busy');
+    if (native) {
+      await fetch('/api/push/apns', { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+      try { localStorage.setItem(IOS_PUSH_OFF_KEY, '1'); } catch { /* التخزين غير متاح */ }
+      setState('off');
+      return;
+    }
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
@@ -80,7 +104,7 @@ export function PushToggle() {
           {state === 'on' && 'مفعّلة على هذا الجهاز — تصلك الرسائل والتحديثات فور حدوثها.'}
           {state === 'off' && 'فعّلها ليصلك تنبيه فوري بالرسائل الجديدة وقرارات التوثيق والشحن.'}
           {state === 'busy' && 'لحظة…'}
-          {state === 'denied' && 'التنبيهات محظورة من إعدادات المتصفح لهذا الموقع — اسمح بها ثم أعد المحاولة.'}
+          {state === 'denied' && (native ? 'الإشعارات مغلقة لتطبيق تربح — افتح إعدادات الآيفون ← الإشعارات ← تربح واسمح بها، ثم أعد المحاولة.' : 'التنبيهات محظورة من إعدادات المتصفح لهذا الموقع — اسمح بها ثم أعد المحاولة.')}
         </div>
       </div>
       {state === 'on' ? (

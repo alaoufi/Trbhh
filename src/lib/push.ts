@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { getSetting, getSettingBool, setSetting } from './settings';
+import { sendApnsToUser } from './apns';
 
 const ensure = ensureSchema;
 
@@ -62,6 +63,15 @@ export async function hasPushSub(userId: number): Promise<boolean> {
 export async function sendTestPush(userId: number): Promise<{ enabled: boolean; subs: number; sent: number; failed: number; error?: string }> {
   const enabled = await pushEnabled();
   if (!enabled) return { enabled: false, subs: 0, sent: 0, failed: 0 };
+  const [web, ios] = await Promise.all([
+    sendTestWebPush(userId),
+    sendApnsToUser(userId, { title: 'تجربة تنبيه ✓', body: 'التنبيهات الفورية تعمل على هذا الجهاز.', url: '/notifications' }),
+  ]);
+  const error = web.error || ios.error;
+  return { enabled: true, subs: web.subs + ios.devices, sent: web.sent + ios.sent, failed: web.failed + ios.failed, ...(error ? { error } : {}) };
+}
+
+async function sendTestWebPush(userId: number): Promise<{ enabled: boolean; subs: number; sent: number; failed: number; error?: string }> {
   await ensure();
   const subs = await prisma.push_subs.findMany({ where: { user_id: BigInt(userId) }, take: 8 }).catch(() => []);
   if (!subs.length) return { enabled: true, subs: 0, sent: 0, failed: 0 };
@@ -91,6 +101,8 @@ export async function sendTestPush(userId: number): Promise<{ enabled: boolean; 
 export async function sendPushToUser(userId: number, payload: { title: string; body: string; url?: string }): Promise<void> {
   try {
     if (!(await pushEnabled())) return;
+    // تطبيق iPhone: يُرسل بالتوازي مع المتصفح ولا يُنتظر، ولا يرمي.
+    void sendApnsToUser(userId, payload);
     await ensure();
     const subs = await prisma.push_subs.findMany({ where: { user_id: BigInt(userId) }, take: 8 }).catch(() => []);
     if (!subs.length) return;

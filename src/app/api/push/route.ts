@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { cookies } from 'next/headers';
+import { apnsConfigured, hasApnsDevice } from '@/lib/apns';
+import { APNS_COOKIE } from '@/lib/apns-cookie';
 import { pushEnabled, getPushPublicKey, savePushSub, deletePushSub, hasPushSub } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +16,11 @@ export async function GET() {
     getPushPublicKey(),
     session ? hasPushSub(session.uid) : Promise.resolve(false),
   ]);
-  return NextResponse.json({ enabled: true, key, subscribed });
+  // تطبيق iPhone: هل هذا الجهاز (المعروف بملف ارتباطه) مسجّل لهذا العضو، وهل الخادم مضبوط بمفتاح Apple.
+  const iosToken = (await cookies()).get(APNS_COOKIE)?.value || '';
+  const ios = apnsConfigured();
+  const iosSubscribed = ios && session && iosToken ? await hasApnsDevice(session.uid, iosToken) : false;
+  return NextResponse.json({ enabled: true, key, subscribed, ios, iosSubscribed });
 }
 
 /** حفظ اشتراك الجهاز الحالي (للأعضاء). */

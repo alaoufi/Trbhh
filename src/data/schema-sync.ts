@@ -518,6 +518,17 @@ const STATEMENTS: string[] = [
     INDEX push_subs_user (user_id),
     INDEX push_subs_endpoint (endpoint(191))
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* أجهزة تطبيق iPhone (رمز APNs لكل جهاز) — الجهاز الواحد لعضو واحد: آخر من سجّل الدخول عليه. */
+  `CREATE TABLE IF NOT EXISTS apns_devices (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    token VARCHAR(200) NOT NULL,
+    sandbox TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY apns_devices_token (token),
+    INDEX apns_devices_user (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* saved searches — member gets notified when a matching ad is published. */
   `CREATE TABLE IF NOT EXISTS saved_searches (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

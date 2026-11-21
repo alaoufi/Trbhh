@@ -4,7 +4,7 @@
 set -euo pipefail
 BASE=http://127.0.0.1:8101
 H=(-H 'Host: trbhh.sa' -H 'X-Forwarded-Proto: https')
-ms() { curl -s -o /dev/null --max-time 30 "${H[@]}" -w '%{http_code} %{time_starttransfer} %{size_download}' "$BASE$1"; }
+ms() { curl -s -o /dev/null --max-time 30 "${H[@]}" -w '%{http_code} %{time_starttransfer} %{size_download}\n' "$BASE$1" || echo '000 0 0'; }
 ad="$(curl -s --max-time 30 "${H[@]}" "$BASE/" | grep -oE '/ads/[0-9]+' | head -n1 || true)"
 img="$(curl -s --max-time 30 "${H[@]}" "$BASE/" | grep -oE '/media/[^"&? ]+\.(jpg|jpeg|png|webp)' | head -n1 || true)"
 slow=0

@@ -12,6 +12,7 @@ import { releaseVersion } from '@/lib/release-version';
 import { GeoPrompt } from '@/components/geo-prompt';
 import { ForceUpdateGate } from '@/components/force-update-gate';
 import { IosPushBridge } from '@/components/ios-push-bridge';
+import { cleanDomainVerification } from '@/lib/domain-verification';
 import { InstallPrompt } from '@/components/install-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
@@ -29,10 +30,12 @@ const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', di
 
 // عنوان ووصف مشاركة الموقع قابلان للتعديل من الإدارة ← النصوص ← عام
 export async function generateMetadata(): Promise<Metadata> {
-  const [shareTitle, shareDesc] = await Promise.all([
+  const [shareTitle, shareDesc, domainVerification] = await Promise.all([
     import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`)),
     import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_DESC, SITE.description)),
-  ]).catch(() => [`${SITE.name} | ${SITE.tagline}`, SITE.description]);
+    // رمز إثبات ملكية النطاق (المركز السعودي للأعمال) — من الإدارة ← الإعدادات. فارغ = لا وسم.
+    import('@/lib/settings').then((m) => m.getSetting(m.SETTING_DOMAIN_VERIFICATION, '')).then((v) => cleanDomainVerification(v)),
+  ]).catch(() => [`${SITE.name} | ${SITE.tagline}`, SITE.description, '']);
   return {
     metadataBase: new URL(primaryOrigin),
     alternates: { canonical: '/' },
@@ -51,6 +54,7 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
     icons: { icon: '/icon-192.png?v=3', apple: '/apple-icon.png?v=3' },
+    ...(domainVerification ? { other: { 'domain-verification': domainVerification } } : {}),
   };
 }
 

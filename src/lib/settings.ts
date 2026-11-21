@@ -875,3 +875,6 @@ export async function getAuditUxSettings() {
   const texts = Object.fromEntries(await Promise.all(AUDIT_UX_TEXTS.map(async ([key, , fallback]) => [key, await getSetting(key, fallback)] as const)));
   return { flags, texts };
 }
+
+/** رمز إثبات ملكية النطاق لدى المركز السعودي للأعمال — يظهر وسماً في <head> كل الصفحات. */
+export const SETTING_DOMAIN_VERIFICATION = 'domain_verification_code';

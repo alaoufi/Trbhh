@@ -1,4 +1,6 @@
 'use server';
+import { cleanDomainVerification } from '@/lib/domain-verification';
+import { SETTING_DOMAIN_VERIFICATION } from '@/lib/settings';
 import { AUDIT_UX_FLAGS, AUDIT_UX_TEXTS } from '@/lib/ux-settings';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
@@ -809,6 +811,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('platform_rating_on', formData.get('platformRatingOn') !== null ? '1' : '0');
   await setSetting('guide_book_enabled', formData.get('guideBookOn') !== null ? '1' : '0');
   await setSetting('push_on', formData.get('pushOn') !== null ? '1' : '0');
+  if (formData.has('domainVerification')) await setSetting(SETTING_DOMAIN_VERIFICATION, cleanDomainVerification(String(formData.get('domainVerification') || '')));
   await setSetting('search_suggest_on', formData.get('searchSuggestOn') !== null ? '1' : '0');
   await setSetting('saved_search_on', formData.get('savedSearchOn') !== null ? '1' : '0');
   await setSetting('match_notify_on', formData.get('matchNotifyOn') !== null ? '1' : '0');
